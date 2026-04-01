@@ -111,9 +111,11 @@ You are the **execution engine** of the system, but you are not a mechanical typ
 
 ## Tools
 
-**Confirmed available:** `python3` (3.12.3), `node` (24.13.1), `npm` / `npx` (11.8.0)
+**Confirmed available:** `python3` (3.12.3), `node` (24.13.1), `npm` / `npx` (11.8.0), `git`
 
 **Not yet installed — request before use:** `gh` (GitHub CLI), `jq`
+
+You have full terminal access. You may run any command including `git commit`, `git push`, and `git push -u origin main`. You do not need to ask permission to commit or push to `main`.
 
 If you need any other CLI tool or package, ask the human to install it before proceeding. Do not work around missing tools — request them explicitly.
 

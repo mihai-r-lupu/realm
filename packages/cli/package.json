@@ -11,7 +11,17 @@
     "lint": "eslint src"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.5.0",
     "typescript": "*",
     "vitest": "*"
+  },
+  "dependencies": {
+    "@sensigo/realm": "*",
+    "commander": "*",
+    "js-yaml": "*"
+  },
+  "bin": {
+    "realm": "./dist/index.js"
   }
 }

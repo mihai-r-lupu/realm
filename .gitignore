@@ -48,5 +48,6 @@ coverage/
 
 # Misc
 .cache/
+.turbo/
 tmp/
 temp/
