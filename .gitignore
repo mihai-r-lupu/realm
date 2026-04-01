@@ -1,6 +1,10 @@
 # Private/local documents (not for public repo)
 .private/
 
+# Agent prompts and reports (local workflow artifacts)
+prompts/
+reports/
+
 # Dependencies
 node_modules/
 .pnp
