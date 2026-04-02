@@ -4,6 +4,8 @@ import { Command } from 'commander';
 import { validateCommand } from './commands/validate.js';
 import { registerCommand } from './commands/register.js';
 import { runCommand } from './commands/run.js';
+import { resumeCommand } from './commands/resume.js';
+import { cleanupCommand } from './commands/cleanup.js';
 
 const program = new Command();
 
@@ -15,5 +17,7 @@ program
 program.addCommand(validateCommand);
 program.addCommand(registerCommand);
 program.addCommand(runCommand);
+program.addCommand(resumeCommand);
+program.addCommand(cleanupCommand);
 
 program.parse();

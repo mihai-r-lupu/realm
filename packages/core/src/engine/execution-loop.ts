@@ -1,13 +1,15 @@
 // Central execution loop — orchestrates state guard, dispatcher, evidence capture,
 // run state update, and ResponseEnvelope construction.
-import type { RunRecord } from '../types/run-record.js';
+// Includes: pending state transitions, step-level retry, step timeouts.
+import type { RunRecord, EvidenceSnapshot } from '../types/run-record.js';
 import type { ResponseEnvelope, NextAction } from '../types/response-envelope.js';
 import { WorkflowError } from '../types/workflow-error.js';
-import type { WorkflowDefinition } from '../types/workflow-definition.js';
+import type { WorkflowDefinition, RetryConfig } from '../types/workflow-definition.js';
 import type { RunStore } from '../store/store-interface.js';
 import type { StateGuard } from './state-guard.js';
 import { captureEvidence } from '../evidence/snapshot.js';
 import { validateInputSchema } from '../validation/input-schema.js';
+import { TERMINAL_STATES, isTerminalState } from './lifecycle.js';
 
 export type StepDispatcher = (
   stepName: string,
@@ -24,7 +26,46 @@ export interface ExecuteStepOptions {
   dispatcher: StepDispatcher;
 }
 
-const TERMINAL_STATES = new Set(['completed', 'cancelled', 'failed', 'abandoned']);
+function delayMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Wraps a promise with a timeout. If the timeout fires first, rejects with STEP_TIMEOUT.
+ * NOTE: if timeout fires, the original promise continues running in the background
+ * (Promises cannot be cancelled in JavaScript). This is acceptable for Phase 1.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, stepName: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new WorkflowError(`Step '${stepName}' timed out after ${ms}ms`, {
+            code: 'STEP_TIMEOUT',
+            category: 'ENGINE',
+            agentAction: 'report_to_user',
+            retryable: false,
+            details: { stepName, timeout_ms: ms },
+          }),
+        ),
+      ms,
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/** Computes the delay (ms) before a retry attempt based on the configured backoff strategy. */
+function computeBackoff(config: RetryConfig, attemptNum: number): number {
+  switch (config.backoff) {
+    case 'fixed':
+      return config.base_delay_ms;
+    case 'linear':
+      return config.base_delay_ms * attemptNum;
+    case 'exponential':
+      return config.base_delay_ms * Math.pow(2, attemptNum - 1);
+  }
+}
 
 function findNextAction(
   newState: string,
@@ -130,49 +171,137 @@ export async function executeStep(
     }
   }
 
-  // Step 4: Execute dispatcher
-  const startedAt = new Date();
-  let output: Record<string, unknown>;
-  let dispatchError: WorkflowError | null = null;
-
+  // Step 3c: Transition run to pending state.
+  // This prevents concurrent callers from executing the same step simultaneously:
+  // the first caller's store.update increments the version, causing any concurrent
+  // caller (who holds the old snapshotId) to fail at step 2 (snapshot mismatch).
+  let pendingRun: RunRecord;
   try {
-    output = await options.dispatcher(options.command, options.input, run);
+    pendingRun = await store.update({ ...run, state: `${options.command}_pending` });
   } catch (err) {
     if (err instanceof WorkflowError) {
-      dispatchError = err;
-    } else {
-      const message = err instanceof Error ? err.message : String(err);
-      dispatchError = new WorkflowError(`Dispatcher failed: ${message}`, {
-        code: 'ENGINE_INTERNAL',
-        category: 'ENGINE',
-        agentAction: 'stop',
-        retryable: false,
-        stepId: options.command,
-      });
+      return makeErrorEnvelope(options, run, err);
     }
-    output = {};
+    const internal = new WorkflowError('Failed to transition run to pending state', {
+      code: 'ENGINE_STORE_FAILED',
+      category: 'ENGINE',
+      agentAction: 'stop',
+      retryable: false,
+    });
+    return makeErrorEnvelope(options, run, internal);
   }
 
-  const completedAt = new Date();
+  // Step 4: Execute dispatcher with retry loop and optional timeout.
+  const retryConfig = stepDef?.retry;
+  const timeoutMs =
+    stepDef?.timeout_seconds !== undefined ? stepDef.timeout_seconds * 1000 : undefined;
+  const maxAttempts = retryConfig?.max_attempts ?? 1;
 
-  // Step 5: Build evidence snapshot
-  const evidenceSnapshot = captureEvidence({
-    stepId: options.command,
-    startedAt,
-    completedAt,
-    input: options.input,
-    output,
-    ...(dispatchError !== null ? { error: dispatchError.message } : {}),
-  });
+  const allEvidence: EvidenceSnapshot[] = [];
+  let output: Record<string, unknown> = {};
+  let dispatchError: WorkflowError | null = null;
+  let attemptsUsed = 0;
 
+  for (let attemptNum = 1; attemptNum <= maxAttempts; attemptNum++) {
+    attemptsUsed++;
+    const startedAt = new Date();
+    let attemptOutput: Record<string, unknown> = {};
+    let attemptError: WorkflowError | null = null;
+
+    try {
+      const call = options.dispatcher(options.command, options.input, pendingRun);
+      attemptOutput = timeoutMs !== undefined
+        ? await withTimeout(call, timeoutMs, options.command)
+        : await call;
+    } catch (err) {
+      if (err instanceof WorkflowError) {
+        attemptError = err;
+      } else {
+        const message = err instanceof Error ? err.message : String(err);
+        attemptError = new WorkflowError(`Dispatcher failed: ${message}`, {
+          code: 'ENGINE_INTERNAL',
+          category: 'ENGINE',
+          agentAction: 'stop',
+          retryable: false,
+          stepId: options.command,
+        });
+      }
+    }
+
+    const completedAt = new Date();
+    const baseSnap = captureEvidence({
+      stepId: options.command,
+      startedAt,
+      completedAt,
+      input: options.input,
+      output: attemptOutput,
+      ...(attemptError !== null ? { error: attemptError.message } : {}),
+    });
+    // Annotate with attempt number when retries are configured.
+    const snap: EvidenceSnapshot =
+      retryConfig !== undefined ? { ...baseSnap, attempt: attemptNum } : baseSnap;
+    allEvidence.push(snap);
+
+    if (attemptError === null) {
+      output = attemptOutput;
+      dispatchError = null; // clear previous attempt failures on success
+      break;
+    }
+
+    dispatchError = attemptError;
+
+    const willRetry =
+      retryConfig !== undefined && attemptError.retryable && attemptNum < maxAttempts;
+    if (willRetry) {
+      await delayMs(computeBackoff(retryConfig, attemptNum));
+    } else {
+      break;
+    }
+  }
+
+  // If all retry attempts were consumed and the final attempt still failed,
+  // upgrade to STEP_RETRY_EXHAUSTED so callers get a meaningful error code.
+  if (dispatchError !== null && retryConfig !== undefined && attemptsUsed === maxAttempts) {
+    const lastError = dispatchError;
+    dispatchError = new WorkflowError(
+      `Step '${options.command}' failed after ${maxAttempts} attempts`,
+      {
+        code: 'STEP_RETRY_EXHAUSTED',
+        category: 'ENGINE',
+        agentAction: 'report_to_user',
+        retryable: false,
+        details: {
+          stepName: options.command,
+          attempts: maxAttempts,
+          lastError: lastError.message,
+        },
+      },
+    );
+  }
+
+  // Step 5: Handle dispatch failure — mark run as failed (terminal) and return error envelope.
   if (dispatchError !== null) {
+    try {
+      await store.update({
+        ...pendingRun,
+        state: 'failed',
+        terminal_state: true,
+        terminal_reason: dispatchError.message,
+        evidence: [...pendingRun.evidence, ...allEvidence],
+      });
+    } catch (cleanupErr) {
+      // Best-effort cleanup — do not throw if the failure update itself fails.
+      console.error(
+        `Failed to mark run as failed after step error: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}`,
+      );
+    }
     return {
       command: options.command,
       run_id: options.runId,
-      snapshot_id: run.version.toString(),
+      snapshot_id: pendingRun.version.toString(),
       status: 'error',
       data: {},
-      evidence: [evidenceSnapshot],
+      evidence: allEvidence,
       warnings: [],
       errors: [dispatchError.message],
       next_action: null,
@@ -180,15 +309,15 @@ export async function executeStep(
   }
 
   // Step 6: Determine new state
-  // stepDef was declared in Step 3b; isAllowed passed so it is defined here
+  // stepDef was declared in step 3b; isAllowed passed so it is defined here.
   const newState = stepDef!.produces_state;
-  const isTerminal = TERMINAL_STATES.has(newState);
+  const isTerminal = isTerminalState(newState);
 
   // Step 7: Update run record
   const updatedRun: RunRecord = {
-    ...run,
+    ...pendingRun,
     state: newState,
-    evidence: [...run.evidence, evidenceSnapshot],
+    evidence: [...pendingRun.evidence, ...allEvidence],
     terminal_state: isTerminal,
     ...(isTerminal ? { terminal_reason: `Run reached terminal state '${newState}'` } : {}),
   };
@@ -198,7 +327,7 @@ export async function executeStep(
     savedRun = await store.update(updatedRun);
   } catch (err) {
     if (err instanceof WorkflowError) {
-      return makeErrorEnvelope(options, run, err);
+      return makeErrorEnvelope(options, pendingRun, err);
     }
     const internal = new WorkflowError('Failed to persist run update', {
       code: 'ENGINE_STORE_FAILED',
@@ -206,7 +335,7 @@ export async function executeStep(
       agentAction: 'stop',
       retryable: false,
     });
-    return makeErrorEnvelope(options, run, internal);
+    return makeErrorEnvelope(options, pendingRun, internal);
   }
 
   // Step 8: Build and return ResponseEnvelope
@@ -218,9 +347,12 @@ export async function executeStep(
     snapshot_id: savedRun.version.toString(),
     status: 'ok',
     data: output,
-    evidence: [evidenceSnapshot],
+    evidence: allEvidence,
     warnings: [],
     errors: [],
     next_action: nextAction,
   };
 }
+
+// Re-export TERMINAL_STATES so existing importers via execution-loop.js still resolve.
+export { TERMINAL_STATES };

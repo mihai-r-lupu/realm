@@ -10,6 +10,7 @@ export interface EvidenceSnapshot {
   status: 'success' | 'error' | 'skipped';
   error?: string;
   evidence_hash: string;
+  attempt?: number;
 }
 
 export interface RunRecord {

@@ -8,6 +8,7 @@ export { JsonFileStore } from './store/json-file-store.js';
 export { StateGuard } from './engine/state-guard.js';
 export { executeStep } from './engine/execution-loop.js';
 export type { StepDispatcher, ExecuteStepOptions } from './engine/execution-loop.js';
+export { TERMINAL_STATES, RESUMABLE_STATES, isTerminalState } from './engine/lifecycle.js';
 export const VERSION = '0.1.0';
 
 // Extensions
