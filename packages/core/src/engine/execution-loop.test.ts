@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -177,6 +177,73 @@ describe('executeStep', () => {
 
     expect(envelope.status).toBe('error');
     expect(envelope.errors[0]).toContain('Run not found');
+  });
+
+  it('input schema validation blocks dispatch when input is invalid', async () => {
+    const dispatchCalled = vi.fn();
+    const spy: StepDispatcher = async (step, input, run) => {
+      dispatchCalled();
+      return echoDispatcher(step, input, run);
+    };
+
+    const schemaDefinition = {
+      ...definition,
+      steps: {
+        ...definition.steps,
+        'step-one': {
+          ...definition.steps['step-one']!,
+          input_schema: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } },
+        },
+      },
+    };
+    const schemaGuard = new StateGuard(schemaDefinition);
+    const run = await store.create({
+      workflowId: 'test-wf',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
+
+    const envelope = await executeStep(store, schemaGuard, schemaDefinition, {
+      runId: run.id,
+      command: 'step-one',
+      input: {}, // missing required 'name' field
+      snapshotId: '0',
+      dispatcher: spy,
+    });
+
+    expect(envelope.status).toBe('error');
+    expect(dispatchCalled).not.toHaveBeenCalled();
+  });
+
+  it('input schema validation passes through for valid input', async () => {
+    const schemaDefinition = {
+      ...definition,
+      steps: {
+        ...definition.steps,
+        'step-one': {
+          ...definition.steps['step-one']!,
+          input_schema: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } },
+        },
+      },
+    };
+    const schemaGuard = new StateGuard(schemaDefinition);
+    const run = await store.create({
+      workflowId: 'test-wf',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
+
+    const envelope = await executeStep(store, schemaGuard, schemaDefinition, {
+      runId: run.id,
+      command: 'step-one',
+      input: { name: 'Alice' },
+      snapshotId: '0',
+      dispatcher: echoDispatcher,
+    });
+
+    expect(envelope.status).toBe('ok');
   });
 
   // Cleanup

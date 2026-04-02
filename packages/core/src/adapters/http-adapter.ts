@@ -1,0 +1,119 @@
+// GenericHttpAdapter — makes HTTP requests to any REST API using Node 24 native fetch.
+import { WorkflowError } from '../types/workflow-error.js';
+import type { ServiceAdapter, ServiceResponse } from '../extensions/service-adapter.js';
+
+export interface HttpAdapterConfig {
+  base_url: string;
+  headers?: Record<string, string>;
+  auth?: {
+    type: 'bearer' | 'basic' | 'header';
+    token?: string;
+    header_name?: string;
+  };
+}
+
+/**
+ * GenericHttpAdapter makes HTTP requests to any REST API.
+ * Method mapping:
+ *   fetch()  → GET  {base_url}/{operation}?{params as query string}
+ *   create() → POST {base_url}/{operation} with JSON body
+ *   update() → PATCH {base_url}/{operation} with JSON body
+ */
+export class GenericHttpAdapter implements ServiceAdapter {
+  constructor(
+    public readonly id: string,
+    private readonly config: HttpAdapterConfig,
+  ) {}
+
+  private buildAuthHeaders(auth: HttpAdapterConfig['auth']): Record<string, string> {
+    if (auth === undefined) return {};
+    const token = auth.token ?? '';
+    if (auth.type === 'bearer') {
+      return { Authorization: `Bearer ${token}` };
+    }
+    if (auth.type === 'basic') {
+      return { Authorization: `Basic ${Buffer.from(token).toString('base64')}` };
+    }
+    // header type
+    const headerName = auth.header_name ?? 'X-Auth-Token';
+    return { [headerName]: token };
+  }
+
+  private async request(
+    method: 'GET' | 'POST' | 'PATCH',
+    operation: string,
+    params: Record<string, unknown>,
+    callConfig: Record<string, unknown>,
+  ): Promise<ServiceResponse> {
+    const merged: HttpAdapterConfig = { ...this.config, ...(callConfig as Partial<HttpAdapterConfig>) };
+    const authHeaders = this.buildAuthHeaders(merged.auth);
+    const baseHeaders: Record<string, string> = {
+      ...(merged.headers ?? {}),
+      ...authHeaders,
+    };
+
+    const url =
+      method === 'GET'
+        ? `${merged.base_url}/${operation}?${new URLSearchParams(params as Record<string, string>).toString()}`
+        : `${merged.base_url}/${operation}`;
+
+    const fetchOptions: RequestInit =
+      method === 'GET'
+        ? { method, headers: baseHeaders }
+        : {
+            method,
+            headers: { ...baseHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify(params),
+          };
+
+    let response: Response;
+    try {
+      response = await fetch(url, fetchOptions);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new WorkflowError(message, {
+        code: 'NETWORK_UNREACHABLE',
+        category: 'NETWORK',
+        agentAction: 'wait_for_human',
+        retryable: true,
+      });
+    }
+
+    if (!response.ok) {
+      const status = response.status;
+      throw new WorkflowError(`HTTP ${status}: ${response.statusText}`, {
+        code: status >= 500 ? 'SERVICE_HTTP_5XX' : 'SERVICE_HTTP_4XX',
+        category: 'SERVICE',
+        agentAction: status >= 500 ? 'wait_for_human' : 'report_to_user',
+        retryable: status >= 500,
+      });
+    }
+
+    const data: unknown = await response.json();
+    return { status: response.status, data };
+  }
+
+  fetch(
+    operation: string,
+    params: Record<string, unknown>,
+    config: Record<string, unknown>,
+  ): Promise<ServiceResponse> {
+    return this.request('GET', operation, params, config);
+  }
+
+  create(
+    operation: string,
+    params: Record<string, unknown>,
+    config: Record<string, unknown>,
+  ): Promise<ServiceResponse> {
+    return this.request('POST', operation, params, config);
+  }
+
+  update(
+    operation: string,
+    params: Record<string, unknown>,
+    config: Record<string, unknown>,
+  ): Promise<ServiceResponse> {
+    return this.request('PATCH', operation, params, config);
+  }
+}

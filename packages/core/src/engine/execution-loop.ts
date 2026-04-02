@@ -1,12 +1,13 @@
 // Central execution loop — orchestrates state guard, dispatcher, evidence capture,
 // run state update, and ResponseEnvelope construction.
-import { createHash } from 'node:crypto';
-import type { RunRecord, EvidenceSnapshot } from '../types/run-record.js';
+import type { RunRecord } from '../types/run-record.js';
 import type { ResponseEnvelope, NextAction } from '../types/response-envelope.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import type { WorkflowDefinition } from '../types/workflow-definition.js';
 import type { RunStore } from '../store/store-interface.js';
 import type { StateGuard } from './state-guard.js';
+import { captureEvidence } from '../evidence/snapshot.js';
+import { validateInputSchema } from '../validation/input-schema.js';
 
 export type StepDispatcher = (
   stepName: string,
@@ -24,10 +25,6 @@ export interface ExecuteStepOptions {
 }
 
 const TERMINAL_STATES = new Set(['completed', 'cancelled', 'failed', 'abandoned']);
-
-function sha256(data: string): string {
-  return createHash('sha256').update(data).digest('hex');
-}
 
 function findNextAction(
   newState: string,
@@ -120,6 +117,19 @@ export async function executeStep(
     };
   }
 
+  // Step 3b: Validate input schema
+  const stepDef = definition.steps[options.command];
+  if (stepDef?.input_schema !== undefined) {
+    try {
+      validateInputSchema(options.input, stepDef.input_schema, options.command);
+    } catch (err) {
+      if (err instanceof WorkflowError) {
+        return makeErrorEnvelope(options, run, err);
+      }
+      throw err;
+    }
+  }
+
   // Step 4: Execute dispatcher
   const startedAt = new Date();
   let output: Record<string, unknown>;
@@ -146,17 +156,14 @@ export async function executeStep(
   const completedAt = new Date();
 
   // Step 5: Build evidence snapshot
-  const evidenceSnapshot: EvidenceSnapshot = {
-    step_id: options.command,
-    started_at: startedAt.toISOString(),
-    completed_at: completedAt.toISOString(),
-    duration_ms: completedAt.getTime() - startedAt.getTime(),
-    input_summary: options.input,
-    output_summary: output,
-    status: dispatchError !== null ? 'error' : 'success',
+  const evidenceSnapshot = captureEvidence({
+    stepId: options.command,
+    startedAt,
+    completedAt,
+    input: options.input,
+    output,
     ...(dispatchError !== null ? { error: dispatchError.message } : {}),
-    evidence_hash: sha256(JSON.stringify(output)),
-  };
+  });
 
   if (dispatchError !== null) {
     return {
@@ -173,8 +180,7 @@ export async function executeStep(
   }
 
   // Step 6: Determine new state
-  const stepDef = definition.steps[options.command];
-  // stepDef is defined because isAllowed passed
+  // stepDef was declared in Step 3b; isAllowed passed so it is defined here
   const newState = stepDef!.produces_state;
   const isTerminal = TERMINAL_STATES.has(newState);
 
