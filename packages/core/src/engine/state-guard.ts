@@ -30,4 +30,18 @@ export class StateGuard {
     const states = this.allowed.get(stepName);
     return states !== undefined ? [...states] : [];
   }
+
+  /**
+   * Returns the names of all steps that are allowed from the given state.
+   * Used by the CLI to find which step to execute next.
+   */
+  getAllowedSteps(state: string): string[] {
+    const allowed: string[] = [];
+    for (const [stepName, allowedSet] of this.allowed) {
+      if (allowedSet.has(state)) {
+        allowed.push(stepName);
+      }
+    }
+    return allowed;
+  }
 }

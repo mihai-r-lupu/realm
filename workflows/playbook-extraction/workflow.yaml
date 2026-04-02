@@ -1,0 +1,46 @@
+# workflows/playbook-extraction/workflow.yaml
+# Simplified playbook field extraction — demonstrates the 4-step engine lifecycle.
+id: playbook-extraction
+name: Playbook Field Extraction
+version: 1
+initial_state: created
+
+services:
+  source:
+    adapter: google_docs
+    auth:
+      token_from: secrets.GDOCS_TOKEN
+    trust: engine_delivered
+
+steps:
+  fetch_document:
+    description: Fetch the target playbook document from Google Docs
+    execution: auto
+    uses_service: source
+    allowed_from_states: [created]
+    produces_state: document_ready
+
+  extract_fields:
+    description: Extract field candidates from the document text
+    execution: agent
+    allowed_from_states: [document_ready]
+    produces_state: fields_extracted
+    input_schema:
+      type: object
+      required: [candidates]
+      properties:
+        candidates:
+          type: array
+
+  validate_candidates:
+    description: Validate extracted quote citations against source document
+    execution: auto
+    handler: validate_verbatim_quotes
+    allowed_from_states: [fields_extracted]
+    produces_state: validated
+
+  finalize:
+    description: Human reviews and approves validated fields
+    execution: human_gate
+    allowed_from_states: [validated]
+    produces_state: completed

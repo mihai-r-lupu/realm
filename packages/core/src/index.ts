@@ -38,3 +38,8 @@ export { validateInputSchema } from './validation/input-schema.js';
 
 // Config
 export { loadSecrets, resolveSecret } from './config/secrets.js';
+
+// Workflow
+export { loadWorkflowFromFile, loadWorkflowFromString } from './workflow/yaml-loader.js';
+export { JsonWorkflowStore } from './workflow/registrar.js';
+export type { WorkflowRegistrar } from './workflow/registrar.js';

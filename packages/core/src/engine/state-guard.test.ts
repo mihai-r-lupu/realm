@@ -60,4 +60,14 @@ describe('StateGuard', () => {
   it('getAllowedStates() returns empty array for unknown step', () => {
     expect(guard.getAllowedStates('does-not-exist')).toEqual([]);
   });
+
+  it('getAllowedSteps() returns steps that allow the given state', () => {
+    const steps = guard.getAllowedSteps('created');
+    expect(steps).toContain('step-one');
+    expect(steps).not.toContain('step-two');
+  });
+
+  it('getAllowedSteps() returns empty array for an unknown state', () => {
+    expect(guard.getAllowedSteps('unknown_state')).toEqual([]);
+  });
 });
