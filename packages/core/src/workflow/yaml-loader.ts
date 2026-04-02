@@ -4,7 +4,7 @@ import { load } from 'js-yaml';
 import type { WorkflowDefinition } from '../types/workflow-definition.js';
 import { WorkflowError } from '../types/workflow-error.js';
 
-const VALID_EXECUTIONS = new Set(['auto', 'agent', 'human_gate']);
+const VALID_EXECUTIONS = new Set(['auto', 'agent']);
 
 /**
  * Loads a WorkflowDefinition from a YAML file on disk.
@@ -121,7 +121,8 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
 
     if ('execution' in step && !VALID_EXECUTIONS.has(step['execution'] as string)) {
       errors.push(
-        `Step '${stepName}': invalid execution value '${String(step['execution'])}'; must be auto, agent, or human_gate`,
+        `Step '${stepName}': invalid execution value '${String(step['execution'])}'; must be 'auto' or 'agent'`,
+      
       );
     }
 

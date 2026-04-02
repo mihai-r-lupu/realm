@@ -6,7 +6,8 @@ import {
   loadWorkflowFromFile,
   JsonFileStore,
   StateGuard,
-  executeStep,
+  executeChain,
+  submitHumanResponse,
 } from '@sensigo/realm';
 import type { WorkflowDefinition, StepDefinition } from '@sensigo/realm';
 import type { StepDispatcher } from '@sensigo/realm';
@@ -81,10 +82,7 @@ export const runCommand = new Command('run')
         // Build dispatcher output based on execution type
         let userOutput: Record<string, unknown>;
 
-        if (stepDef.execution === 'human_gate') {
-          const answer = await rl.question('  Approve? [y/N]: ');
-          userOutput = { approved: answer.toLowerCase() === 'y' };
-        } else if (stepDef.execution === 'agent') {
+        if (stepDef.execution === 'agent') {
           const raw = await rl.question('  Agent output JSON (Enter for {}): ');
           userOutput = raw.trim() === '' ? {} : (JSON.parse(raw) as Record<string, unknown>);
         } else {
@@ -101,7 +99,7 @@ export const runCommand = new Command('run')
 
         const dispatcher: StepDispatcher = async () => userOutput;
 
-        const result = await executeStep(store, guard, definition, {
+        const result = await executeChain(store, guard, definition, {
           runId,
           command: stepName,
           input: userOutput,
@@ -115,6 +113,27 @@ export const runCommand = new Command('run')
           const hash = ev !== undefined ? ev.evidence_hash.slice(0, 8) : 'n/a';
           const dur = ev !== undefined ? `${ev.duration_ms}ms` : 'n/a';
           console.log(`  ✓ → ${run.state} | hash: ${hash}... | ${dur}\n`);
+        } else if (result.status === 'confirm_required' && result.gate !== undefined) {
+          const g = result.gate;
+          console.log(`  ⏸  Gate: ${g.step_name} | gate_id: ${g.gate_id}`);
+          console.log(`  Preview: ${JSON.stringify(g.preview, null, 2)}`);
+          const raw = await rl.question(`  Choice [${g.choices.join('/')}]: `);
+          const choice = raw.trim();
+          run = await store.get(runId); // reload to get current version after gate open
+          const respondResult = await submitHumanResponse(store, definition, {
+            runId,
+            gateId: g.gate_id,
+            choice,
+            snapshotId: run.version.toString(),
+          });
+          if (respondResult.status === 'ok') {
+            run = await store.get(runId);
+            console.log(`  ✓ → ${run.state}\n`);
+          } else {
+            console.error(`  ✗ ${respondResult.errors.join(', ')}\n`);
+            break;
+          }
+          continue; // back to top of while loop
         } else {
           console.error(`  ✗ ${result.status}: ${result.errors.join(', ')}\n`);
           break;

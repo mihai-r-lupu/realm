@@ -6,6 +6,7 @@ import { registerCommand } from './commands/register.js';
 import { runCommand } from './commands/run.js';
 import { resumeCommand } from './commands/resume.js';
 import { cleanupCommand } from './commands/cleanup.js';
+import { respondCommand } from './commands/respond.js';
 
 const program = new Command();
 
@@ -19,5 +20,6 @@ program.addCommand(registerCommand);
 program.addCommand(runCommand);
 program.addCommand(resumeCommand);
 program.addCommand(cleanupCommand);
+program.addCommand(respondCommand);
 
 program.parse();

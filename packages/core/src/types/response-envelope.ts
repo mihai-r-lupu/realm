@@ -19,6 +19,13 @@ export interface BlockedReason {
   suggestion?: string;
 }
 
+export interface GateInfo {
+  gate_id: string;
+  step_name: string;
+  preview: Record<string, unknown>;
+  choices: string[];
+}
+
 export interface ResponseEnvelope {
   command: string;
   run_id: string;
@@ -30,4 +37,5 @@ export interface ResponseEnvelope {
   errors: string[];
   next_action: NextAction | null;
   blocked_reason?: BlockedReason;
+  gate?: GateInfo;
 }

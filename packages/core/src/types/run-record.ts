@@ -13,6 +13,15 @@ export interface EvidenceSnapshot {
   attempt?: number;
 }
 
+export interface PendingGate {
+  gate_id: string;
+  step_name: string;
+  /** Output produced by the step dispatcher; presented to the human for review. */
+  preview: Record<string, unknown>;
+  choices: string[];
+  opened_at: string;
+}
+
 export interface RunRecord {
   id: string;
   workflow_id: string;
@@ -25,4 +34,5 @@ export interface RunRecord {
   updated_at: string;
   terminal_state: boolean;
   terminal_reason?: string;
+  pending_gate?: PendingGate;
 }

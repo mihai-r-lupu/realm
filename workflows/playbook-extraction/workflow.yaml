@@ -41,6 +41,7 @@ steps:
 
   finalize:
     description: Human reviews and approves validated fields
-    execution: human_gate
+    execution: auto
+    trust: human_confirmed
     allowed_from_states: [validated]
     produces_state: completed

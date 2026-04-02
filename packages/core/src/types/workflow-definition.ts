@@ -1,6 +1,6 @@
 // Typed representation of a parsed workflow YAML definition.
 
-export type ExecutionMode = 'auto' | 'agent' | 'human_gate';
+export type ExecutionMode = 'auto' | 'agent';
 
 export type TrustLevel = 'auto' | 'human_notified' | 'human_confirmed' | 'human_reviewed';
 
