@@ -48,6 +48,18 @@ export async function resumeRun(
 
   let resetState: string;
   if (options.state !== undefined) {
+    if (!stepDef.allowed_from_states.includes(options.state)) {
+      const joined = stepDef.allowed_from_states.join(', ');
+      throw new WorkflowError(
+        `State '${options.state}' is not in allowed_from_states for step '${options.from}': [${joined}].`,
+        {
+          code: 'STATE_TRANSITION_DENIED',
+          category: 'STATE',
+          agentAction: 'report_to_user',
+          retryable: false,
+        },
+      );
+    }
     resetState = options.state;
   } else if (stepDef.allowed_from_states.length === 1) {
     resetState = stepDef.allowed_from_states[0]!;

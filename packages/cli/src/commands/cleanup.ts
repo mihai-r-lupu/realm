@@ -10,9 +10,9 @@ function parseDuration(s: string): number {
   const match = /^(\d+)(d|h|m)$/.exec(s);
   if (match === null) {
     throw new WorkflowError(`Invalid duration '${s}'. Use format: <number>(d|h|m), e.g. 30d, 6h, 10m`, {
-      code: 'ENGINE_INTERNAL',
-      category: 'ENGINE',
-      agentAction: 'report_to_user',
+      code: 'VALIDATION_INPUT_SCHEMA',
+      category: 'VALIDATION',
+      agentAction: 'provide_input',
       retryable: false,
     });
   }
