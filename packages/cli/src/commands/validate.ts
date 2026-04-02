@@ -20,7 +20,9 @@ interface ValidationError {
   message: string;
 }
 
-function validateWorkflow(raw: unknown): { errors: ValidationError[] } {
+export type { ValidationError };
+
+export function validateWorkflow(raw: unknown): { errors: ValidationError[] } {
   const errors: ValidationError[] = [];
 
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
