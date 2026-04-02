@@ -45,17 +45,20 @@ export class GenericHttpAdapter implements ServiceAdapter {
     params: Record<string, unknown>,
     callConfig: Record<string, unknown>,
   ): Promise<ServiceResponse> {
-    const merged: HttpAdapterConfig = { ...this.config, ...(callConfig as Partial<HttpAdapterConfig>) };
-    const authHeaders = this.buildAuthHeaders(merged.auth);
+    // Only per-call headers can be merged — base_url and auth are constructor-time
+    // security boundaries that callers must not override.
+    const callHeaders = (callConfig['headers'] as Record<string, string> | undefined) ?? {};
+    const authHeaders = this.buildAuthHeaders(this.config.auth);
     const baseHeaders: Record<string, string> = {
-      ...(merged.headers ?? {}),
+      ...(this.config.headers ?? {}),
+      ...callHeaders,
       ...authHeaders,
     };
 
     const url =
       method === 'GET'
-        ? `${merged.base_url}/${operation}?${new URLSearchParams(params as Record<string, string>).toString()}`
-        : `${merged.base_url}/${operation}`;
+        ? `${this.config.base_url}/${operation}?${new URLSearchParams(params as Record<string, string>).toString()}`
+        : `${this.config.base_url}/${operation}`;
 
     const fetchOptions: RequestInit =
       method === 'GET'
