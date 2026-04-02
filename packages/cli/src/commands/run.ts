@@ -104,7 +104,7 @@ export const runCommand = new Command('run')
         const result = await executeStep(store, guard, definition, {
           runId,
           command: stepName,
-          input: params,
+          input: userOutput,
           snapshotId: run.version.toString(),
           dispatcher,
         });
@@ -117,9 +117,7 @@ export const runCommand = new Command('run')
           console.log(`  ✓ → ${run.state} | hash: ${hash}... | ${dur}\n`);
         } else {
           console.error(`  ✗ ${result.status}: ${result.errors.join(', ')}\n`);
-          if (result.status === 'error') break;
-          // For blocked, reload and continue
-          run = await store.get(runId);
+          break;
         }
       }
 
