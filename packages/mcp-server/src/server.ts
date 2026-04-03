@@ -2,6 +2,7 @@
 // realm-mcp — MCP server exposing the Realm workflow engine to AI agents.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { ExtensionRegistry } from '@sensigo/realm';
 import { registerListWorkflows } from './tools/list-workflows.js';
 import { registerGetWorkflowProtocol } from './tools/get-workflow-protocol.js';
 import { registerStartRun } from './tools/start-run.js';
@@ -9,10 +10,19 @@ import { registerExecuteStep } from './tools/execute-step.js';
 import { registerSubmitHumanResponse } from './tools/submit-human-response.js';
 import { registerGetRunState } from './tools/get-run-state.js';
 
+export interface RealmMcpServerOptions {
+  /** Extension registry for resolving service adapters and step handlers at runtime. */
+  registry?: ExtensionRegistry;
+  /** Resolved secrets to pass to adapter configs (e.g. API tokens). */
+  secrets?: Record<string, string>;
+}
+
 /**
  * Creates and configures the Realm MCP server with all 6 workflow tools.
+ * Pass `registry` and `secrets` to enable auto steps that use service adapters
+ * or custom step handlers.
  */
-export function createRealmMcpServer(): McpServer {
+export function createRealmMcpServer(options?: RealmMcpServerOptions): McpServer {
   const server = new McpServer({
     name: 'realm',
     version: '0.1.0',
@@ -20,8 +30,8 @@ export function createRealmMcpServer(): McpServer {
 
   registerListWorkflows(server);
   registerGetWorkflowProtocol(server);
-  registerStartRun(server);
-  registerExecuteStep(server);
+  registerStartRun(server, options);
+  registerExecuteStep(server, options);
   registerSubmitHumanResponse(server);
   registerGetRunState(server);
 

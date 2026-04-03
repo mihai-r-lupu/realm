@@ -38,11 +38,13 @@ export async function handleExecuteStep(
     input: params,
     snapshotId: run.version.toString(),
     dispatcher,
+    ...(stores?.registry !== undefined ? { registry: stores.registry } : {}),
+    ...(stores?.secrets !== undefined ? { secrets: stores.secrets } : {}),
   });
 }
 
 /** Registers the execute_step MCP tool on the server. */
-export function registerExecuteStep(server: McpServer): void {
+export function registerExecuteStep(server: McpServer, opts?: { registry?: import('@sensigo/realm').ExtensionRegistry; secrets?: Record<string, string> }): void {
   server.tool(
     'execute_step',
     'Execute a workflow step. For agent steps, pass your output in params.',
@@ -53,7 +55,7 @@ export function registerExecuteStep(server: McpServer): void {
     },
     async (args) => {
       try {
-        const result = await handleExecuteStep(args);
+        const result = await handleExecuteStep(args, opts);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

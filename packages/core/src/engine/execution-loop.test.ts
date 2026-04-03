@@ -6,8 +6,11 @@ import { executeStep } from './execution-loop.js';
 import { StateGuard } from './state-guard.js';
 import { JsonFileStore } from '../store/json-file-store.js';
 import { WorkflowError } from '../types/workflow-error.js';
+import { ExtensionRegistry } from '../extensions/registry.js';
 import type { WorkflowDefinition } from '../types/workflow-definition.js';
 import type { StepDispatcher } from './execution-loop.js';
+import type { ServiceAdapter } from '../extensions/service-adapter.js';
+import type { StepHandler, StepHandlerInputs, StepContext } from '../extensions/step-handler.js';
 
 const definition: WorkflowDefinition = {
   id: 'test-wf',
@@ -244,6 +247,332 @@ describe('executeStep', () => {
     });
 
     expect(envelope.status).toBe('ok');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Adapter dispatch (uses_service)
+  // ---------------------------------------------------------------------------
+
+  describe('adapter dispatch via uses_service', () => {
+    const adapterDefinition: WorkflowDefinition = {
+      id: 'adapter-wf',
+      name: 'Adapter Workflow',
+      version: 1,
+      initial_state: 'created',
+      services: {
+        my_service: { adapter: 'mock_adapter', trust: 'engine_delivered' },
+      },
+      steps: {
+        fetch_data: {
+          description: 'Fetch data from a service',
+          execution: 'auto',
+          allowed_from_states: ['created'],
+          produces_state: 'fetched',
+          uses_service: 'my_service',
+        },
+      },
+    };
+    const adapterGuard = new StateGuard(adapterDefinition);
+
+    function makeAdapter(data: Record<string, unknown>): ServiceAdapter {
+      return {
+        id: 'mock_adapter',
+        fetch: vi.fn().mockResolvedValue({ status: 200, data }),
+        create: vi.fn(),
+        update: vi.fn(),
+      };
+    }
+
+    it('calls the registered adapter and returns its data as step output', async () => {
+      const adapter = makeAdapter({ content: 'hello' });
+      const registry = new ExtensionRegistry();
+      registry.register('adapter', 'mock_adapter', adapter);
+
+      const run = await store.create({
+        workflowId: 'adapter-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const envelope = await executeStep(store, adapterGuard, adapterDefinition, {
+        runId: run.id,
+        command: 'fetch_data',
+        input: { doc_id: 'abc' },
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(envelope.status).toBe('ok');
+      expect(envelope.data).toEqual({ content: 'hello' });
+      expect(adapter.fetch).toHaveBeenCalledWith(
+        'fetch_data',
+        { doc_id: 'abc' },
+        expect.objectContaining({ adapter: 'mock_adapter' }),
+      );
+    });
+
+    it('returns error envelope when service is not declared in definition', async () => {
+      const badDefinition: WorkflowDefinition = {
+        id: 'adapter-wf',
+        name: 'Adapter Workflow',
+        version: 1,
+        initial_state: 'created',
+        // no services block
+        steps: {
+          fetch_data: {
+            description: 'Fetch data from a service',
+            execution: 'auto',
+            allowed_from_states: ['created'],
+            produces_state: 'fetched',
+            uses_service: 'my_service',
+          },
+        },
+      };
+      const badGuard = new StateGuard(badDefinition);
+      const registry = new ExtensionRegistry();
+
+      const run = await store.create({
+        workflowId: 'adapter-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const envelope = await executeStep(store, badGuard, badDefinition, {
+        runId: run.id,
+        command: 'fetch_data',
+        input: {},
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(envelope.status).toBe('error');
+      expect(envelope.errors[0]).toContain("Service 'my_service' not found");
+    });
+
+    it('returns error envelope when adapter is not registered in the registry', async () => {
+      const registry = new ExtensionRegistry(); // empty — no adapter registered
+
+      const run = await store.create({
+        workflowId: 'adapter-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const envelope = await executeStep(store, adapterGuard, adapterDefinition, {
+        runId: run.id,
+        command: 'fetch_data',
+        input: {},
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(envelope.status).toBe('error');
+      expect(envelope.errors[0]).toContain("Adapter 'mock_adapter'");
+      expect(envelope.errors[0]).toContain('not registered');
+    });
+
+    it('wraps non-object adapter response in { data, status }', async () => {
+      const adapter = makeAdapter('raw string' as unknown as Record<string, unknown>);
+      const registry = new ExtensionRegistry();
+      registry.register('adapter', 'mock_adapter', adapter);
+
+      const run = await store.create({
+        workflowId: 'adapter-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const envelope = await executeStep(store, adapterGuard, adapterDefinition, {
+        runId: run.id,
+        command: 'fetch_data',
+        input: {},
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(envelope.status).toBe('ok');
+      expect(envelope.data).toEqual({ data: 'raw string', status: 200 });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Handler dispatch (handler field)
+  // ---------------------------------------------------------------------------
+
+  describe('handler dispatch via handler field', () => {
+    const handlerDefinition: WorkflowDefinition = {
+      id: 'handler-wf',
+      name: 'Handler Workflow',
+      version: 1,
+      initial_state: 'created',
+      steps: {
+        validate: {
+          description: 'Run custom validation logic',
+          execution: 'auto',
+          allowed_from_states: ['created'],
+          produces_state: 'validated',
+          handler: 'my_handler',
+        },
+      },
+    };
+    const handlerGuard = new StateGuard(handlerDefinition);
+
+    function makeHandler(data: Record<string, unknown>): StepHandler {
+      return {
+        id: 'my_handler',
+        execute: vi.fn<[StepHandlerInputs, StepContext], Promise<{ data: Record<string, unknown> }>>()
+          .mockResolvedValue({ data }),
+      };
+    }
+
+    it('calls the registered handler and returns its data as step output', async () => {
+      const handler = makeHandler({ valid: true });
+      const registry = new ExtensionRegistry();
+      registry.register('handler', 'my_handler', handler);
+
+      const run = await store.create({
+        workflowId: 'handler-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: { source: 'doc-1' },
+      });
+
+      const envelope = await executeStep(store, handlerGuard, handlerDefinition, {
+        runId: run.id,
+        command: 'validate',
+        input: { threshold: 0.9 },
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(envelope.status).toBe('ok');
+      expect(envelope.data).toEqual({ valid: true });
+      expect(handler.execute).toHaveBeenCalledWith(
+        { params: { threshold: 0.9 } },
+        expect.objectContaining({
+          run_id: run.id,
+          run_params: { source: 'doc-1' },
+        }),
+      );
+    });
+
+    it('returns error envelope when handler is not registered', async () => {
+      const registry = new ExtensionRegistry(); // empty
+
+      const run = await store.create({
+        workflowId: 'handler-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const envelope = await executeStep(store, handlerGuard, handlerDefinition, {
+        runId: run.id,
+        command: 'validate',
+        input: {},
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(envelope.status).toBe('error');
+      expect(envelope.errors[0]).toContain("Handler 'my_handler' is not registered");
+    });
+
+    it('passes prior step outputs as context.resources to the handler', async () => {
+      // Two-step workflow: first step uses adapter, second uses handler.
+      // We run only the handler step here and verify resources are populated
+      // by pre-populating the run store's evidence through a first step execution.
+      const twoStepDefinition: WorkflowDefinition = {
+        id: 'two-step-wf',
+        name: 'Two Step Workflow',
+        version: 1,
+        initial_state: 'created',
+        services: {
+          docs: { adapter: 'mock_adapter', trust: 'engine_delivered' },
+        },
+        steps: {
+          fetch_doc: {
+            description: 'Fetch document',
+            execution: 'auto',
+            allowed_from_states: ['created'],
+            produces_state: 'fetched',
+            uses_service: 'docs',
+          },
+          run_validation: {
+            description: 'Validate fetched document',
+            execution: 'auto',
+            allowed_from_states: ['fetched'],
+            produces_state: 'done',
+            handler: 'my_handler',
+          },
+        },
+      };
+      const twoStepGuard = new StateGuard(twoStepDefinition);
+
+      const capturedContext: StepContext[] = [];
+      const handler: StepHandler = {
+        id: 'my_handler',
+        execute: vi.fn().mockImplementation(async (_inputs: StepHandlerInputs, ctx: StepContext) => {
+          capturedContext.push(ctx);
+          return { data: { captured: true } };
+        }),
+      };
+
+      const adapter: ServiceAdapter = {
+        id: 'mock_adapter',
+        fetch: vi.fn().mockResolvedValue({ status: 200, data: { text: 'document content' } }),
+        create: vi.fn(),
+        update: vi.fn(),
+      };
+
+      const registry = new ExtensionRegistry();
+      registry.register('adapter', 'mock_adapter', adapter);
+      registry.register('handler', 'my_handler', handler);
+
+      const run = await store.create({
+        workflowId: 'two-step-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      // Execute the adapter step first so its evidence is stored.
+      await executeStep(store, twoStepGuard, twoStepDefinition, {
+        runId: run.id,
+        command: 'fetch_doc',
+        input: {},
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      const updatedRun = await store.get(run.id);
+
+      await executeStep(store, twoStepGuard, twoStepDefinition, {
+        runId: run.id,
+        command: 'run_validation',
+        input: {},
+        snapshotId: updatedRun.version.toString(),
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(capturedContext).toHaveLength(1);
+      const ctx = capturedContext[0]!;
+      expect(ctx.resources).toBeDefined();
+      // The adapter step's output_summary should be available under 'fetch_doc'.
+      expect(ctx.resources!['fetch_doc']).toBeDefined();
+    });
   });
 
   // Cleanup
