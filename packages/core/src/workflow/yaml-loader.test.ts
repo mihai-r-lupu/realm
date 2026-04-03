@@ -47,6 +47,19 @@ describe('loadWorkflowFromString', () => {
     expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
   });
 
+  it('invalid service_method value throws WorkflowError containing service_method', () => {
+    const content = VALID_YAML.replace(
+      'produces_state: step_one_done',
+      'produces_state: step_one_done\n    service_method: invalid_value',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain('service_method');
+    }
+  });
+
   it('produces_state collision throws WorkflowError', () => {
     const content = VALID_YAML.replace(
       'produces_state: completed',

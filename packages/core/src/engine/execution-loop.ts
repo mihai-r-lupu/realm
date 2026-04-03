@@ -14,6 +14,7 @@ import { validateInputSchema } from '../validation/input-schema.js';
 import { TERMINAL_STATES, isTerminalState } from './lifecycle.js';
 import { checkPreconditions, evaluateAllPreconditions } from './precondition.js';
 import { ExtensionRegistry } from '../extensions/registry.js';
+import type { ServiceResponse } from '../extensions/service-adapter.js';
 import { resolveSecret } from '../config/secrets.js';
 
 export type StepDispatcher = (
@@ -142,9 +143,12 @@ async function callAdapter(
     config['auth'] = { token: resolveSecret(serviceDef.auth.token_from, secrets) };
   }
 
-  let response: Awaited<ReturnType<typeof adapter.fetch>>;
+  const method = stepDef.service_method ?? 'fetch';
+  const operation = stepDef.operation ?? options.command;
+
+  let response: ServiceResponse;
   try {
-    response = await adapter.fetch(options.command, options.input, config);
+    response = await adapter[method](operation, options.input, config);
   } catch (err) {
     if (err instanceof WorkflowError) throw err;
     const message = err instanceof Error ? err.message : String(err);

@@ -179,9 +179,7 @@ export async function runFixtureTests(options: RunFixtureTestsOptions): Promise<
   const guard = new StateGuard(definition);
   const fixtures = loadFixturesFromDir(options.fixturesPath);
 
-  const results: TestResult[] = [];
-  for (const fixture of fixtures) {
-    results.push(await runSingleFixture(fixture, definition, guard, options));
-  }
-  return results;
+  return Promise.all(
+    fixtures.map((fixture) => runSingleFixture(fixture, definition, guard, options)),
+  );
 }

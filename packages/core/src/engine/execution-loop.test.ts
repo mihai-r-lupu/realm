@@ -401,6 +401,183 @@ describe('executeStep', () => {
       expect(envelope.status).toBe('ok');
       expect(envelope.data).toEqual({ data: 'raw string', status: 200 });
     });
+
+    it('defaults to fetch when service_method is absent', async () => {
+      const adapter = makeAdapter({ result: 1 });
+      const registry = new ExtensionRegistry();
+      registry.register('adapter', 'mock_adapter', adapter);
+
+      const run = await store.create({
+        workflowId: 'adapter-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      await executeStep(store, adapterGuard, adapterDefinition, {
+        runId: run.id,
+        command: 'fetch_data',
+        input: {},
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(adapter.fetch).toHaveBeenCalledTimes(1);
+      expect(adapter.create).not.toHaveBeenCalled();
+      expect(adapter.update).not.toHaveBeenCalled();
+    });
+
+    it('calls adapter.create() when service_method is create', async () => {
+      const adapter: ServiceAdapter = {
+        id: 'mock_adapter',
+        fetch: vi.fn().mockResolvedValue({ status: 200, data: {} }),
+        create: vi.fn().mockResolvedValue({ status: 201, data: { id: 'new-1' } }),
+        update: vi.fn().mockResolvedValue({ status: 200, data: {} }),
+      };
+      const registry = new ExtensionRegistry();
+      registry.register('adapter', 'mock_adapter', adapter);
+
+      const def: WorkflowDefinition = {
+        ...adapterDefinition,
+        steps: {
+          fetch_data: {
+            ...adapterDefinition.steps['fetch_data']!,
+            service_method: 'create',
+          },
+        },
+      };
+      const g = new StateGuard(def);
+
+      const run = await store.create({
+        workflowId: 'adapter-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const envelope = await executeStep(store, g, def, {
+        runId: run.id,
+        command: 'fetch_data',
+        input: {},
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(envelope.status).toBe('ok');
+      expect(adapter.create).toHaveBeenCalledTimes(1);
+      expect(adapter.fetch).not.toHaveBeenCalled();
+    });
+
+    it('calls adapter.update() when service_method is update', async () => {
+      const adapter: ServiceAdapter = {
+        id: 'mock_adapter',
+        fetch: vi.fn().mockResolvedValue({ status: 200, data: {} }),
+        create: vi.fn().mockResolvedValue({ status: 201, data: {} }),
+        update: vi.fn().mockResolvedValue({ status: 200, data: { updated: true } }),
+      };
+      const registry = new ExtensionRegistry();
+      registry.register('adapter', 'mock_adapter', adapter);
+
+      const def: WorkflowDefinition = {
+        ...adapterDefinition,
+        steps: {
+          fetch_data: {
+            ...adapterDefinition.steps['fetch_data']!,
+            service_method: 'update',
+          },
+        },
+      };
+      const g = new StateGuard(def);
+
+      const run = await store.create({
+        workflowId: 'adapter-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const envelope = await executeStep(store, g, def, {
+        runId: run.id,
+        command: 'fetch_data',
+        input: {},
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(envelope.status).toBe('ok');
+      expect(adapter.update).toHaveBeenCalledTimes(1);
+      expect(adapter.fetch).not.toHaveBeenCalled();
+    });
+
+    it('uses step name as operation when operation field is absent', async () => {
+      const adapter = makeAdapter({ ok: true });
+      const registry = new ExtensionRegistry();
+      registry.register('adapter', 'mock_adapter', adapter);
+
+      const run = await store.create({
+        workflowId: 'adapter-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      await executeStep(store, adapterGuard, adapterDefinition, {
+        runId: run.id,
+        command: 'fetch_data',
+        input: {},
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(adapter.fetch).toHaveBeenCalledWith(
+        'fetch_data',
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it('uses operation field when present instead of step name', async () => {
+      const adapter = makeAdapter({ ok: true });
+      const registry = new ExtensionRegistry();
+      registry.register('adapter', 'mock_adapter', adapter);
+
+      const def: WorkflowDefinition = {
+        ...adapterDefinition,
+        steps: {
+          fetch_data: {
+            ...adapterDefinition.steps['fetch_data']!,
+            operation: 'fetch_document_v2',
+          },
+        },
+      };
+      const g = new StateGuard(def);
+
+      const run = await store.create({
+        workflowId: 'adapter-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      await executeStep(store, g, def, {
+        runId: run.id,
+        command: 'fetch_data',
+        input: {},
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+        registry,
+      });
+
+      expect(adapter.fetch).toHaveBeenCalledWith(
+        'fetch_document_v2',
+        expect.anything(),
+        expect.anything(),
+      );
+    });
   });
 
   // ---------------------------------------------------------------------------

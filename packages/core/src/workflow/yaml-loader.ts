@@ -5,6 +5,7 @@ import type { WorkflowDefinition } from '../types/workflow-definition.js';
 import { WorkflowError } from '../types/workflow-error.js';
 
 const VALID_EXECUTIONS = new Set(['auto', 'agent']);
+const VALID_SERVICE_METHODS = new Set(['fetch', 'create', 'update']);
 
 /**
  * Loads a WorkflowDefinition from a YAML file on disk.
@@ -137,6 +138,12 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
           `Step '${stepName}': uses_service '${step['uses_service']}' is not defined in 'services'`,
         );
       }
+    }
+
+    if ('service_method' in step && !VALID_SERVICE_METHODS.has(step['service_method'] as string)) {
+      errors.push(
+        `Step '${stepName}': invalid service_method '${String(step['service_method'])}'; must be 'fetch', 'create', or 'update'`,
+      );
     }
 
     // Step 5: produces_state uniqueness
