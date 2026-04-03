@@ -53,7 +53,7 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
   // Step 2: Top-level validation
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     throw new WorkflowError('Invalid workflow: Workflow must be a non-null object', {
-      code: 'VALIDATION_INPUT_SCHEMA',
+      code: 'VALIDATION_WORKFLOW_SCHEMA',
       category: 'VALIDATION',
       agentAction: 'report_to_user',
       retryable: false,
@@ -83,7 +83,7 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
 
   if (errors.length > 0) {
     throw new WorkflowError(`Invalid workflow: ${errors.join('; ')}`, {
-      code: 'VALIDATION_INPUT_SCHEMA',
+      code: 'VALIDATION_WORKFLOW_SCHEMA',
       category: 'VALIDATION',
       agentAction: 'report_to_user',
       retryable: false,
@@ -164,7 +164,7 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
 
   if (errors.length > 0) {
     throw new WorkflowError(`Invalid workflow: ${errors.join('; ')}`, {
-      code: 'VALIDATION_INPUT_SCHEMA',
+      code: 'VALIDATION_WORKFLOW_SCHEMA',
       category: 'VALIDATION',
       agentAction: 'report_to_user',
       retryable: false,
@@ -183,7 +183,7 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
           throw new WorkflowError(
             `Ambiguous routing: steps '${existing}' and '${stepName}' both allow state '${state}'. Each state must route to exactly one step.`,
             {
-              code: 'VALIDATION_INPUT_SCHEMA',
+              code: 'VALIDATION_WORKFLOW_SCHEMA',
               category: 'VALIDATION',
               agentAction: 'report_to_user',
               retryable: false,

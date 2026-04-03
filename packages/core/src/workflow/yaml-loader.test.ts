@@ -79,6 +79,7 @@ describe('loadWorkflowFromString', () => {
       loadWorkflowFromString(content);
     } catch (err) {
       expect(err).toBeInstanceOf(WorkflowError);
+      expect((err as WorkflowError).code).toBe('VALIDATION_WORKFLOW_SCHEMA');
       expect((err as WorkflowError).message).toContain('Ambiguous routing');
     }
   });
