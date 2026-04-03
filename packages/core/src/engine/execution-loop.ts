@@ -1,17 +1,20 @@
 // Central execution loop — orchestrates state guard, dispatcher, evidence capture,
 // run state update, and ResponseEnvelope construction.
 // Includes: pending state transitions, step-level retry, step timeouts,
-// human gate mechanics, auto-chaining, and precondition evaluation.
+// human gate mechanics, auto-chaining, precondition evaluation,
+// and registry-based dispatch for adapter and handler steps.
 import type { RunRecord, EvidenceSnapshot } from '../types/run-record.js';
 import type { ResponseEnvelope, NextAction } from '../types/response-envelope.js';
 import { WorkflowError } from '../types/workflow-error.js';
-import type { WorkflowDefinition, RetryConfig } from '../types/workflow-definition.js';
+import type { WorkflowDefinition, RetryConfig, StepDefinition } from '../types/workflow-definition.js';
 import type { RunStore } from '../store/store-interface.js';
 import type { StateGuard } from './state-guard.js';
 import { captureEvidence } from '../evidence/snapshot.js';
 import { validateInputSchema } from '../validation/input-schema.js';
 import { TERMINAL_STATES, isTerminalState } from './lifecycle.js';
 import { checkPreconditions, evaluateAllPreconditions } from './precondition.js';
+import { ExtensionRegistry } from '../extensions/registry.js';
+import { resolveSecret } from '../config/secrets.js';
 
 export type StepDispatcher = (
   stepName: string,
@@ -26,6 +29,14 @@ export interface ExecuteStepOptions {
   /** Caller's expected version string — for optimistic concurrency check. */
   snapshotId: string;
   dispatcher: StepDispatcher;
+  /**
+   * Extension registry for resolving service adapters and step handlers.
+   * Required for auto steps that declare `uses_service` or `handler`.
+   * Callers that only drive agent steps may omit this.
+   */
+  registry?: ExtensionRegistry;
+  /** Resolved secrets passed to adapter configs (e.g. API tokens). */
+  secrets?: Record<string, string>;
 }
 
 export interface SubmitGateOptions {
@@ -41,6 +52,10 @@ export interface ExecuteChainOptions {
   input: Record<string, unknown>;
   snapshotId: string;
   dispatcher: StepDispatcher;
+  /** @see ExecuteStepOptions.registry */
+  registry?: ExtensionRegistry;
+  /** @see ExecuteStepOptions.secrets */
+  secrets?: Record<string, string>;
 }
 
 function delayMs(ms: number): Promise<void> {
@@ -82,6 +97,123 @@ function computeBackoff(config: RetryConfig, attemptNum: number): number {
     case 'exponential':
       return config.base_delay_ms * Math.pow(2, attemptNum - 1);
   }
+}
+
+/**
+ * Resolves and calls the service adapter for an auto step with `uses_service`.
+ * Throws WorkflowError(ENGINE_ADAPTER_FAILED) if the service or adapter is not found,
+ * or if the adapter throws an unexpected error.
+ */
+async function callAdapter(
+  stepDef: StepDefinition,
+  definition: WorkflowDefinition,
+  options: ExecuteStepOptions,
+): Promise<Record<string, unknown>> {
+  const serviceName = stepDef.uses_service!;
+  const serviceDef = definition.services?.[serviceName];
+  if (serviceDef === undefined) {
+    throw new WorkflowError(`Service '${serviceName}' not found in workflow definition`, {
+      code: 'ENGINE_ADAPTER_FAILED',
+      category: 'ENGINE',
+      agentAction: 'stop',
+      retryable: false,
+      stepId: options.command,
+    });
+  }
+
+  const adapter = options.registry?.getAdapter(serviceDef.adapter);
+  if (adapter === undefined) {
+    throw new WorkflowError(
+      `Adapter '${serviceDef.adapter}' for service '${serviceName}' is not registered`,
+      {
+        code: 'ENGINE_ADAPTER_FAILED',
+        category: 'ENGINE',
+        agentAction: 'stop',
+        retryable: false,
+        stepId: options.command,
+      },
+    );
+  }
+
+  // Build config object, resolving any secrets.KEY references in auth.
+  const secrets = options.secrets ?? {};
+  const config: Record<string, unknown> = { adapter: serviceDef.adapter, trust: serviceDef.trust };
+  if (serviceDef.auth?.token_from !== undefined) {
+    config['auth'] = { token: resolveSecret(serviceDef.auth.token_from, secrets) };
+  }
+
+  let response: Awaited<ReturnType<typeof adapter.fetch>>;
+  try {
+    response = await adapter.fetch(options.command, options.input, config);
+  } catch (err) {
+    if (err instanceof WorkflowError) throw err;
+    const message = err instanceof Error ? err.message : String(err);
+    throw new WorkflowError(`Adapter '${serviceDef.adapter}' threw: ${message}`, {
+      code: 'ENGINE_ADAPTER_FAILED',
+      category: 'ENGINE',
+      agentAction: 'stop',
+      retryable: false,
+      stepId: options.command,
+    });
+  }
+
+  // Unwrap ServiceResponse: surface the inner data object as the step output.
+  // If data is not a plain object, wrap it to preserve the status code.
+  return typeof response.data === 'object' && response.data !== null
+    ? (response.data as Record<string, unknown>)
+    : { data: response.data, status: response.status };
+}
+
+/**
+ * Resolves and calls the step handler for an auto step with a `handler` reference.
+ * The handler receives prior step outputs via context.resources so it can access
+ * evidence produced by earlier steps (e.g. the document text fetched in step 1).
+ * Throws WorkflowError(ENGINE_HANDLER_FAILED) if the handler is not found or throws.
+ */
+async function callHandler(
+  stepDef: StepDefinition,
+  options: ExecuteStepOptions,
+  pendingRun: RunRecord,
+  evidenceByStep: Record<string, Record<string, unknown>>,
+): Promise<Record<string, unknown>> {
+  const handlerName = stepDef.handler!;
+  const handler = options.registry?.getHandler(handlerName);
+  if (handler === undefined) {
+    throw new WorkflowError(`Handler '${handlerName}' is not registered`, {
+      code: 'ENGINE_HANDLER_FAILED',
+      category: 'ENGINE',
+      agentAction: 'stop',
+      retryable: false,
+      stepId: options.command,
+    });
+  }
+
+  let result: Awaited<ReturnType<typeof handler.execute>>;
+  try {
+    result = await handler.execute(
+      { params: options.input },
+      {
+        run_id: options.runId,
+        run_params: pendingRun.params,
+        config: {},
+        // Prior step outputs are exposed as resources so the handler can access
+        // document text, extracted candidates, etc. without reading the store.
+        resources: evidenceByStep,
+      },
+    );
+  } catch (err) {
+    if (err instanceof WorkflowError) throw err;
+    const message = err instanceof Error ? err.message : String(err);
+    throw new WorkflowError(`Handler '${handlerName}' threw: ${message}`, {
+      code: 'ENGINE_HANDLER_FAILED',
+      category: 'ENGINE',
+      agentAction: 'stop',
+      retryable: false,
+      stepId: options.command,
+    });
+  }
+
+  return result.data;
 }
 
 /**
@@ -283,7 +415,16 @@ export async function executeStep(
     let attemptError: WorkflowError | null = null;
 
     try {
-      const call = options.dispatcher(options.command, options.input, pendingRun);
+      // For auto steps, resolve the correct callable from the registry.
+      // For agent steps (or auto steps without a service/handler), use the caller's dispatcher.
+      let call: Promise<Record<string, unknown>>;
+      if (stepDef?.execution === 'auto' && stepDef.uses_service !== undefined) {
+        call = callAdapter(stepDef, definition, options);
+      } else if (stepDef?.execution === 'auto' && stepDef.handler !== undefined) {
+        call = callHandler(stepDef, options, pendingRun, evidenceByStep);
+      } else {
+        call = options.dispatcher(options.command, options.input, pendingRun);
+      }
       attemptOutput = timeoutMs !== undefined
         ? await withTimeout(call, timeoutMs, options.command)
         : await call;

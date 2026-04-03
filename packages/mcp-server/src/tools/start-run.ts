@@ -8,19 +8,22 @@ import {
   executeChain,
   type StepDispatcher,
   type ResponseEnvelope,
+  ExtensionRegistry,
 } from '@sensigo/realm';
 
 export interface HandleRunStores {
   runStore?: JsonFileStore;
   workflowStore?: JsonWorkflowStore;
+  /** Extension registry for resolving service adapters and step handlers. */
+  registry?: ExtensionRegistry;
+  /** Resolved secrets for use by service adapters. */
+  secrets?: Record<string, string>;
 }
 
-/**
- * stubDispatcher — returns {} for all steps.
- * Auto steps in Phase 2 do not perform real external work. This stub is the
- * seam where real handler implementations will plug in during Phase 3.
- */
-const stubDispatcher: StepDispatcher = async () => ({});
+// Fallback dispatcher for agent steps and auto steps without a registry entry.
+// For auto steps that have uses_service or handler, the engine resolves them
+// from the registry instead of calling this dispatcher.
+const passthroughDispatcher: StepDispatcher = async () => ({});
 
 /**
  * Business logic for the start_run tool.
@@ -69,7 +72,9 @@ export async function handleStartRun(
     command: firstStep,
     input: params,
     snapshotId: run.version.toString(),
-    dispatcher: stubDispatcher,
+    dispatcher: passthroughDispatcher,
+    ...(stores?.registry !== undefined ? { registry: stores.registry } : {}),
+    ...(stores?.secrets !== undefined ? { secrets: stores.secrets } : {}),
   });
 
   return {
@@ -83,7 +88,7 @@ export async function handleStartRun(
 }
 
 /** Registers the start_run MCP tool on the server. */
-export function registerStartRun(server: McpServer): void {
+export function registerStartRun(server: McpServer, opts?: { registry?: import('@sensigo/realm').ExtensionRegistry; secrets?: Record<string, string> }): void {
   server.tool(
     'start_run',
     'Create a new workflow run and chain through initial auto steps.',
@@ -93,7 +98,7 @@ export function registerStartRun(server: McpServer): void {
     },
     async (args) => {
       try {
-        const result = await handleStartRun(args);
+        const result = await handleStartRun(args, opts);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
