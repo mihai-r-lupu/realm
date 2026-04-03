@@ -220,7 +220,7 @@ export async function executeStep(
         blocked_reason: {
           current_state: run.state,
           allowed_states: guard.getAllowedStates(options.command),
-          suggestion: `Precondition failed: '${failed.expression}'. Resolved value: ${String(failed.resolvedValue)}.`,
+          suggestion: `Precondition failed: '${failed.expression}'. Resolved value: ${String(failed.resolved_value)}.`,
         },
       };
     }
@@ -312,11 +312,7 @@ export async function executeStep(
       ...(attemptError !== null ? { error: attemptError.message } : {}),
       diagnostics: {
         input_token_estimate: inputTokenEstimate,
-        precondition_trace: preconditionTrace.map((r) => ({
-          expression: r.expression,
-          passed: r.passed,
-          resolved_value: r.resolvedValue,
-        })),
+        precondition_trace: preconditionTrace,
       },
     });
     // Annotate with attempt number when retries are configured.

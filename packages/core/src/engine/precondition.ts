@@ -86,7 +86,7 @@ export interface PreconditionResult {
   expression: string;
   passed: boolean;
   /** LHS value as resolved from evidence, or undefined if not resolved. */
-  resolvedValue: unknown;
+  resolved_value: unknown;
 }
 
 /**
@@ -108,7 +108,7 @@ export function checkPreconditions(
           resolvedValue = resolvePath(stepEvidence, match[2]!);
         }
       }
-      return { expression, passed: false, resolvedValue };
+      return { expression, passed: false, resolved_value: resolvedValue };
     }
   }
   return null;
@@ -133,6 +133,6 @@ export function evaluateAllPreconditions(
         resolvedValue = resolvePath(stepEvidence, match[2]!);
       }
     }
-    return { expression, passed, resolvedValue };
+    return { expression, passed, resolved_value: resolvedValue };
   });
 }
