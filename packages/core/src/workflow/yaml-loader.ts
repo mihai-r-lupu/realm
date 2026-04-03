@@ -122,7 +122,7 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
     if ('execution' in step && !VALID_EXECUTIONS.has(step['execution'] as string)) {
       errors.push(
         `Step '${stepName}': invalid execution value '${String(step['execution'])}'; must be 'auto' or 'agent'`,
-      
+
       );
     }
 

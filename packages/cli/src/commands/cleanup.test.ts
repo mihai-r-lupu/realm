@@ -111,4 +111,22 @@ describe('cleanupRuns', () => {
 
     expect(affected).toHaveLength(0);
   });
+
+  it('does not abandon gate-waiting runs', async () => {
+    const now = new Date('2024-06-01T12:00:00Z');
+    vi.setSystemTime(now);
+
+    const oldTime = new Date(now.getTime() - 2 * 86_400_000).toISOString();
+    const gateRun = makeRun({ updated_at: oldTime, state: 'gate_waiting' });
+    await injectRun(dir, gateRun);
+
+    const store = new JsonFileStore(dir);
+    const { affected } = await cleanupRuns({ olderThan: '1d' }, store);
+
+    expect(affected).toHaveLength(0);
+
+    const unchanged = await store.get(gateRun.id);
+    expect(unchanged.state).toBe('gate_waiting');
+    expect(unchanged.terminal_state).toBe(false);
+  });
 });

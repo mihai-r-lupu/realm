@@ -200,4 +200,48 @@ describe('human gate', () => {
     expect(result.status).toBe('error');
     expect(result.errors[0]).toContain('not valid');
   });
+
+  it('submitHumanResponse records a gate_response evidence entry', async () => {
+    const store = new JsonFileStore(dir);
+    const guard = new StateGuard(autoGateDef);
+    const run = await store.create({
+      workflowId: 'auto-gate-wf',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
+
+    // Open the gate.
+    const gateEnvelope = await executeStep(store, guard, autoGateDef, {
+      runId: run.id,
+      command: 'step-one',
+      input: {},
+      snapshotId: run.version.toString(),
+      dispatcher: echoDispatcher,
+    });
+    const gateRun = await store.get(run.id);
+
+    // Submit a valid response.
+    const result = await submitHumanResponse(store, autoGateDef, {
+      runId: run.id,
+      gateId: gateEnvelope.gate!.gate_id,
+      choice: 'approve',
+      snapshotId: gateRun.version.toString(),
+    });
+
+    expect(result.status).toBe('ok');
+
+    const final = await store.get(run.id);
+    // The dispatch run produced one evidence entry; submitHumanResponse must add a second.
+    expect(final.evidence).toHaveLength(2);
+
+    const dispatchEntry = final.evidence[0]!;
+    expect(dispatchEntry.kind === undefined || dispatchEntry.kind === 'execution').toBe(true);
+
+    const gateEntry = final.evidence[1]!;
+    expect(gateEntry.kind).toBe('gate_response');
+    expect(gateEntry.step_id).toBe('step-one');
+    expect(gateEntry.output_summary['choice']).toBe('approve');
+    expect(gateEntry.input_summary['choice']).toBe('approve');
+  });
 });

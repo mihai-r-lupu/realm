@@ -11,6 +11,8 @@ export interface EvidenceSnapshot {
   error?: string;
   evidence_hash: string;
   attempt?: number;
+  /** Distinguishes computation records from human decision records. Absent on pre-existing entries. */
+  kind?: 'execution' | 'gate_response';
 }
 
 export interface PendingGate {

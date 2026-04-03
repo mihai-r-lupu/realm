@@ -1,7 +1,7 @@
 // cleanup command — marks idle non-terminal runs as abandoned.
 import { Command } from 'commander';
 import type { RunStore, RunRecord } from '@sensigo/realm';
-import { WorkflowError } from '@sensigo/realm';
+import { WorkflowError, WAITING_STATES } from '@sensigo/realm';
 
 /**
  * Parses a duration string such as "30d", "6h", or "10m" into milliseconds.
@@ -39,6 +39,9 @@ export async function cleanupRuns(
   const affected: RunRecord[] = [];
   for (const run of all) {
     if (run.terminal_state) {
+      continue;
+    }
+    if (WAITING_STATES.has(run.state)) {
       continue;
     }
     const idleMs = now - new Date(run.updated_at).getTime();

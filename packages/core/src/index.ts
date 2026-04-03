@@ -9,15 +9,15 @@ export { StateGuard } from './engine/state-guard.js';
 export { executeStep } from './engine/execution-loop.js';
 export type { StepDispatcher, ExecuteStepOptions } from './engine/execution-loop.js';
 export {
-  findNextAction,
-  submitHumanResponse,
-  executeChain,
+    findNextAction,
+    submitHumanResponse,
+    executeChain,
 } from './engine/execution-loop.js';
 export type { SubmitGateOptions, ExecuteChainOptions } from './engine/execution-loop.js';
-export { TERMINAL_STATES, RESUMABLE_STATES, isTerminalState } from './engine/lifecycle.js';
+export { TERMINAL_STATES, RESUMABLE_STATES, WAITING_STATES, isTerminalState } from './engine/lifecycle.js';
 export {
-  evaluatePrecondition,
-  checkPreconditions,
+    evaluatePrecondition,
+    checkPreconditions,
 } from './engine/precondition.js';
 export type { PreconditionResult } from './engine/precondition.js';
 export const VERSION = '0.1.0';

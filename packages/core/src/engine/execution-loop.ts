@@ -200,6 +200,7 @@ export async function executeStep(
   if (stepDef?.preconditions !== undefined && stepDef.preconditions.length > 0) {
     const evidenceByStep: Record<string, Record<string, unknown>> = {};
     for (const snap of run.evidence) {
+      if (snap.kind === 'gate_response') continue;
       evidenceByStep[snap.step_id] = snap.output_summary;
     }
     const failed = checkPreconditions(stepDef.preconditions, evidenceByStep);
@@ -562,7 +563,18 @@ export async function submitHumanResponse(
   const isTerminal = isTerminalState(newState);
 
   // 6. Strip pending_gate and terminal_reason, then advance state.
+  // Capture a gate_response evidence entry so the human's decision is permanently recorded.
   const { pending_gate: _pg, terminal_reason: _tr, ...rest } = run;
+
+  const respondedAt = new Date();
+  const gateEvidence = captureEvidence({
+    stepId: run.pending_gate.step_name,
+    startedAt: new Date(run.pending_gate.opened_at),
+    completedAt: respondedAt,
+    input: { choice: options.choice },
+    output: { ...run.pending_gate.preview, choice: options.choice },
+  });
+  const gateSnapshot: EvidenceSnapshot = { ...gateEvidence, kind: 'gate_response' };
 
   let savedRun: RunRecord;
   try {
@@ -571,6 +583,7 @@ export async function submitHumanResponse(
       state: newState,
       terminal_state: isTerminal,
       ...(isTerminal ? { terminal_reason: `Run reached terminal state '${newState}'` } : {}),
+      evidence: [...rest.evidence, gateSnapshot],
     });
   } catch (err) {
     const e =
