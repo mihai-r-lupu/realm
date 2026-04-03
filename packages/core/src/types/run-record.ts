@@ -1,5 +1,17 @@
 // Types for an active or historical workflow run record stored on disk.
 
+/** Diagnostic metadata captured during step execution. Written once; read by inspect. */
+export interface StepDiagnostics {
+  /** Rough token count estimate: Math.ceil(JSON.stringify(input).length / 4) */
+  input_token_estimate: number;
+  /** Ordered list of precondition evaluations for this step. Empty array if no preconditions. */
+  precondition_trace: Array<{
+    expression: string;
+    passed: boolean;
+    resolved_value: unknown;
+  }>;
+}
+
 export interface EvidenceSnapshot {
   step_id: string;
   started_at: string;
@@ -13,6 +25,8 @@ export interface EvidenceSnapshot {
   attempt?: number;
   /** Distinguishes computation records from human decision records. Absent on pre-existing entries. */
   kind?: 'execution' | 'gate_response';
+  /** Diagnostic metadata. Present on snapshots captured after Week 7. */
+  diagnostics?: StepDiagnostics;
 }
 
 export interface PendingGate {

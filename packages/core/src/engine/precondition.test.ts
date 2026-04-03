@@ -1,9 +1,9 @@
-// Tests for precondition evaluator — evaluatePrecondition and checkPreconditions.
+// Tests for precondition evaluator — evaluatePrecondition, checkPreconditions, and evaluateAllPreconditions.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { evaluatePrecondition, checkPreconditions } from './precondition.js';
+import { evaluatePrecondition, checkPreconditions, evaluateAllPreconditions } from './precondition.js';
 import { executeStep } from './execution-loop.js';
 import { StateGuard } from './state-guard.js';
 import { JsonFileStore } from '../store/json-file-store.js';
@@ -100,5 +100,28 @@ describe('executeStep blocks when precondition fails', () => {
     expect(envelope.status).toBe('blocked');
     expect(envelope.blocked_reason?.suggestion).toContain('Precondition failed');
     expect(envelope.blocked_reason?.suggestion).toContain("step-a.result.count > 0");
+  });
+});
+
+describe('evaluateAllPreconditions', () => {
+  it('returns all results with passed: true when all preconditions pass', () => {
+    const evidence = { step_a: { count: 5 } };
+    const results = evaluateAllPreconditions(['step_a.count > 0', 'step_a.count >= 5'], evidence);
+    expect(results).toHaveLength(2);
+    expect(results[0]!.passed).toBe(true);
+    expect(results[1]!.passed).toBe(true);
+  });
+
+  it('returns results for both passing and failing expressions in order', () => {
+    const evidence = { step_a: { count: 0 } };
+    const results = evaluateAllPreconditions(
+      ['step_a.count > 0', 'step_a.count >= 0'],
+      evidence,
+    );
+    expect(results).toHaveLength(2);
+    expect(results[0]!.expression).toBe('step_a.count > 0');
+    expect(results[0]!.passed).toBe(false);
+    expect(results[1]!.expression).toBe('step_a.count >= 0');
+    expect(results[1]!.passed).toBe(true);
   });
 });

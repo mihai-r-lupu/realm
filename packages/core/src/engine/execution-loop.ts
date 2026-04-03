@@ -11,7 +11,7 @@ import type { StateGuard } from './state-guard.js';
 import { captureEvidence } from '../evidence/snapshot.js';
 import { validateInputSchema } from '../validation/input-schema.js';
 import { TERMINAL_STATES, isTerminalState } from './lifecycle.js';
-import { checkPreconditions } from './precondition.js';
+import { checkPreconditions, evaluateAllPreconditions } from './precondition.js';
 
 export type StepDispatcher = (
   stepName: string,
@@ -196,13 +196,15 @@ export async function executeStep(
 
   const stepDef = definition.steps[options.command];
 
+  // Build evidence map once — used for precondition check and diagnostics.
+  const evidenceByStep: Record<string, Record<string, unknown>> = {};
+  for (const snap of run.evidence) {
+    if (snap.kind === 'gate_response') continue;
+    evidenceByStep[snap.step_id] = snap.output_summary;
+  }
+
   // Step 3a: Evaluate preconditions — block the step if any expression fails.
   if (stepDef?.preconditions !== undefined && stepDef.preconditions.length > 0) {
-    const evidenceByStep: Record<string, Record<string, unknown>> = {};
-    for (const snap of run.evidence) {
-      if (snap.kind === 'gate_response') continue;
-      evidenceByStep[snap.step_id] = snap.output_summary;
-    }
     const failed = checkPreconditions(stepDef.preconditions, evidenceByStep);
     if (failed !== null) {
       return {
@@ -223,6 +225,13 @@ export async function executeStep(
       };
     }
   }
+
+  // Build diagnostics metadata for every evidence snapshot produced by this step.
+  const preconditionTrace = evaluateAllPreconditions(
+    stepDef?.preconditions ?? [],
+    evidenceByStep,
+  );
+  const inputTokenEstimate = Math.ceil(JSON.stringify(options.input).length / 4);
 
   // Step 3b: Validate input schema
   if (stepDef?.input_schema !== undefined) {
@@ -301,6 +310,14 @@ export async function executeStep(
       input: options.input,
       output: attemptOutput,
       ...(attemptError !== null ? { error: attemptError.message } : {}),
+      diagnostics: {
+        input_token_estimate: inputTokenEstimate,
+        precondition_trace: preconditionTrace.map((r) => ({
+          expression: r.expression,
+          passed: r.passed,
+          resolved_value: r.resolvedValue,
+        })),
+      },
     });
     // Annotate with attempt number when retries are configured.
     const snap: EvidenceSnapshot =

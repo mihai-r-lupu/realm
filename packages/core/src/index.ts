@@ -18,8 +18,10 @@ export { TERMINAL_STATES, RESUMABLE_STATES, WAITING_STATES, isTerminalState } fr
 export {
     evaluatePrecondition,
     checkPreconditions,
+    evaluateAllPreconditions,
 } from './engine/precondition.js';
 export type { PreconditionResult } from './engine/precondition.js';
+export type { StepDiagnostics } from './types/run-record.js';
 export const VERSION = '0.1.0';
 
 // Extensions

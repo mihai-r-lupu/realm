@@ -113,3 +113,26 @@ export function checkPreconditions(
   }
   return null;
 }
+
+/**
+ * Evaluates all preconditions and returns results for every expression.
+ * Unlike checkPreconditions, does not stop at the first failure.
+ * Used to build precondition_trace for StepDiagnostics.
+ */
+export function evaluateAllPreconditions(
+  preconditions: string[],
+  evidenceByStep: Record<string, Record<string, unknown>>,
+): PreconditionResult[] {
+  return preconditions.map((expression) => {
+    const passed = evaluatePrecondition(expression, evidenceByStep);
+    const match = /^([\w-]+)\.([\w.]+)/.exec(expression);
+    let resolvedValue: unknown = undefined;
+    if (match !== null) {
+      const stepEvidence = evidenceByStep[match[1]!];
+      if (stepEvidence !== undefined) {
+        resolvedValue = resolvePath(stepEvidence, match[2]!);
+      }
+    }
+    return { expression, passed, resolvedValue };
+  });
+}

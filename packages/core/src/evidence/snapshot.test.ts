@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { captureEvidence } from './snapshot.js';
+import type { StepDiagnostics } from '../types/run-record.js';
 
 describe('captureEvidence', () => {
   const base = {
@@ -40,5 +41,14 @@ describe('captureEvidence', () => {
     const ev1 = captureEvidence(base);
     const ev2 = captureEvidence({ ...base, output: { result: 99 } });
     expect(ev1.evidence_hash).not.toBe(ev2.evidence_hash);
+  });
+
+  it('includes diagnostics when provided in params', () => {
+    const diag: StepDiagnostics = {
+      input_token_estimate: 10,
+      precondition_trace: [{ expression: 'step.count > 0', passed: true, resolved_value: 5 }],
+    };
+    const ev = captureEvidence({ ...base, diagnostics: diag });
+    expect(ev.diagnostics).toEqual(diag);
   });
 });

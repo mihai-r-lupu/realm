@@ -7,6 +7,10 @@ import { runCommand } from './commands/run.js';
 import { resumeCommand } from './commands/resume.js';
 import { cleanupCommand } from './commands/cleanup.js';
 import { respondCommand } from './commands/respond.js';
+import { inspectCommand } from './commands/inspect.js';
+import { replayCommand } from './commands/replay.js';
+import { diffCommand } from './commands/diff.js';
+import { initCommand } from './commands/init.js';
 
 const program = new Command();
 
@@ -21,5 +25,9 @@ program.addCommand(runCommand);
 program.addCommand(resumeCommand);
 program.addCommand(cleanupCommand);
 program.addCommand(respondCommand);
+program.addCommand(inspectCommand);
+program.addCommand(replayCommand);
+program.addCommand(diffCommand);
+program.addCommand(initCommand);
 
 program.parse();
