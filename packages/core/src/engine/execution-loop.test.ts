@@ -250,4 +250,42 @@ describe('executeStep', () => {
   it('cleanup', async () => {
     await rm(dir, { recursive: true, force: true });
   });
+
+  describe('cleanup failure warning', () => {
+    it('surfaces cleanup failure as warning when the failed-state store.update throws', async () => {
+      const run = await store.create({
+        workflowId: 'test-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      // Allow the first store.update (pending state) to succeed; throw on the second
+      // (the cleanup write that marks the run as failed after dispatch failure).
+      let updateCount = 0;
+      const originalUpdate = store.update.bind(store);
+      vi.spyOn(store, 'update').mockImplementation(async (record) => {
+        updateCount++;
+        if (updateCount >= 2) throw new Error('store write failed');
+        return originalUpdate(record);
+      });
+
+      try {
+        const envelope = await executeStep(store, guard, definition, {
+          runId: run.id,
+          command: 'step-one',
+          input: {},
+          snapshotId: '0',
+          dispatcher: failDispatcher,
+        });
+
+        expect(envelope.status).toBe('error');
+        expect(envelope.errors[0]).toContain('step failed');
+        expect(envelope.warnings).toHaveLength(1);
+        expect(envelope.warnings[0]).toMatch(/Failed to mark run as failed/);
+      } finally {
+        vi.restoreAllMocks();
+      }
+    });
+  });
 });

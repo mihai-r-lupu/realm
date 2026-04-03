@@ -32,6 +32,23 @@ function parseLiteralValue(raw: string): unknown {
 }
 
 /**
+ * Sets a value at a dot-separated path within an object, creating
+ * intermediate objects as needed.
+ */
+function deepSet(obj: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split('.');
+  let current: Record<string, unknown> = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i]!;
+    if (typeof current[part] !== 'object' || current[part] === null) {
+      current[part] = {};
+    }
+    current = current[part] as Record<string, unknown>;
+  }
+  current[parts.at(-1)!] = value;
+}
+
+/**
  * Parses a --with override expression of the form "step.field=value".
  * @throws Error if the expression is missing '.' or '='.
  */
@@ -67,16 +84,17 @@ export function replayRun(
     evidenceByStep[snap.step_id] = snap.output_summary;
   }
 
-  // Build replay evidence as a shallow-copy, then apply overrides.
+  // Build replay evidence as a deep clone, then apply overrides.
+  // structuredClone prevents nested object mutations from affecting the original evidence map.
   const replayEvidenceByStep: Record<string, Record<string, unknown>> = {};
   for (const [stepId, output] of Object.entries(evidenceByStep)) {
-    replayEvidenceByStep[stepId] = { ...output };
+    replayEvidenceByStep[stepId] = structuredClone(output) as Record<string, unknown>;
   }
   for (const override of overrides) {
     if (replayEvidenceByStep[override.step] === undefined) {
       replayEvidenceByStep[override.step] = {};
     }
-    replayEvidenceByStep[override.step]![override.field] = override.value;
+    deepSet(replayEvidenceByStep[override.step]!, override.field, override.value);
   }
 
   // Evaluate preconditions for each step in definition order.

@@ -359,6 +359,7 @@ export async function executeStep(
 
   // Step 5: Handle dispatch failure — mark run as failed (terminal) and return error envelope.
   if (dispatchError !== null) {
+    let cleanupWarning: string | undefined;
     try {
       await store.update({
         ...pendingRun,
@@ -368,10 +369,9 @@ export async function executeStep(
         evidence: [...pendingRun.evidence, ...allEvidence],
       });
     } catch (cleanupErr) {
-      // Best-effort cleanup — do not throw if the failure update itself fails.
-      console.error(
-        `Failed to mark run as failed after step error: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}`,
-      );
+      // Best-effort cleanup — surface as a warning so callers are aware of the
+      // inconsistent state without masking the original dispatch error.
+      cleanupWarning = `Failed to mark run as failed after step error: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}`;
     }
     return {
       command: options.command,
@@ -380,7 +380,7 @@ export async function executeStep(
       status: 'error',
       data: {},
       evidence: allEvidence,
-      warnings: [],
+      warnings: cleanupWarning !== undefined ? [cleanupWarning] : [],
       errors: [dispatchError.message],
       next_action: null,
     };
@@ -497,11 +497,11 @@ export async function submitHumanResponse(
       err instanceof WorkflowError
         ? err
         : new WorkflowError('Failed to load run from store', {
-            code: 'ENGINE_STORE_FAILED',
-            category: 'ENGINE',
-            agentAction: 'stop',
-            retryable: false,
-          });
+          code: 'ENGINE_STORE_FAILED',
+          category: 'ENGINE',
+          agentAction: 'stop',
+          retryable: false,
+        });
     return errorEnvelope('submit_gate', options.runId, options.snapshotId, e);
   }
 
@@ -603,11 +603,11 @@ export async function submitHumanResponse(
       err instanceof WorkflowError
         ? err
         : new WorkflowError('Failed to persist gate response', {
-            code: 'ENGINE_STORE_FAILED',
-            category: 'ENGINE',
-            agentAction: 'stop',
-            retryable: false,
-          });
+          code: 'ENGINE_STORE_FAILED',
+          category: 'ENGINE',
+          agentAction: 'stop',
+          retryable: false,
+        });
     return errorEnvelope(run.pending_gate.step_name, options.runId, run.version.toString(), e);
   }
 

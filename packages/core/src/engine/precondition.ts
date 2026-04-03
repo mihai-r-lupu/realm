@@ -40,11 +40,11 @@ function compare(lhs: unknown, op: string, rhs: unknown): boolean {
   switch (op) {
     case '==': return lhs === rhs;
     case '!=': return lhs !== rhs;
-    case '>':  return typeof lhs === 'number' && typeof rhs === 'number' && lhs > rhs;
-    case '<':  return typeof lhs === 'number' && typeof rhs === 'number' && lhs < rhs;
+    case '>': return typeof lhs === 'number' && typeof rhs === 'number' && lhs > rhs;
+    case '<': return typeof lhs === 'number' && typeof rhs === 'number' && lhs < rhs;
     case '>=': return typeof lhs === 'number' && typeof rhs === 'number' && lhs >= rhs;
     case '<=': return typeof lhs === 'number' && typeof rhs === 'number' && lhs <= rhs;
-    default:   return false;
+    default: return false;
   }
 }
 

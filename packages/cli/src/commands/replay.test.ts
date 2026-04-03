@@ -76,6 +76,11 @@ describe('parseOverride', () => {
     expect(result).toEqual({ step: 'step', field: 'status', value: 'done' });
   });
 
+  it('parses a multi-segment dot-path field — "validate.result.accepted_count=5"', () => {
+    const result = parseOverride('validate.result.accepted_count=5');
+    expect(result).toEqual({ step: 'validate', field: 'result.accepted_count', value: 5 });
+  });
+
   it('throws on missing equals sign', () => {
     expect(() => parseOverride('validate_candidates.accepted_count')).toThrow("missing '='");
   });
@@ -134,5 +139,56 @@ describe('replayRun', () => {
     expect(fetchRow!.preconditions_original).toBe(true);
     expect(fetchRow!.preconditions_replay).toBe(true);
     expect(fetchRow!.changed).toBe(false);
+  });
+
+  it('dot-path override correctly changes a nested-field precondition outcome', () => {
+    const nestedDef: WorkflowDefinition = {
+      ...definition,
+      steps: {
+        ...definition.steps,
+        write: {
+          description: 'Write results',
+          execution: 'auto',
+          allowed_from_states: ['validated'],
+          produces_state: 'completed',
+          preconditions: ['validate.result.accepted_count > 0'],
+        },
+      },
+    };
+    const evidence = [makeSnapshot('validate', { result: { accepted_count: 3 } })];
+    const run = makeRun(evidence);
+    const results = replayRun(run, nestedDef, [
+      { step: 'validate', field: 'result.accepted_count', value: 0 },
+    ]);
+    const writeRow = results.find((r) => r.step_id === 'write')!;
+    expect(writeRow.preconditions_original).toBe(true);
+    expect(writeRow.preconditions_replay).toBe(false);
+    expect(writeRow.changed).toBe(true);
+  });
+
+  it('dot-path override does not mutate the original evidence object', () => {
+    const nestedDef: WorkflowDefinition = {
+      ...definition,
+      steps: {
+        ...definition.steps,
+        write: {
+          description: 'Write results',
+          execution: 'auto',
+          allowed_from_states: ['validated'],
+          produces_state: 'completed',
+          preconditions: ['validate.result.accepted_count > 0'],
+        },
+      },
+    };
+    const originalOutput = { result: { accepted_count: 3 } };
+    const evidence = [makeSnapshot('validate', originalOutput)];
+    const run = makeRun(evidence);
+
+    replayRun(run, nestedDef, [
+      { step: 'validate', field: 'result.accepted_count', value: 0 },
+    ]);
+
+    // Original evidence must not have been mutated.
+    expect(originalOutput.result.accepted_count).toBe(3);
   });
 });
