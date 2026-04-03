@@ -42,6 +42,16 @@ export interface StepDefinition {
   allowed_from_states: string[];
   produces_state: string;
   uses_service?: string;
+  /**
+   * Which adapter method to invoke for this service step.
+   * Defaults to 'fetch' if omitted.
+   */
+  service_method?: 'fetch' | 'create' | 'update';
+  /**
+   * Operation name passed as the first argument to the adapter method.
+   * Defaults to the step name if omitted.
+   */
+  operation?: string;
   handler?: string;
   input_schema?: JsonSchema;
   preconditions?: string[];
