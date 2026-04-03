@@ -2,39 +2,205 @@
 
 **Reliable Agent Lifecycle Management**
 
-A workflow execution engine that makes AI agents follow instructions reliably and produces evidence of what they did.
-
-## What This Is
-
-Realm lets you define multi-step workflows in YAML. When an AI agent executes a workflow, the engine:
-
-- Guides the agent step by step, telling it exactly what to do and what comes next
-- Guards execution order — the agent cannot skip steps or execute out of sequence
-- Captures evidence at every step — what was received, what was produced, what decisions were made
-- Enforces human gates where a human must approve before execution continues
-
-## Status
-
-**Early development.** Monorepo scaffolding is complete. Engine implementation begins in Phase 1.
+Realm is a workflow execution engine for AI agents. You define workflows in YAML. The engine enforces step order, validates every agent output against a JSON schema, captures tamper-evident evidence at each step, and pauses at human gates until a person approves. An AI agent connected via MCP cannot skip steps, produce malformed output, or proceed past a gate without authorization.
 
 ## Packages
 
-| Package | Description |
+| Package | npm | Description |
+|---------|-----|-------------|
+| `@sensigo/realm` | [![npm](https://img.shields.io/npm/v/@sensigo/realm)](https://www.npmjs.com/package/@sensigo/realm) | Core engine — state guard, execution loop, evidence capture |
+| `@sensigo/realm-cli` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-cli)](https://www.npmjs.com/package/@sensigo/realm-cli) | `realm` CLI — 11 commands for building and operating workflows |
+| `@sensigo/realm-mcp` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-mcp)](https://www.npmjs.com/package/@sensigo/realm-mcp) | `realm-mcp` MCP server — 6 tools for AI agent connections |
+| `@sensigo/realm-testing` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-testing)](https://www.npmjs.com/package/@sensigo/realm-testing) | Testing utilities — fixtures, assertions, in-memory store |
+
+## Installation
+
+**CLI (global)**
+
+```bash
+npm install -g @sensigo/realm-cli
+```
+
+**MCP server (global, for AI agent connections)**
+
+```bash
+npm install -g @sensigo/realm-mcp
+```
+
+**Programmatic use**
+
+```bash
+npm install @sensigo/realm
+```
+
+**Testing utilities**
+
+```bash
+npm install --save-dev @sensigo/realm-testing
+```
+
+## Quick Start
+
+### 1. Scaffold a workflow
+
+```bash
+realm init my-workflow
+```
+
+This creates `my-workflow/` with `workflow.yaml`, `schema.json`, `.env.example`, and a `README.md`.
+
+### 2. Edit `my-workflow/workflow.yaml`
+
+```yaml
+id: my-workflow
+name: "My Workflow"
+version: 1
+initial_state: created
+
+steps:
+  gather_input:
+    description: "Agent collects the required information"
+    execution: agent
+    allowed_from_states: [created]
+    produces_state: input_ready
+    input_schema:
+      type: object
+      required: [summary]
+      properties:
+        summary:
+          type: string
+
+  finalize:
+    description: "Human reviews and approves"
+    execution: auto
+    trust: human_confirmed
+    allowed_from_states: [input_ready]
+    produces_state: completed
+```
+
+### 3. Validate, register, and run
+
+```bash
+realm validate ./my-workflow   # check the YAML
+realm register ./my-workflow   # register with the local store
+realm run ./my-workflow        # run interactively (development mode)
+```
+
+`realm run` drives the workflow step by step, prompting you for simulated agent output and pausing at human gates.
+
+## Connect an AI Agent via MCP
+
+Start the MCP server:
+
+```bash
+realm-mcp
+```
+
+Or with `npx` without a global install:
+
+```bash
+npx @sensigo/realm-mcp
+```
+
+**Claude Desktop — `claude_desktop_config.json`**
+
+```json
+{
+  "mcpServers": {
+    "realm": {
+      "command": "realm-mcp"
+    }
+  }
+}
+```
+
+**Cursor — `~/.cursor/mcp.json`**
+
+```json
+{
+  "mcpServers": {
+    "realm": {
+      "command": "realm-mcp"
+    }
+  }
+}
+```
+
+Once connected the agent has access to 6 tools: `list_workflows`, `get_workflow_protocol`, `start_run`, `execute_step`, `submit_human_response`, and `get_run_state`.
+
+The agent calls `get_workflow_protocol` first to receive explicit step-by-step instructions embedded in the workflow definition. It cannot execute a step out of order or submit output that fails schema validation.
+
+## CLI Reference
+
+| Command | Description |
 |---------|-------------|
-| `@sensigo/realm` | Core workflow execution engine |
-| `@sensigo/realm-cli` | Command-line interface (`realm` binary) |
-| `@sensigo/realm-mcp` | MCP server for AI agent connections |
-| `@sensigo/realm-testing` | Testing utilities for Realm workflows |
+| `realm init <name>` | Scaffold a new workflow project directory |
+| `realm validate <path>` | Validate a workflow YAML without registering it |
+| `realm register <path>` | Register a workflow in the local store |
+| `realm run <path>` | Run a workflow interactively (development mode) |
+| `realm resume <run-id>` | Resume a paused run |
+| `realm respond <run-id>` | Submit a response to a human gate |
+| `realm inspect <run-id>` | Print the full evidence chain for a run |
+| `realm replay <run-id>` | Re-evaluate preconditions with modified step outputs |
+| `realm diff <run-a> <run-b>` | Compare evidence chains of two runs side by side |
+| `realm cleanup` | Mark idle non-terminal runs as abandoned |
+| `realm test <path>` | Run fixture-based tests against a workflow |
+
+Run `realm <command> --help` for full options on any command.
+
+## Writing a Custom Step Handler
+
+A step handler contains business logic for an `auto` step. Register it before running the workflow.
+
+```typescript
+import type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from '@sensigo/realm';
+import { ExtensionRegistry } from '@sensigo/realm';
+
+const validateQuotes: StepHandler = {
+  id: 'validate_verbatim_quotes',
+  async execute(inputs: StepHandlerInputs, context: StepContext): Promise<StepHandlerResult> {
+    const candidates = inputs.params['candidates'] as Array<{ verbatim_quote: string }>;
+    const valid = candidates.filter(c => c.verbatim_quote.length > 0);
+    return { data: { valid_count: valid.length, candidates: valid } };
+  },
+};
+
+const registry = new ExtensionRegistry();
+registry.register('handler', 'validate_verbatim_quotes', validateQuotes);
+```
+
+In `workflow.yaml`, reference it with `handler: validate_verbatim_quotes` on an `execution: auto` step.
+
+See [docs/getting-started.md](docs/getting-started.md) for a complete end-to-end walkthrough including service adapters and MCP integration.
+
+## Testing Workflows
+
+Write fixture files describing a run's steps and expected outcomes, then run:
+
+```bash
+realm test ./my-workflow --fixtures ./my-workflow/fixtures/
+```
+
+In code, use `@sensigo/realm-testing` for unit-level assertions:
+
+```typescript
+import { InMemoryStore, assertFinalState, assertStepOutput } from '@sensigo/realm-testing';
+
+// assertFinalState(runRecord, 'completed')
+// assertStepOutput(runRecord, 'gather_input', { summary: 'approved' })
+```
+
+Full API: `InMemoryStore`, `MockServiceRecorder`, `createAgentDispatcher`, `createGateResponder`, `assertFinalState`, `assertStepSucceeded`, `assertStepFailed`, `assertStepOutput`, `assertEvidenceHash`, `testStepHandler`, `testProcessor`, `testAdapter`.
 
 ## Development
 
 **Prerequisites:** Node.js 20+, npm 10+
 
 ```bash
-npm install
-npm run build    # compile all packages
-npm run test     # run all tests
-npm run lint     # lint all packages
+npm install          # install all workspace dependencies
+npm run build        # compile all packages
+npm run test         # run all tests (226 total)
+npm run lint         # lint all packages
 ```
 
 ## License
