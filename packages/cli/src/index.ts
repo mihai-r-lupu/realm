@@ -11,6 +11,7 @@ import { inspectCommand } from './commands/inspect.js';
 import { replayCommand } from './commands/replay.js';
 import { diffCommand } from './commands/diff.js';
 import { initCommand } from './commands/init.js';
+import { testCommand } from './commands/test.js';
 
 const program = new Command();
 
@@ -29,5 +30,6 @@ program.addCommand(inspectCommand);
 program.addCommand(replayCommand);
 program.addCommand(diffCommand);
 program.addCommand(initCommand);
+program.addCommand(testCommand);
 
 program.parse();

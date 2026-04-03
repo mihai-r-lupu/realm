@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@sensigo/realm": "*",
+    "@sensigo/realm-testing": "*",
     "chalk": "^5.0.0",
     "commander": "*",
     "js-yaml": "*"
