@@ -5,10 +5,18 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "realm-mcp": "./dist/server.js"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
     "lint": "eslint src"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@sensigo/realm": "*",
+    "zod": "^3.25.7"
   },
   "devDependencies": {
     "typescript": "*",

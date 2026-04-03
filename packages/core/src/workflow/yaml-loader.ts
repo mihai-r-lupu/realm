@@ -171,6 +171,30 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
     });
   }
 
+  // Detect ambiguous routing: two steps with the same source state.
+  // This would create non-deterministic behaviour in executeChain's step lookup.
+  const sourceStateSeen = new Map<string, string>();
+  for (const [stepName, stepRaw] of Object.entries(stepsRaw)) {
+    const step = stepRaw as Record<string, unknown>;
+    if (Array.isArray(step['allowed_from_states'])) {
+      for (const state of step['allowed_from_states'] as string[]) {
+        const existing = sourceStateSeen.get(state);
+        if (existing !== undefined) {
+          throw new WorkflowError(
+            `Ambiguous routing: steps '${existing}' and '${stepName}' both allow state '${state}'. Each state must route to exactly one step.`,
+            {
+              code: 'VALIDATION_INPUT_SCHEMA',
+              category: 'VALIDATION',
+              agentAction: 'report_to_user',
+              retryable: false,
+            },
+          );
+        }
+        sourceStateSeen.set(state, stepName);
+      }
+    }
+  }
+
   // Step 6: Return typed result
   return doc as unknown as WorkflowDefinition;
 }

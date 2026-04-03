@@ -2,6 +2,13 @@
 
 export type ExecutionMode = 'auto' | 'agent';
 
+export interface ProtocolConfig {
+  /** Override for the generated quick-start paragraph. */
+  quick_start?: string;
+  /** Behavioral rules injected verbatim into the agent protocol. */
+  rules?: string[];
+}
+
 export type TrustLevel = 'auto' | 'human_notified' | 'human_confirmed' | 'human_reviewed';
 
 export type ServiceTrust = 'engine_delivered' | 'engine_managed' | 'agent_provided';
@@ -41,6 +48,8 @@ export interface StepDefinition {
   trust?: TrustLevel;
   timeout_seconds?: number;
   retry?: RetryConfig;
+  /** Plain-English instructions for the agent at this step. */
+  instructions?: string;
 }
 
 export interface WorkflowDefinition {
@@ -48,6 +57,10 @@ export interface WorkflowDefinition {
   name: string;
   version: number;
   initial_state: string;
+  /** JSON Schema describing the params accepted by start_run. */
+  params_schema?: JsonSchema;
+  /** Optional protocol customizations — overrides generated sections. */
+  protocol?: ProtocolConfig;
   services?: Record<string, ServiceDefinition>;
   steps: Record<string, StepDefinition>;
 }

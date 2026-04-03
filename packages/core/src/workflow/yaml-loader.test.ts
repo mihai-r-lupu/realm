@@ -65,6 +65,23 @@ describe('loadWorkflowFromString', () => {
 `;
     expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
   });
+
+  it('rejects workflows with duplicate allowed_from_states', () => {
+    const content = VALID_YAML + `
+  step-dupe:
+    description: Duplicate source step
+    execution: auto
+    allowed_from_states: [created]
+    produces_state: dupe_done
+`;
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect(err).toBeInstanceOf(WorkflowError);
+      expect((err as WorkflowError).message).toContain('Ambiguous routing');
+    }
+  });
 });
 
 describe('loadWorkflowFromFile', () => {

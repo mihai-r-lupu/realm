@@ -1,0 +1,69 @@
+// get-run-state tool — returns the current state summary of a run.
+import { z } from 'zod';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { JsonFileStore } from '@sensigo/realm';
+
+export interface HandleRunStateStores {
+  runStore?: JsonFileStore;
+}
+
+export interface RunStateSummary {
+  run_id: string;
+  workflow_id: string;
+  state: string;
+  terminal_state: boolean;
+  terminal_reason: string | undefined;
+  pending_gate: import('@sensigo/realm').PendingGate | undefined;
+  evidence_count: number;
+  last_step: string | null;
+  created_at: string;
+  updated_at: string;
+  params: Record<string, unknown>;
+}
+
+/**
+ * Business logic for the get_run_state tool.
+ * Returns a structured summary of the run without the full evidence array.
+ */
+export async function handleGetRunState(
+  args: { run_id: string },
+  stores?: HandleRunStateStores,
+): Promise<RunStateSummary> {
+  const runStore = stores?.runStore ?? new JsonFileStore();
+  const run = await runStore.get(args.run_id);
+
+  return {
+    run_id: run.id,
+    workflow_id: run.workflow_id,
+    state: run.state,
+    terminal_state: run.terminal_state,
+    terminal_reason: run.terminal_reason,
+    pending_gate: run.pending_gate,
+    evidence_count: run.evidence.length,
+    last_step: run.evidence.at(-1)?.step_id ?? null,
+    created_at: run.created_at,
+    updated_at: run.updated_at,
+    params: run.params,
+  };
+}
+
+/** Registers the get_run_state MCP tool on the server. */
+export function registerGetRunState(server: McpServer): void {
+  server.tool(
+    'get_run_state',
+    'Get the current state summary of a workflow run.',
+    { run_id: z.string() },
+    async (args) => {
+      try {
+        const result = await handleGetRunState(args);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: 'text' as const, text: `Error: ${message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+}
