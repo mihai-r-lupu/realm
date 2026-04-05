@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "realm-code-review": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/examples/code-review/dist/mcp-server.js"
+      ]
+    }
+  }
+}
