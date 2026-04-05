@@ -243,7 +243,9 @@ export function findNextAction(
       return {
         instruction: step.handler !== undefined
           ? { tool: step.handler, params: {} }
-          : null,
+          : step.execution === 'agent'
+            ? { tool: 'execute_step', params: { step_name: stepName, input_schema: step.input_schema ?? {} } }
+            : null,
         human_readable: `Execute step '${stepName}': ${step.description}`,
         context_hint: `Current state is '${newState}'. Next step is '${stepName}'.`,
         ...(step.timeout_seconds !== undefined
@@ -580,9 +582,9 @@ export async function executeStep(
     const resolvedGatePrompt =
       stepDef!.prompt !== undefined
         ? resolvePromptTemplate(stepDef!.prompt, {
-            evidenceByStep: gateEvidenceCtx,
-            runParams: run.params,
-          })
+          evidenceByStep: gateEvidenceCtx,
+          runParams: run.params,
+        })
         : undefined;
 
     return {
@@ -799,9 +801,9 @@ export async function submitHumanResponse(
   const nextAction = isTerminal
     ? null
     : findNextAction(newState, definition, {
-        evidenceByStep,
-        runParams: savedRun.params,
-      });
+      evidenceByStep,
+      runParams: savedRun.params,
+    });
 
   return {
     command: run.pending_gate.step_name,
