@@ -232,6 +232,7 @@ export function findNextAction(
   context: {
     evidenceByStep: Record<string, Record<string, unknown>>;
     runParams: Record<string, unknown>;
+    runId: string;
   },
 ): NextAction | null {
   for (const [stepName, step] of Object.entries(definition.steps)) {
@@ -244,8 +245,11 @@ export function findNextAction(
         instruction: step.handler !== undefined
           ? { tool: step.handler, params: {} }
           : step.execution === 'agent'
-            ? { tool: 'execute_step', params: { step_name: stepName, input_schema: step.input_schema ?? {} } }
+            ? { tool: 'execute_step', params: { run_id: context.runId, command: stepName } }
             : null,
+        ...(step.execution === 'agent' && step.input_schema !== undefined
+          ? { input_schema: step.input_schema }
+          : {}),
         human_readable: `Execute step '${stepName}': ${step.description}`,
         context_hint: `Current state is '${newState}'. Next step is '${stepName}'.`,
         ...(step.timeout_seconds !== undefined
@@ -596,7 +600,14 @@ export async function executeStep(
       evidence: allEvidence,
       warnings: [],
       errors: [],
-      next_action: null,
+      next_action: {
+        instruction: {
+          tool: 'submit_human_response',
+          params: { run_id: options.runId, gate_id },
+        },
+        human_readable: `Human review required for step '${options.command}'. Present gate.prompt to the user, wait for their choice from gate.choices, then call submit_human_response.`,
+        context_hint: `Run is paused at gate '${gate_id}'. Available choices: ${choices.join(', ')}.`,
+      },
       gate: {
         gate_id,
         step_name,
@@ -643,7 +654,7 @@ export async function executeStep(
     evidenceByStep: { ...evidenceByStep, [options.command]: output },
     runParams: run.params,
   };
-  const nextAction = isTerminal ? null : findNextAction(newState, definition, nextStepContext);
+  const nextAction = isTerminal ? null : findNextAction(newState, definition, { ...nextStepContext, runId: options.runId });
 
   return {
     command: options.command,
@@ -803,6 +814,7 @@ export async function submitHumanResponse(
     : findNextAction(newState, definition, {
       evidenceByStep,
       runParams: savedRun.params,
+      runId: options.runId,
     });
 
   return {

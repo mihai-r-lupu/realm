@@ -9,6 +9,8 @@ export interface NextAction {
   human_readable: string;
   context_hint: string;
   expected_timeout?: string;
+  /** The step's declared input schema — use this to structure the params argument of your execute_step call. */
+  input_schema?: Record<string, unknown>;
   /** Template-resolved step prompt, delivered to the agent at step entry. */
   prompt?: string;
 }

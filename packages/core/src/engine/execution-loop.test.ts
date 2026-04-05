@@ -881,15 +881,16 @@ describe('executeStep', () => {
       };
 
       const { findNextAction } = await import('./execution-loop.js');
-      const result = findNextAction('created', agentStepDef, { evidenceByStep: {}, runParams: {} });
+      const result = findNextAction('created', agentStepDef, { evidenceByStep: {}, runParams: {}, runId: 'test-run-id' });
 
       expect(result).not.toBeNull();
       expect(result!.instruction).not.toBeNull();
       expect(result!.instruction!.tool).toBe('execute_step');
-      expect((result!.instruction!.params as Record<string, unknown>)['step_name']).toBe('review-code');
-      expect((result!.instruction!.params as Record<string, unknown>)['input_schema']).toEqual(
-        agentStepDef.steps['review-code']?.input_schema,
-      );
+      expect((result!.instruction!.params as Record<string, unknown>)['command']).toBe('review-code');
+      expect((result!.instruction!.params as Record<string, unknown>)['run_id']).toBe('test-run-id');
+      expect(result!.input_schema).toEqual(agentStepDef.steps['review-code']?.input_schema);
+      // instruction.params must NOT contain input_schema
+      expect((result!.instruction!.params as Record<string, unknown>)['input_schema']).toBeUndefined();
     });
 
     it('returns instruction: null for an auto step without a handler', async () => {
@@ -909,10 +910,52 @@ describe('executeStep', () => {
       };
 
       const { findNextAction } = await import('./execution-loop.js');
-      const result = findNextAction('created', autoStepDef, { evidenceByStep: {}, runParams: {} });
+      const result = findNextAction('created', autoStepDef, { evidenceByStep: {}, runParams: {}, runId: 'test-run-id' });
 
       expect(result).not.toBeNull();
       expect(result!.instruction).toBeNull();
+    });
+  });
+
+  describe('confirm_required next_action population', () => {
+    it('confirm_required response has next_action instruction pointing to submit_human_response', async () => {
+      const gateWorkflow: WorkflowDefinition = {
+        id: 'gate-nav-wf',
+        name: 'Gate Navigation Workflow',
+        version: 1,
+        initial_state: 'created',
+        steps: {
+          gate_step: {
+            description: 'Gate step requiring human approval',
+            execution: 'auto',
+            trust: 'human_confirmed',
+            allowed_from_states: ['created'],
+            produces_state: 'approved',
+          },
+        },
+      };
+      const gateGuard = new StateGuard(gateWorkflow);
+      const run = await store.create({
+        workflowId: 'gate-nav-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const envelope = await executeStep(store, gateGuard, gateWorkflow, {
+        runId: run.id,
+        command: 'gate_step',
+        input: {},
+        snapshotId: '0',
+        dispatcher: echoDispatcher,
+      });
+
+      expect(envelope.status).toBe('confirm_required');
+      expect(envelope.next_action).not.toBeNull();
+      expect(envelope.next_action!.instruction).not.toBeNull();
+      expect(envelope.next_action!.instruction!.tool).toBe('submit_human_response');
+      expect((envelope.next_action!.instruction!.params as Record<string, unknown>)['run_id']).toBe(run.id);
+      expect((envelope.next_action!.instruction!.params as Record<string, unknown>)['gate_id']).toBe(envelope.gate!.gate_id);
     });
   });
 
