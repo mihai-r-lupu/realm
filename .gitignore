@@ -30,7 +30,8 @@ out/
 Thumbs.db
 
 # Editor
-.vscode/
+.vscode/*
+!.vscode/mcp.json
 .idea/
 *.swp
 *.swo
