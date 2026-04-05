@@ -891,6 +891,9 @@ describe('executeStep', () => {
       expect(result!.input_schema).toEqual(agentStepDef.steps['review-code']?.input_schema);
       // instruction.params must NOT contain input_schema
       expect((result!.instruction!.params as Record<string, unknown>)['input_schema']).toBeUndefined();
+      expect(result!.instruction!.params_required).not.toBeUndefined();
+      expect(result!.instruction!.params_required).toHaveLength(1);
+      expect(result!.instruction!.params_required![0]!.name).toBe('params');
     });
 
     it('returns instruction: null for an auto step without a handler', async () => {
@@ -956,6 +959,13 @@ describe('executeStep', () => {
       expect(envelope.next_action!.instruction!.tool).toBe('submit_human_response');
       expect((envelope.next_action!.instruction!.params as Record<string, unknown>)['run_id']).toBe(run.id);
       expect((envelope.next_action!.instruction!.params as Record<string, unknown>)['gate_id']).toBe(envelope.gate!.gate_id);
+      const paramsRequired = envelope.next_action!.instruction!.params_required;
+      expect(paramsRequired).not.toBeUndefined();
+      expect(paramsRequired).toHaveLength(1);
+      expect(paramsRequired![0]!.name).toBe('choice');
+      expect(paramsRequired![0]!.valid_values).toBeDefined();
+      expect(paramsRequired![0]!.valid_values).toContain('approve');
+      expect(paramsRequired![0]!.valid_values).toContain('reject');
     });
   });
 
