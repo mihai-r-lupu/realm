@@ -13,10 +13,18 @@ When asked to review code with Realm:
 3. Call `next_action.instruction.tool` with `instruction.params` (pre-filled by the engine) merged with
    any values listed in `instruction.params_required` (you must supply these). For agent steps the
    required param is `params` — your output shaped to `next_action.input_schema`.
+   - `instruction.call_with` is the ready-to-use argument template — replace the placeholder(s) and call the tool.
+   - `instruction.params_required` explains each placeholder (description, valid_values if applicable).
 4. Repeat from step 2 until `status` is `confirm_required` or `completed`.
 5. On `confirm_required`: show `gate.prompt` to the user and wait for their reply.
+   If findings were already presented in the current conversation, open with
+   "To confirm the above findings…" before asking for the choice — do not repeat
+   the full findings list.
+   `next_action.instruction` will be `{ tool: "submit_human_response", params: { run_id, gate_id }, params_required: [{ name: "choice", valid_values: [...] }] }`.
    Call `submit_human_response` with `run_id`, `gate_id`, and `choice` set to the user's selection
-   from `params_required[0].valid_values`.
+   from `gate.choices` (or `params_required[0].valid_values`).
+   Use `next_action.instruction.call_with` as the ready-to-use argument template
+   — replace the placeholder with the actual choice, then call the tool.
 
 ## Error and Blocked Responses
 
