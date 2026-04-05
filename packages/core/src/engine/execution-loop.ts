@@ -287,6 +287,7 @@ function errorEnvelope(
     evidence: [],
     warnings: [],
     errors: [err.message],
+    agent_action: err.agentAction,
     next_action: null,
   };
 }
@@ -295,13 +296,28 @@ function makeErrorEnvelope(
   options: ExecuteStepOptions,
   run: RunRecord | null,
   err: WorkflowError,
+  definition?: WorkflowDefinition,
 ): ResponseEnvelope {
-  return errorEnvelope(
+  const base = errorEnvelope(
     options.command,
     options.runId,
     run !== null ? run.version.toString() : options.snapshotId,
     err,
   );
+  if (run !== null && definition !== undefined && err.agentAction !== 'stop') {
+    const evidenceByStep: Record<string, Record<string, unknown>> = {};
+    for (const snap of run.evidence) {
+      if (snap.kind === 'gate_response') continue;
+      evidenceByStep[snap.step_id] = snap.output_summary;
+    }
+    const next_action = findNextAction(run.state, definition, {
+      evidenceByStep,
+      runParams: run.params,
+      runId: options.runId,
+    });
+    return { ...base, next_action };
+  }
+  return base;
 }
 
 export async function executeStep(
@@ -336,7 +352,7 @@ export async function executeStep(
       retryable: true,
       details: { expected: options.snapshotId, actual: run.version.toString() },
     });
-    return makeErrorEnvelope(options, run, err);
+    return makeErrorEnvelope(options, run, err, definition);
   }
 
   // Step 3: Check state guard
@@ -351,6 +367,7 @@ export async function executeStep(
       evidence: [],
       warnings: [],
       errors: [],
+      agent_action: 'resolve_precondition' as const,
       next_action: null,
       blocked_reason: blockedReason,
     };
@@ -378,6 +395,7 @@ export async function executeStep(
         evidence: [],
         warnings: [],
         errors: [],
+        agent_action: 'stop' as const,
         next_action: null,
         blocked_reason: {
           current_state: run.state,
@@ -401,7 +419,7 @@ export async function executeStep(
       validateInputSchema(options.input, stepDef.input_schema, options.command);
     } catch (err) {
       if (err instanceof WorkflowError) {
-        return makeErrorEnvelope(options, run, err);
+        return makeErrorEnvelope(options, run, err, definition);
       }
       throw err;
     }
@@ -416,7 +434,7 @@ export async function executeStep(
     pendingRun = await store.update({ ...run, state: `${options.command}_pending` });
   } catch (err) {
     if (err instanceof WorkflowError) {
-      return makeErrorEnvelope(options, run, err);
+      return makeErrorEnvelope(options, run, err, definition);
     }
     const internal = new WorkflowError('Failed to transition run to pending state', {
       code: 'ENGINE_STORE_FAILED',
@@ -424,7 +442,7 @@ export async function executeStep(
       agentAction: 'stop',
       retryable: false,
     });
-    return makeErrorEnvelope(options, run, internal);
+    return makeErrorEnvelope(options, run, internal, definition);
   }
 
   // Step 4: Execute dispatcher with retry loop and optional timeout.
@@ -576,7 +594,7 @@ export async function executeStep(
       });
     } catch (err) {
       if (err instanceof WorkflowError) {
-        return makeErrorEnvelope(options, pendingRun, err);
+        return makeErrorEnvelope(options, pendingRun, err, definition);
       }
       return makeErrorEnvelope(
         options,
@@ -587,6 +605,7 @@ export async function executeStep(
           agentAction: 'stop',
           retryable: false,
         }),
+        definition,
       );
     }
 
@@ -651,7 +670,7 @@ export async function executeStep(
     savedRun = await store.update(updatedRun);
   } catch (err) {
     if (err instanceof WorkflowError) {
-      return makeErrorEnvelope(options, pendingRun, err);
+      return makeErrorEnvelope(options, pendingRun, err, definition);
     }
     const internal = new WorkflowError('Failed to persist run update', {
       code: 'ENGINE_STORE_FAILED',
@@ -659,7 +678,7 @@ export async function executeStep(
       agentAction: 'stop',
       retryable: false,
     });
-    return makeErrorEnvelope(options, pendingRun, internal);
+    return makeErrorEnvelope(options, pendingRun, internal, definition);
   }
 
   // Step 8: Build and return ResponseEnvelope

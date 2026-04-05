@@ -99,6 +99,11 @@ describe('executeStep', () => {
 
     expect(envelope.status).toBe('error');
     expect(envelope.errors[0]).toContain('Snapshot mismatch');
+    expect(envelope.agent_action).toBe('report_to_user');
+    // next_action is populated because run state is known; instruction is null
+    // because the next step (step-one) is auto and needs no agent call.
+    expect(envelope.next_action).not.toBeNull();
+    expect(envelope.next_action?.instruction).toBeNull();
   });
 
   it('blocked state returns blocked envelope with blocked_reason', async () => {
@@ -121,6 +126,8 @@ describe('executeStep', () => {
     expect(envelope.blocked_reason).toBeDefined();
     expect(envelope.blocked_reason?.current_state).toBe('created');
     expect(envelope.blocked_reason?.allowed_states).toContain('step_one_done');
+    expect(envelope.agent_action).toBe('resolve_precondition');
+    expect(envelope.next_action).toBeNull();
   });
 
   it('dispatcher error returns error envelope with evidence', async () => {
@@ -180,6 +187,10 @@ describe('executeStep', () => {
 
     expect(envelope.status).toBe('error');
     expect(envelope.errors[0]).toContain('Run not found');
+    // InMemoryStore throws agentAction: 'report_to_user' for missing runs.
+    // Step 1 run-load failure always returns next_action: null (no run state to recover from).
+    expect(envelope.agent_action).toBe('report_to_user');
+    expect(envelope.next_action).toBeNull();
   });
 
   it('input schema validation blocks dispatch when input is invalid', async () => {
@@ -217,6 +228,8 @@ describe('executeStep', () => {
 
     expect(envelope.status).toBe('error');
     expect(dispatchCalled).not.toHaveBeenCalled();
+    expect(envelope.agent_action).toBe('provide_input');
+    expect(envelope.next_action).not.toBeNull();
   });
 
   it('input schema validation passes through for valid input', async () => {
