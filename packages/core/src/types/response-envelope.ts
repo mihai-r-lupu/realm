@@ -1,5 +1,6 @@
 // Types for the ResponseEnvelope returned by every step execution.
 import type { EvidenceSnapshot } from './run-record.js';
+import type { AgentAction } from './workflow-error.js';
 
 /** Describes a parameter the agent must supply at call time. */
 export interface RequiredParam {
@@ -50,6 +51,7 @@ export interface ResponseEnvelope {
   evidence: EvidenceSnapshot[];
   warnings: string[];
   errors: string[];
+  agent_action?: AgentAction;
   next_action: NextAction | null;
   blocked_reason?: BlockedReason;
   gate?: GateInfo;

@@ -24,3 +24,17 @@ When asked to review code with Realm:
 5. On `confirm_required`: show `gate.prompt` to the user and wait for their reply.
    `next_action.instruction` will be `{ tool: "submit_human_response", params: { run_id, gate_id }, params_required: [{ name: "choice", valid_values: [...] }] }`.
    Call `submit_human_response` with `run_id`, `gate_id`, and `choice` set to the user's selection from `gate.choices` (or `params_required[0].valid_values`).
+
+## Error and Blocked Responses
+
+Every `status: 'error'` and `status: 'blocked'` response carries `agent_action` that tells you what to do next. Do not parse the `errors` text to decide recovery strategy — use `agent_action`.
+
+| `agent_action` | Meaning | What to do |
+|---|---|---|
+| `stop` | The run is terminal or has failed unrecoverably. | Do not retry. Report to user. |
+| `report_to_user` | Engine state is inconsistent (e.g. snapshot mismatch). | Surface to user. Do not retry autonomously. |
+| `provide_input` | The params you submitted were invalid. | Fix the params and retry `execute_step` with the same command. `next_action` shows the correct tool call. |
+| `resolve_precondition` | A prior step must complete before this one. | Follow `next_action` if non-null, or check `blocked_reason` for allowed states. |
+| `wait_for_human` | A human gate is open and waiting for a choice. | Call `submit_human_response` with the user's choice. |
+
+When `agent_action` is `provide_input` or `resolve_precondition` and `next_action` is non-null, follow it exactly as you would after a successful step. When `next_action` is null, surface `blocked_reason` to the user.
