@@ -7,6 +7,15 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Added
+- `call_with` field on `NextAction.instruction` — a ready-to-use flat argument object for calling the
+  tool. Agent-supplied params appear as placeholder strings (e.g. `<YOUR_PARAMS>`, `<approve|reject>`).
+  The agent copies the object, replaces the placeholder(s), and calls the tool — no manual merging of
+  `params` and `params_required` required.
+- `context_hint` promoted to a required top-level field on `ResponseEnvelope` — every response now
+  carries orientation about the current run state and what just happened, including error and blocked
+  responses where `next_action` is `null`. Previously only appeared inside `next_action`.
+- JSDoc on `ResponseEnvelope.snapshot_id` (audit-only — do not parse) and `ResponseEnvelope.evidence`
+  (debugging and CLI inspection only) to reduce agent confusion about opaque fields.
 - `params_required` field on `NextAction.instruction` — each tool instruction now declares which
   parameters the agent must supply, separately from parameters pre-filled by the engine. Agent steps
   include `{ name: "params" }` (output shaped to `input_schema`). Human gate instructions include
