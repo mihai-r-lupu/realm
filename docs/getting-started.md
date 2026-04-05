@@ -164,7 +164,44 @@ registry.register('adapter', 'google_docs', googleDocsAdapter);
 
 ---
 
-## 8. Adding a Step Handler
+## 8. Adding a Human Gate
+
+A human gate pauses a run and requires explicit approval before the engine advances to the next step. Add one to `workflow.yaml`:
+
+```yaml
+steps:
+  review_findings:
+    description: "Security team reviews the identified findings."
+    execution: auto
+    trust: human_confirmed
+    allowed_from_states: [findings_ready]
+    produces_state: findings_approved
+    gate:
+      preview: "{{ steps.collect_findings.output.summary }}"
+      choices:
+        - approve
+        - reject
+```
+
+When the engine reaches a step with `trust: human_confirmed`, it pauses the run and returns `status: confirm_required`. The run will not advance until a human responds.
+
+**To resume a paused run from the CLI:**
+
+```bash
+realm respond <run-id>
+```
+
+**To resume via the MCP tool:** call `submit_human_response` with the `run_id`, `gate_id`, and `choice` from the `confirm_required` response.
+
+### The `gate.preview` field
+
+`gate.preview` is a Jinja-style template resolved when the gate opens. Its resolved value is sent inline in the response and is what the human sees when deciding whether to approve or reject. It must be a bounded, human-readable summary — not raw agent output.
+
+**Authoring constraint:** the preview is sent to the agent and forwarded to the human. It must contain only the information needed to make the decision: a concise summary, a count, or a short excerpt. Do not surface unbounded payloads — full document text, raw finding arrays, or large JSON objects — as the preview value. Workflow authors are responsible for ensuring gate previews remain small.
+
+---
+
+## 9. Adding a Step Handler
 
 A step handler contains business logic for an `auto` step — validation, transformation, enrichment.
 
@@ -195,7 +232,7 @@ const checkRequiredFields: StepHandler = {
 
 ---
 
-## 9. Connect an AI Agent via MCP
+## 10. Connect an AI Agent via MCP
 
 Install the MCP server:
 
@@ -260,7 +297,7 @@ For agent steps, `params_required` will contain `{ name: "params" }` — the age
 
 ---
 
-## 10. Testing Workflows
+## 11. Testing Workflows
 
 Write a fixture file in `extraction-demo/fixtures/happy-path.yaml`:
 
@@ -302,7 +339,7 @@ assertStepOutput(run, 'step_one', { result: 'the document text' });
 
 ---
 
-## 11. Other Useful Commands
+## 12. Other Useful Commands
 
 ```bash
 realm resume <run-id>             # resume a paused run
