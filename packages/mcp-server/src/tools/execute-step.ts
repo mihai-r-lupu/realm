@@ -55,6 +55,28 @@ export async function handleExecuteStep(
   });
 }
 
+/**
+ * MCP tool handler for execute_step.
+ * Calls handleExecuteStep and serialises the result for MCP transport,
+ * stripping the data payload to avoid oversized responses.
+ */
+export async function handleExecuteStepTool(
+  args: { run_id: string; command: string; params?: Record<string, unknown> },
+  opts?: HandleRunStores,
+): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
+  try {
+    const result = await handleExecuteStep(args, opts);
+    const slimResult = { ...result, data: {}, evidence: slimEvidence(result.evidence) };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      content: [{ type: 'text' as const, text: `Error: ${message}` }],
+      isError: true,
+    };
+  }
+}
+
 /** Registers the execute_step MCP tool on the server. */
 export function registerExecuteStep(server: McpServer, opts?: { registry?: import('@sensigo/realm').ExtensionRegistry; secrets?: Record<string, string> }): void {
   server.tool(
@@ -65,18 +87,6 @@ export function registerExecuteStep(server: McpServer, opts?: { registry?: impor
       command: z.string(),
       params: z.record(z.unknown()).optional().default({}),
     },
-    async (args) => {
-      try {
-        const result = await handleExecuteStep(args, opts);
-        const slimResult = { ...result, data: {}, evidence: slimEvidence(result.evidence) };
-        return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          content: [{ type: 'text' as const, text: `Error: ${message}` }],
-          isError: true,
-        };
-      }
-    },
+    async (args) => handleExecuteStepTool(args, opts),
   );
 }
