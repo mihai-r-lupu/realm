@@ -6,6 +6,7 @@ import {
   JsonFileStore,
   StateGuard,
   executeChain,
+  findNextAction,
   type StepDispatcher,
   type ResponseEnvelope,
   ExtensionRegistry,
@@ -62,6 +63,23 @@ export async function handleStartRun(
       status: 'ok',
       data: {},
       next_action: null,
+      gate: undefined,
+      errors: [],
+    };
+  }
+
+  const firstStepDef = definition.steps[firstStep];
+  if (firstStepDef?.execution !== 'auto') {
+    const nextAction = findNextAction(run.state, definition, {
+      evidenceByStep: {},
+      runParams: params,
+      runId: run.id,
+    });
+    return {
+      run_id: run.id,
+      status: 'ok',
+      data: {},
+      next_action: nextAction,
       gate: undefined,
       errors: [],
     };

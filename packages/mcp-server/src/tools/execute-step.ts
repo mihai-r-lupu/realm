@@ -11,6 +11,18 @@ import {
 } from '@sensigo/realm';
 import type { HandleRunStores } from './start-run.js';
 
+/** Strips verbose I/O summaries and diagnostics from evidence entries for MCP responses. */
+function slimEvidence(evidence: ResponseEnvelope['evidence']): unknown[] {
+  return evidence.map(snap => ({
+    step_id: snap.step_id,
+    status: snap.status,
+    duration_ms: snap.duration_ms,
+    evidence_hash: snap.evidence_hash,
+    ...(snap.attempt !== undefined ? { attempt: snap.attempt } : {}),
+    ...(snap.error !== undefined ? { error: snap.error } : {}),
+  }));
+}
+
 /**
  * Business logic for the execute_step tool.
  * For agent steps: the agent's params ARE the step output — the result of their work.
@@ -56,7 +68,8 @@ export function registerExecuteStep(server: McpServer, opts?: { registry?: impor
     async (args) => {
       try {
         const result = await handleExecuteStep(args, opts);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+        const slimResult = { ...result, evidence: slimEvidence(result.evidence) };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
