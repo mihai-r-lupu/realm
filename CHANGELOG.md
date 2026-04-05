@@ -12,6 +12,16 @@ All notable changes to this project are documented here.
   include `{ name: "params" }` (output shaped to `input_schema`). Human gate instructions include
   `{ name: "choice", valid_values: [...] }` so the agent knows both the key name and the allowed values
   without having to guess.
+- `agent_action` field on `ResponseEnvelope` — every `error` and `blocked` response now includes
+  `agent_action: AgentAction` (`stop`, `report_to_user`, `provide_input`, `resolve_precondition`,
+  `wait_for_human`) so consuming agents can determine recovery strategy without parsing error text.
+- `next_action` populated on recoverable error responses — when `agentAction !== 'stop'` and the
+  run state is known, the error envelope includes a populated `next_action` pointing the agent to
+  the correct next step. Agents no longer need to call `get_workflow_protocol` to recover.
+- `next_action` populated on state-guard blocked responses — when the agent calls a step from the
+  wrong state, the blocked response now includes `next_action` redirecting to the correct step.
+  `blocked_reason.suggestion` indicates either the redirect or that no valid next step exists from
+  the current state.
 
 ### Fixed
 - MCP `start_run`: returns a populated `next_action` when the first step is an agent step (previously
@@ -22,9 +32,12 @@ All notable changes to this project are documented here.
   `submit_human_response` instruction (previously `next_action` was `null`).
 - `realm inspect`: step input/output fields are now truncated to 120 characters to prevent
   overwhelming terminal output on evidence-heavy runs.
+- MCP tool catch handlers (`start_run`, `execute_step`, `submit_human_response`) now return
+  structured JSON on unexpected exceptions instead of a bare `Error: <message>` string. All MCP
+  responses are now JSON-parseable on every code path.
 
 ### Tests
-250 tests across all packages (157 core, 42 CLI, 11 MCP, 40 testing).
+253 tests across all packages (158 core, 42 CLI, 13 MCP, 40 testing).
 
 ---
 

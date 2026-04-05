@@ -295,6 +295,22 @@ For agent steps, `params_required` will contain `{ name: "params" }` — the age
 `next_action.input_schema`. For human gate responses, it will contain
 `{ name: "choice", valid_values: [...] }` listing the allowed choices.
 
+### Error and blocked responses
+
+Every `status: 'error'` and `status: 'blocked'` response includes an `agent_action` field that
+tells the agent how to recover — without requiring it to parse the error message text.
+
+| `agent_action` | Meaning | What to do |
+|---|---|---|
+| `stop` | Terminal failure. | Do not retry. Report to user. |
+| `report_to_user` | Engine state inconsistent (e.g. snapshot mismatch). | Surface to user. Do not retry autonomously. |
+| `provide_input` | Submitted params were invalid. | Fix params and retry `execute_step` with the same command. Use `next_action` for the correct call. |
+| `resolve_precondition` | Wrong step for current state. | Follow `next_action` to the correct step, or check `blocked_reason` for allowed states. |
+| `wait_for_human` | Gate is open. | Call `submit_human_response` with the user's choice. |
+
+When `agent_action` is `provide_input` or `resolve_precondition` and `next_action` is non-null,
+follow it exactly as after a successful step.
+
 ---
 
 ## 11. Testing Workflows
