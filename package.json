@@ -3,7 +3,8 @@
   "private": true,
   "packageManager": "npm@11.8.0",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "examples/*"
   ],
   "scripts": {
     "build": "turbo run build",

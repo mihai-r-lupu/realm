@@ -16,6 +16,7 @@ import { checkPreconditions, evaluateAllPreconditions } from './precondition.js'
 import { ExtensionRegistry } from '../extensions/registry.js';
 import type { ServiceResponse } from '../extensions/service-adapter.js';
 import { resolveSecret } from '../config/secrets.js';
+import { resolvePromptTemplate } from './prompt-template.js';
 
 export type StepDispatcher = (
   stepName: string,
@@ -223,13 +224,22 @@ async function callHandler(
 /**
  * Returns a NextAction for the first step that can execute from the given state,
  * or null if no step is available (terminal or stalled state).
+ * Resolves any step.prompt template references before returning.
  */
 export function findNextAction(
   newState: string,
   definition: WorkflowDefinition,
+  context: {
+    evidenceByStep: Record<string, Record<string, unknown>>;
+    runParams: Record<string, unknown>;
+  },
 ): NextAction | null {
   for (const [stepName, step] of Object.entries(definition.steps)) {
     if (step.allowed_from_states.includes(newState)) {
+      const resolvedPrompt =
+        step.prompt !== undefined
+          ? resolvePromptTemplate(step.prompt, context)
+          : undefined;
       return {
         instruction: step.handler !== undefined
           ? { tool: step.handler, params: {} }
@@ -239,6 +249,7 @@ export function findNextAction(
         ...(step.timeout_seconds !== undefined
           ? { expected_timeout: `${step.timeout_seconds}s` }
           : {}),
+        ...(resolvedPrompt !== undefined ? { prompt: resolvedPrompt } : {}),
       };
     }
   }
@@ -564,6 +575,16 @@ export async function executeStep(
       );
     }
 
+    // Resolve gate prompt with the full evidence context (including current step output).
+    const gateEvidenceCtx = { ...evidenceByStep, [options.command]: output };
+    const resolvedGatePrompt =
+      stepDef!.prompt !== undefined
+        ? resolvePromptTemplate(stepDef!.prompt, {
+            evidenceByStep: gateEvidenceCtx,
+            runParams: run.params,
+          })
+        : undefined;
+
     return {
       command: options.command,
       run_id: options.runId,
@@ -574,7 +595,13 @@ export async function executeStep(
       warnings: [],
       errors: [],
       next_action: null,
-      gate: { gate_id, step_name, preview: output, choices },
+      gate: {
+        gate_id,
+        step_name,
+        preview: output,
+        choices,
+        ...(resolvedGatePrompt !== undefined ? { prompt: resolvedGatePrompt } : {}),
+      },
     };
   }
 
@@ -609,7 +636,12 @@ export async function executeStep(
   }
 
   // Step 8: Build and return ResponseEnvelope
-  const nextAction = isTerminal ? null : findNextAction(newState, definition);
+  // Include the current step's output in evidenceByStep for the next step's prompt template.
+  const nextStepContext = {
+    evidenceByStep: { ...evidenceByStep, [options.command]: output },
+    runParams: run.params,
+  };
+  const nextAction = isTerminal ? null : findNextAction(newState, definition, nextStepContext);
 
   return {
     command: options.command,
@@ -758,7 +790,18 @@ export async function submitHumanResponse(
 
   // 7. Build response — merge step output with human choice for a complete data record.
   const data = { ...run.pending_gate.preview, choice: options.choice };
-  const nextAction = isTerminal ? null : findNextAction(newState, definition);
+  // Build evidenceByStep from the saved run for next step's prompt template resolution.
+  const evidenceByStep: Record<string, Record<string, unknown>> = {};
+  for (const snap of savedRun.evidence) {
+    if (snap.kind === 'gate_response') continue;
+    evidenceByStep[snap.step_id] = snap.output_summary;
+  }
+  const nextAction = isTerminal
+    ? null
+    : findNextAction(newState, definition, {
+        evidenceByStep,
+        runParams: savedRun.params,
+      });
 
   return {
     command: run.pending_gate.step_name,

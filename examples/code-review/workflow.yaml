@@ -1,0 +1,103 @@
+# examples/code-review/workflow.yaml
+# Structured Code Review — Example 1: Hello Realm
+# Three steps: two agent steps + one human gate.
+# Demonstrates: step.prompt delivery, sequential schema enforcement, human gate.
+id: code-review
+name: Structured Code Review
+version: 1
+initial_state: created
+
+params_schema:
+  type: object
+  required: [code]
+  properties:
+    code:
+      type: string
+      description: "Source code to review"
+
+steps:
+  review_security:
+    description: Analyze the code for security vulnerabilities
+    execution: agent
+    allowed_from_states: [created]
+    produces_state: security_reviewed
+    prompt: |
+      Analyze the code below for security vulnerabilities.
+      Look for: SQL injection, XSS, authentication bypass, insecure deserialization,
+      hardcoded credentials, and path traversal.
+      Submit your findings using the required schema. Do not suggest fixes yet.
+
+      Code:
+      {{ run.params.code }}
+    input_schema:
+      type: object
+      required: [findings]
+      properties:
+        findings:
+          type: array
+          items:
+            type: object
+            required: [severity, description]
+            properties:
+              severity:
+                type: string
+                enum: [critical, high, medium, low]
+              description:
+                type: string
+              location:
+                type: string
+
+  assess_quality:
+    description: Assess overall code quality taking security findings into account
+    execution: agent
+    allowed_from_states: [security_reviewed]
+    produces_state: quality_assessed
+    prompt: |
+      Review the code below for overall quality issues.
+      Security findings from the previous step are provided — do not repeat them as quality findings.
+      Assess: naming, structure, error handling, test coverage, and maintainability.
+      Submit your assessment using the required schema.
+
+      Code:
+      {{ run.params.code }}
+
+      Security findings already identified:
+      {{ context.resources.review_security.findings }}
+    input_schema:
+      type: object
+      required: [findings, overall_risk]
+      properties:
+        findings:
+          type: array
+          items:
+            type: object
+            required: [category, description, suggestion]
+            properties:
+              category:
+                type: string
+              description:
+                type: string
+              suggestion:
+                type: string
+        overall_risk:
+          type: string
+          enum: [low, medium, high]
+
+  confirm_review:
+    description: Human reviews the combined findings report and approves or rejects
+    execution: auto
+    trust: human_confirmed
+    allowed_from_states: [quality_assessed]
+    produces_state: completed
+    prompt: |
+      Code review complete. Present this report to the user and ask for approval.
+
+      --- SECURITY FINDINGS ---
+      {{ context.resources.review_security.findings }}
+
+      --- QUALITY FINDINGS ---
+      {{ context.resources.assess_quality.findings }}
+
+      Overall risk: {{ context.resources.assess_quality.overall_risk }}
+
+      Ask: "Shall I mark this review as approved? Reply with approve or reject."

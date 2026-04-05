@@ -1,0 +1,20 @@
+{
+  "name": "@sensigo/example-code-review",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "driver": "node dist/driver.js"
+  },
+  "dependencies": {
+    "@sensigo/realm": "*",
+    "@sensigo/realm-mcp": "*",
+    "@sensigo/realm-testing": "*",
+    "@modelcontextprotocol/sdk": "1.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "*",
+    "typescript": "*"
+  }
+}
