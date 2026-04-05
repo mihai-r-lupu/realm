@@ -60,6 +60,12 @@ export interface StepDefinition {
   retry?: RetryConfig;
   /** Plain-English instructions for the agent at this step. */
   instructions?: string;
+  /**
+   * Template-resolved task prompt delivered to the agent at step entry via next_action.prompt.
+   * Supports {{ context.resources.STEP.FIELD }} and {{ run.params.FIELD }} references.
+   * For human_confirmed steps, delivered as gate.prompt when the gate opens.
+   */
+  prompt?: string;
 }
 
 export interface WorkflowDefinition {

@@ -337,7 +337,7 @@ mcp-server/src/
 
 **Tests:**
 - MCP server responds to all 6 tool calls
-- Protocol generator produces valid, complete protocol from the playbook workflow
+- Protocol generator produces valid, complete protocol from the code review workflow
 - Start run → execute steps → complete run, all via MCP tool calls
 
 **Definition of done:** Claude (or any MCP client) connects to the Realm MCP server, reads the protocol, and drives the playbook extraction workflow end-to-end.
@@ -414,34 +414,88 @@ expected:
 
 ---
 
-## Phase 3: Second Workflow, Multi-Agent Demo, Branching, Templates (Weeks 9-13)
+## Phase 3: Progressive Examples, Multi-Agent Demo, Branching, Templates (Weeks 9-13)
 
-### Week 9-10 — Second Workflow + Multi-Agent Profiles + Branching (20-30 hrs)
+**Full example specifications:** `.private/realm-examples.md`
 
-**Goal:** Build a second workflow with multiple agent profiles to prove generality and demonstrate multi-agent orchestration.
+### Week 9 — Examples 1 + 2 + Engine Features for Example 3 (10-15 hrs)
 
-**Candidate workflows (pick one based on market signal):**
-- Invoice line item extraction (PDF → structured data → QuickBooks)
-- Contract clause detection (document → flagged clauses → risk score)
-- Support ticket categorization (ticket text → category + priority + routing)
+**Goal:** Ship Examples 1 and 2 as fully runnable demos. Lay the engine groundwork that Example 3 requires.
 
-**Deliverables:**
+**Engine deliverables (required by Example 1):**
 
-1. **Second workflow YAML + schema** — complete workflow in a different domain, designed with 2-3 agent profiles (e.g., pricing specialist, USP specialist, senior reviewer).
+1. **`step.prompt` with template resolution** — new optional `prompt?: string` field on `StepDefinition` (all step types). At step entry, the engine resolves template references (`run.params.X`, `context.resources.X.Y`) against live run state and includes the resolved string in the `next_action` response as `next_action.prompt`. This is the mechanism that enables the thin SKILL.md pattern — the agent's task instruction is delivered at runtime, not authored into a static skill file.
 
-2. **Agent profiles** — `agent_profile` field on step definitions. Profile content included in MCP responses. Evidence snapshots record which profile executed each step. Profile files stored in workflow directory under `agents/`.
+**Engine deliverables (required by Example 3):**
 
-3. **`create_workflow` MCP tool (Mode 2)** — agents can register dynamic workflows for self-tracking. Accepts lightweight step definitions (id, description, dependencies). Returns workflow_id and run_id. Agent uses existing `execute_step` to check in at each step.
+2. **Conditional branching** — `transitions` field on `StepDefinition` with `on_success`, `on_error`, `on_confirm`, `on_cancel`. Condition expressions evaluated by the precondition evaluator. Required for the identity gate bypass path in Example 3.
 
-4. **Conditional branching** — `transitions` with `on_success`, `on_error`, `on_confirm`, `on_cancel`. Condition expressions evaluated by the expression evaluator.
+3. **`input_map` with expression language** — steps declare how prior step outputs map to their inputs. Expression evaluator extended from preconditions to handle dot-path access, simple comparisons, ternary. Required for passing `fetch_document` text into `check_identity`.
 
-5. **`input_map` with expression language** — steps receive computed inputs from prior step results. Expression evaluator extended from preconditions to handle property access, pipe filters, ternary.
+4. **`on_error: fallback`** — error recovery routes to an alternative step.
 
-6. **`on_error: fallback`** — error recovery routes to alternative step.
+**New adapters (in `packages/core/src/adapters/`):**
+
+5. **`FileSystemAdapter`** — reads `.txt`/`.md` files via `fetch()`, writes JSON via `create()`. No auth, no network. Used in Examples 2 and 3 as the Google Docs stand-in.
+
+**Example 1 — Structured Code Review (`examples/code-review/`):**
+- `workflow.yaml` with `step.prompt` on all three steps (security analysis, quality assessment, gate report)
+- `skill.md` — thin 8-line dispatch file, no domain rules
+- 2 fixtures (findings-approved, findings-rejected)
+- `driver.ts` (Mode 2 headless) + `mcp-server.ts` (Mode 1 VS Code Copilot)
+- `README.md` with 5-section structure including the before/after SKILL.md comparison
+- `realm test` passing on both fixtures
+
+**Example 2 — CHANGELOG Entry Extraction (`examples/changelog-extract/`):**
+- `workflow.yaml` using `FileSystemAdapter` for source + output, with `pipeline: [normalize_text, compute_hash]` on `fetch_document`
+- `validate-verbatim-quotes` handler in `packages/core/src/handlers/` (shared with Example 3)
+- `skill.md` — thin 4-step dispatch, no human gate
+- 3 fixtures (all accepted, some rejected, all rejected / precondition block)
+- `driver.ts` + `mcp-server.ts` + `README.md`
+- `realm test` passing on all three fixtures
+
+**Tests:** All existing tests must continue to pass. New tests for `step.prompt` template resolution, branching engine, `input_map`, `FileSystemAdapter`.
 
 ---
 
-### Week 11 — Step Templates (10-15 hrs)
+### Week 10-11 — Example 3 + Agent Profiles (20-30 hrs)
+
+**Goal:** Ship Example 3 — the PR Description Generator. Add agent profiles for the multi-agent demo blog post.
+
+**New adapters and servers:**
+
+1. **`GitHubAdapter`** (`packages/core/src/adapters/github-adapter.ts`) — three operations:
+   - `fetch('get_pr_diff', { repo, pr_number })` → `{ diff_text, pr_title, base_branch, files_changed[] }`
+   - `fetch('get_linked_issues', { repo, pr_number })` → `{ issues: [{ number, title, body, state }] }`
+   - `update('set_pr_description', { repo, pr_number, body })` → GitHub PATCH
+   Configurable `base_url` so it points at mock server in demo and at `https://api.github.com` in production.
+
+2. **`GitHubMockServer`** (`packages/testing/src/servers/github-mock-server.ts`) — lightweight Node.js `http` server (no framework). Accepts GitHub API routes, returns fixture data from `github-fixture-data.json`. Started by the example's setup script on `localhost:3032`.
+
+**New handler in `packages/core/src/handlers/`:**
+
+3. **`check-repo-identity`** — compares `run.params.repo` against `context.resources.fetch_diff.repo`. Exact match → `{ confidence: 'high' }`. Same org → `{ confidence: 'low' }` (triggers gate). Different org → throws `ENGINE_HANDLER_FAILED`.
+
+**Example 3 — PR Description Generator (`examples/pr-description/`):**
+- `workflow.yaml` — 7-step workflow with conditional identity gate bypass
+- 1 domain-specific handler (`check-repo-identity`) + 1 reused from core (`validate_verbatim_quotes`)
+- 3 fixtures (happy path, low confidence gate, all rejected precondition block)
+- `fixtures/github-fixture-data.json` — static seed for `GitHubMockServer`
+- `sample-diffs/feature-addition.diff` + `sample-diffs/mixed-changes.diff`
+- `driver.ts` + `mcp-server.ts` + `README.md`
+- `realm test` passing on all three fixtures
+
+**Agent profiles:**
+
+4. **`agent_profile` field on StepDefinition** — profile name references a markdown file in `workflow-dir/agents/`. Profile content injected into MCP protocol response for that step. Evidence snapshots record `agent_profile` used.
+
+5. **Apply profiles to Example 3** — `extract_description` uses `pr-writer` profile; `confirm_description` uses `senior-reviewer` profile. Two agents, one run, evidence shows which profile did what.
+
+---
+
+---
+
+### Week 12 — Step Templates + Replay Persistence (10-15 hrs)
 
 **Deliverables:**
 
@@ -474,27 +528,29 @@ steps:
 
 5. **Replay persistence (`ReplayStore`)** — persist named replay snapshots so `realm diff` can compare two replays by ID. Requires: a `ReplayStore` that stores `ReplayStepResult[]` alongside metadata (origin run ID, overrides applied, `created_at`); a `realm replay --save` flag that runs the replay and prints the persisted replay ID; and updating `realm diff` to accept replay IDs in addition to run IDs. Note: `realm diff <run-a> <run-b>` already works against persisted `RunRecord` objects (Week 7). This item extends it to replay outputs. Deferred from Week 7 because `replayRun` is in-memory only and `ReplayStepResult[]` is not a `RunRecord` — it cannot be diffed without a persistence layer.
 
-**Milestone: Phase 3 complete. Two workflows in different domains. Shared templates. Conditional branching. Expression language for input transforms. Replay diffing.**
+**Milestone: Phase 3 complete. Three runnable examples covering simple-to-complex. Full Clozr architecture demonstrated on Realm. Multi-agent profiles. Conditional branching. Shared templates. Replay diffing.**
 
 ---
 
-## Phase 4: Public Launch + Cloud MVP + RAG (Weeks 12-20)
+## Phase 4: Public Launch + Cloud MVP + RAG (Weeks 13-21)
 
-### Week 12 — Documentation (10-15 hrs)
+### Week 13 — Documentation (10-15 hrs)
 
-1. **Getting-started guide** — from `npm install` to running first workflow in under 10 minutes. Includes: install, `realm init`, edit YAML, `realm register`, `realm run`.
+1. **Getting-started guide** — from `npm install` to running first workflow in under 10 minutes. Entry point is Example 1 (code review). Links to Examples 2 and 3 for progressive depth.
 
-2. **Building-extensions guide** — how to write a ServiceAdapter, Processor, StepHandler. With examples.
+2. **Building-extensions guide** — how to write a `ServiceAdapter`, `Processor`, `StepHandler`. Uses `FileSystemAdapter` and `validate_verbatim_quotes` from the examples as reference implementations.
 
 3. **Protocol spec** — how the engine works, for contributors.
 
-4. **Two complete example workflows** with test fixtures and README.
+4. **Data flow guide** — how data moves between steps via `context.resources`. Includes the authoring rule: never rely on the agent's context window for cross-step data; always reference prior step output via `context.resources.STEP_NAME.FIELD` in `step.prompt`. The engine resolves these references against the evidence chain before delivery.
 
-5. **JSON Schema for workflow YAML** — published at `sensigo.dev/realm/schema/workflow.json` for IDE autocomplete.
+5. **Demo assets** — GIF screen recordings for all three examples (Mode 2 headless terminal recording + `realm inspect` output). Embedded in root README.
+
+6. **JSON Schema for workflow YAML** — published at `sensigo.dev/realm/schema/workflow.json` for IDE autocomplete.
 
 ---
 
-### Week 13 — Public Launch (10-15 hrs)
+### Week 14 — Public Launch (10-15 hrs)
 
 1. **GitHub repo goes public**
 2. **`npm publish` — @sensigo/realm, @sensigo/realm-cli, @sensigo/realm-mcp, @sensigo/realm-testing**
@@ -509,7 +565,7 @@ steps:
 
 ---
 
-### Weeks 14-15 — Cloud API + Mode 3 Delegation (20-30 hrs)
+### Weeks 15-16 — Cloud API + Mode 3 Delegation (20-30 hrs)
 
 **Only proceed if launch shows signal (stars, installs, questions, interest).**
 
@@ -532,7 +588,7 @@ steps:
 
 ---
 
-### Weeks 16-17 — Dashboard (20-30 hrs)
+### Weeks 17-18 — Dashboard (20-30 hrs)
 
 1. **Next.js app** — run list, run inspector, evidence viewer, workflow registry.
 2. **Evidence viewer** — click into any run, see every step's inputs/outputs/evidence. Color-coded by status.
@@ -540,7 +596,7 @@ steps:
 
 ---
 
-### Weeks 18-19 — RAG + Cloud-Only Features (20-30 hrs)
+### Weeks 19-20 — RAG + Cloud-Only Features (20-30 hrs)
 
 1. **Vector DB adapters** — Pinecone and pgvector. Engine calls vector search, logs queries + results + scores as evidence.
 2. **Quote verification against retrieved chunks** — the agent claims an answer came from chunk X, engine verifies.
@@ -550,7 +606,7 @@ steps:
 
 ---
 
-### Week 20 — Billing (10-15 hrs)
+### Week 21 — Billing (10-15 hrs)
 
 1. **Stripe integration** — $49/month plan.
 2. **Usage metering** — runs per month, documents indexed (for RAG pricing).
@@ -562,30 +618,30 @@ steps:
 
 ---
 
-## Phase 5: Growth + Ecosystem (Weeks 21-30)
+## Phase 5: Growth + Ecosystem (Weeks 22-31)
 
-### Weeks 21-23 — RAG Premium Features
+### Weeks 22-24 — RAG Premium Features
 
 1. **Managed vector storage** — developers upload documents, Realm handles chunking, embedding, indexing. $0.10 per 1K documents/month.
 2. **Chroma adapter** (free).
 3. **RAG quality scoring** — cross-run retrieval analysis.
 4. **Retrieval drift detection** — alerts when RAG quality degrades.
 
-### Weeks 24-26 — Domain Bundles + Adapters
+### Weeks 25-27 — Domain Bundles + Adapters
 
 1. **Real Estate Leasing Pack** ($19) — based on clozr workflow.
 2. **Invoice Processing Pack** ($39) — PDF + QuickBooks adapter + schema + template.
 3. **Salesforce adapter** ($19), **HubSpot adapter** ($9).
 4. **Slack adapter** (free) — human gates via Slack messages.
 
-### Weeks 27-28 — Enterprise Features
+### Weeks 28-29 — Enterprise Features
 
 1. **SSO** (SAML/OIDC).
 2. **Compliance export** — SOC 2, HIPAA evidence packages.
 3. **Audit log search API**.
 4. **Team collaboration** — multi-user access, role-based permissions.
 
-### Weeks 29-30 — AI-Powered Diagnostics
+### Weeks 30-31 — AI-Powered Diagnostics
 
 1. **"Why did this fail?"** — cloud AI analyzes evidence chain and explains in plain English.
 2. **"How can I improve this?"** — suggestions based on cross-run patterns.
@@ -594,7 +650,7 @@ steps:
 
 ---
 
-## Phase 6: Scale (Weeks 30+)
+### Weeks 32+ — Scale
 
 Build based on demand signals only:
 
@@ -648,11 +704,14 @@ Every commit should leave the project in a working state. Every week should prod
 |------|-----------|-------------------|
 | 3 | Engine runs a workflow | `realm run` completes a 4-step workflow with evidence |
 | 5 | Engine is production-grade | Retries, timeouts, human gates, auto-execution all work |
-| 6 | Agent can drive a workflow | Claude connects via MCP and completes the playbook workflow |
+| 6 | Agent can drive a workflow | Agent connects via MCP and completes a full workflow end-to-end |
 | 8 | Testing works | `realm test` runs fixtures and reports pass/fail |
-| 10 | Multi-agent demo works | Second workflow uses 2-3 agent profiles, evidence shows which profile did what |
-| 10 | Mode 2 works | An agent creates its own dynamic workflow via `create_workflow` and self-tracks |
-| 11 | Platform is general | Two different-domain workflows run on the same engine |
+| 9 | Examples 1 + 2 ship | `node examples/code-review/driver.js` and `node examples/changelog-extract/driver.js` both exit 0 |
+| 9 | Branching works | Conditional `transitions.on_condition` evaluated correctly in 3 new tests |
+| 11 | Example 3 ships | `node examples/pr-description/driver.js` exits 0; full evidence chain printed |
+| 11 | Platform is general | Three different-complexity examples run on the same engine |
+| 11 | Multi-agent demo works | Example 3 uses 2 agent profiles, evidence records which profile ran each step |
+| 12 | Mode 2 works | An agent creates its own dynamic workflow via `create_workflow` and self-tracks |
 | 13 | Public launch | Repo public, npm published, multi-agent blog post live |
 | 15 | Mode 3 works | Master agent creates delegated workflow, sub-agents use handles, quality reports work. Handles emitted as A2A Agent Cards (MCP or A2A). |
 | 17 | Dashboard works | Web UI shows runs, evidence, workflow versions, per-agent performance |

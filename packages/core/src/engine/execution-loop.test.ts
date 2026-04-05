@@ -752,6 +752,116 @@ describe('executeStep', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // step.prompt resolution
+  // ---------------------------------------------------------------------------
+
+  describe('step.prompt resolution', () => {
+    it('resolves step.prompt into next_action.prompt after a step completes', async () => {
+      const promptDefinition: WorkflowDefinition = {
+        id: 'prompt-wf',
+        name: 'Prompt Workflow',
+        version: 1,
+        initial_state: 'created',
+        steps: {
+          'step-one': {
+            description: 'First step',
+            execution: 'auto',
+            allowed_from_states: ['created'],
+            produces_state: 'step_one_done',
+          },
+          'step-two': {
+            description: 'Second step',
+            execution: 'agent',
+            allowed_from_states: ['step_one_done'],
+            produces_state: 'completed',
+            prompt: 'Use result: {{ context.resources.step-one.key }}',
+          },
+        },
+      };
+      const promptGuard = new StateGuard(promptDefinition);
+
+      const run = await store.create({
+        workflowId: 'prompt-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const stepOneDispatcher: StepDispatcher = async () => ({ key: 'value-from-step-one' });
+
+      const envelope = await executeStep(store, promptGuard, promptDefinition, {
+        runId: run.id,
+        command: 'step-one',
+        input: {},
+        snapshotId: '0',
+        dispatcher: stepOneDispatcher,
+      });
+
+      expect(envelope.status).toBe('ok');
+      expect(envelope.next_action).toBeDefined();
+      expect(envelope.next_action?.prompt).toBe('Use result: value-from-step-one');
+    });
+
+    it('resolves step.prompt into gate.prompt when step has trust: human_confirmed', async () => {
+      const gatePromptDefinition: WorkflowDefinition = {
+        id: 'gate-prompt-wf',
+        name: 'Gate Prompt Workflow',
+        version: 1,
+        initial_state: 'created',
+        steps: {
+          'step-one': {
+            description: 'First step',
+            execution: 'auto',
+            allowed_from_states: ['created'],
+            produces_state: 'step_one_done',
+          },
+          'gate-step': {
+            description: 'Gate step',
+            execution: 'auto',
+            trust: 'human_confirmed',
+            allowed_from_states: ['step_one_done'],
+            produces_state: 'completed',
+            prompt: 'Risk: {{ context.resources.step-one.risk }}',
+          },
+        },
+      };
+      const gatePromptGuard = new StateGuard(gatePromptDefinition);
+
+      // Run step-one first so evidence is populated.
+      const run = await store.create({
+        workflowId: 'gate-prompt-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const stepOneDispatcher: StepDispatcher = async () => ({ risk: 'high' });
+
+      await executeStep(store, gatePromptGuard, gatePromptDefinition, {
+        runId: run.id,
+        command: 'step-one',
+        input: {},
+        snapshotId: '0',
+        dispatcher: stepOneDispatcher,
+      });
+
+      const updatedRun = await store.get(run.id);
+
+      const gateDispatcher: StepDispatcher = async () => ({});
+      const envelope = await executeStep(store, gatePromptGuard, gatePromptDefinition, {
+        runId: run.id,
+        command: 'gate-step',
+        input: {},
+        snapshotId: updatedRun.version.toString(),
+        dispatcher: gateDispatcher,
+      });
+
+      expect(envelope.status).toBe('confirm_required');
+      expect(envelope.gate?.prompt).toBe('Risk: high');
+    });
+  });
+
   // Cleanup
   it('cleanup', async () => {
     await rm(dir, { recursive: true, force: true });
