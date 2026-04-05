@@ -3,6 +3,13 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import type { RunStore, RunRecord, WorkflowRegistrar, EvidenceSnapshot, StepDiagnostics } from '@sensigo/realm';
 
+/** Truncates a JSON-serialised summary to a readable single line. */
+function formatSummary(value: unknown, maxLength = 120): string {
+  const raw = JSON.stringify(value);
+  if (raw.length <= maxLength) return raw;
+  return raw.slice(0, maxLength) + chalk.dim('…');
+}
+
 /** Formats a diagnostics object into a readable string for the inspect output. */
 function formatDiagnostics(diag: StepDiagnostics): string {
   const tokens = `~${diag.input_token_estimate} tokens`;
@@ -99,8 +106,8 @@ export async function inspectRun(
       });
       // Show Input/Output/Diagnostics for the last attempt.
       const lastSnap = snaps[snaps.length - 1]!;
-      lines.push(`     Input:  ${JSON.stringify(lastSnap.input_summary)}`);
-      lines.push(`     Output: ${JSON.stringify(lastSnap.output_summary)}`);
+        lines.push(`     Input:  ${formatSummary(lastSnap.input_summary)}`);
+        lines.push(`     Output: ${formatSummary(lastSnap.output_summary)}`);
       if (lastSnap.diagnostics !== undefined) {
         lines.push(chalk.dim(`     Diagnostics: ${formatDiagnostics(lastSnap.diagnostics)}`));
       }
@@ -109,8 +116,8 @@ export async function inspectRun(
       const statusColored = colorStatus(snap.status);
       const hashShort = chalk.dim(`hash: ${snap.evidence_hash.slice(0, 8)}`);
       lines.push(`  ${idx + 1}. ${stepId.padEnd(22)} ${statusColored}   ${snap.duration_ms}ms   ${hashShort}`);
-      lines.push(`     Input:  ${JSON.stringify(snap.input_summary)}`);
-      lines.push(`     Output: ${JSON.stringify(snap.output_summary)}`);
+      lines.push(`     Input:  ${formatSummary(snap.input_summary)}`);
+      lines.push(`     Output: ${formatSummary(snap.output_summary)}`);
       if (snap.diagnostics !== undefined) {
         lines.push(chalk.dim(`     Diagnostics: ${formatDiagnostics(snap.diagnostics)}`));
       }
