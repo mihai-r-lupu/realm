@@ -106,8 +106,8 @@ export async function inspectRun(
       });
       // Show Input/Output/Diagnostics for the last attempt.
       const lastSnap = snaps[snaps.length - 1]!;
-        lines.push(`     Input:  ${formatSummary(lastSnap.input_summary)}`);
-        lines.push(`     Output: ${formatSummary(lastSnap.output_summary)}`);
+      lines.push(`     Input:  ${formatSummary(lastSnap.input_summary)}`);
+      lines.push(`     Output: ${formatSummary(lastSnap.output_summary)}`);
       if (lastSnap.diagnostics !== undefined) {
         lines.push(chalk.dim(`     Diagnostics: ${formatDiagnostics(lastSnap.diagnostics)}`));
       }
