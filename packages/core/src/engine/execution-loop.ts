@@ -358,6 +358,16 @@ export async function executeStep(
   // Step 3: Check state guard
   if (!guard.isAllowed(options.command, run.state)) {
     const blockedReason = guard.getBlockedReason(options.command, run.state);
+    const blockedEvidence: Record<string, Record<string, unknown>> = {};
+    for (const snap of run.evidence) {
+      if (snap.kind === 'gate_response') continue;
+      blockedEvidence[snap.step_id] = snap.output_summary;
+    }
+    const nextAction = findNextAction(run.state, definition, {
+      evidenceByStep: blockedEvidence,
+      runParams: run.params,
+      runId: options.runId,
+    });
     return {
       command: options.command,
       run_id: options.runId,
@@ -368,8 +378,10 @@ export async function executeStep(
       warnings: [],
       errors: [],
       agent_action: 'resolve_precondition' as const,
-      next_action: null,
-      blocked_reason: blockedReason,
+      next_action: nextAction,
+      blocked_reason: nextAction !== null
+        ? { ...blockedReason, suggestion: `Call the step indicated in next_action instead.` }
+        : { ...blockedReason, suggestion: `No valid next step exists from state '${run.state}'.` },
     };
   }
 
