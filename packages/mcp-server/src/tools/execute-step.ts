@@ -63,7 +63,7 @@ export async function handleExecuteStep(
 export async function handleExecuteStepTool(
   args: { run_id: string; command: string; params?: Record<string, unknown> },
   opts?: HandleRunStores,
-): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
+): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
   try {
     const result = await handleExecuteStep(args, opts);
     const slimResult = { ...result, data: {}, evidence: slimEvidence(result.evidence) };
@@ -71,18 +71,20 @@ export async function handleExecuteStepTool(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {
-      content: [{ type: 'text' as const, text: JSON.stringify({
-        command: args.command,
-        run_id: args.run_id,
-        snapshot_id: '',
-        status: 'error',
-        data: {},
-        evidence: [],
-        warnings: [],
-        errors: [message],
-        agent_action: 'stop',
-        next_action: null,
-      }, null, 2) }],
+      content: [{
+        type: 'text' as const, text: JSON.stringify({
+          command: args.command,
+          run_id: args.run_id,
+          snapshot_id: '',
+          status: 'error',
+          data: {},
+          evidence: [],
+          warnings: [],
+          errors: [message],
+          agent_action: 'stop',
+          next_action: null,
+        }, null, 2)
+      }],
     };
   }
 }

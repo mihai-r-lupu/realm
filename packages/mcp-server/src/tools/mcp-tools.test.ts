@@ -215,7 +215,6 @@ describe('mcp tool handlers', () => {
       throwingOpts,
     );
 
-    expect(result.isError).toBeUndefined();
     const parsed = JSON.parse(result.content[0]!.text) as Record<string, unknown>;
     expect(parsed['status']).toBe('error');
     expect(parsed['agent_action']).toBe('stop');
