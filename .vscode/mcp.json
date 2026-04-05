@@ -5,7 +5,8 @@
       "command": "node",
       "args": [
         "${workspaceFolder}/examples/code-review/dist/mcp-server.js"
-      ]
+      ],
+      "autoStart": true
     }
   }
 }
