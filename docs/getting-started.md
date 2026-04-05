@@ -246,6 +246,18 @@ The agent has access to 6 MCP tools:
 
 The agent should call `get_workflow_protocol` first. The protocol is embedded in the workflow definition and provides exact instructions for what to do at each step.
 
+Every `start_run` and `execute_step` response includes a `next_action` object. The agent reads
+`next_action.prompt` for its current task, then calls `next_action.instruction.tool` with the
+complete argument set built from two disjoint sources:
+
+- `instruction.params` — values pre-filled by the engine (e.g. `run_id`, `command`). Pass these as-is.
+- `instruction.params_required` — parameters the agent must supply (e.g. its output for the step,
+  or a human gate `choice`). Each entry has a `name`, a `description`, and optionally `valid_values`.
+
+For agent steps, `params_required` will contain `{ name: "params" }` — the agent's output shaped to
+`next_action.input_schema`. For human gate responses, it will contain
+`{ name: "choice", valid_values: [...] }` listing the allowed choices.
+
 ---
 
 ## 10. Testing Workflows
