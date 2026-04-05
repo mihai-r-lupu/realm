@@ -68,7 +68,7 @@ export function registerExecuteStep(server: McpServer, opts?: { registry?: impor
     async (args) => {
       try {
         const result = await handleExecuteStep(args, opts);
-        const slimResult = { ...result, evidence: slimEvidence(result.evidence) };
+        const slimResult = { ...result, data: {}, evidence: slimEvidence(result.evidence) };
         return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

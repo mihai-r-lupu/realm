@@ -98,7 +98,7 @@ export async function handleStartRun(
   return {
     run_id: run.id,
     status: result.status,
-    data: result.data,
+    data: {},
     next_action: result.next_action,
     gate: result.gate,
     errors: result.errors,
