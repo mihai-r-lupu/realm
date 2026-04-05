@@ -78,7 +78,7 @@ core/src/
 
 1. **RunRecord type** — `id`, `workflow_id`, `workflow_version`, `state`, `version` (optimistic concurrency), `params`, `evidence` (array of step snapshots), `created_at`, `updated_at`, `terminal_state`, `terminal_reason`
 
-2. **ResponseEnvelope type** — `command`, `run_id`, `status` (ok/error/blocked/confirm_required), `data`, `errors[]`, `warnings[]`, `next_action` (object with `instruction`, `human_readable`, `context_hint`, `expected_timeout`)
+2. **ResponseEnvelope type** — `command`, `run_id`, `snapshot_id`, `status` (ok/error/blocked/confirm_required/warning), `data`, `evidence[]`, `errors[]`, `warnings[]`, `agent_action?: AgentAction` (on error/blocked only), `next_action` (object with `instruction`, `params_required?`, `human_readable`, `context_hint`, `expected_timeout`, `input_schema?`, `prompt?`)
 
 3. **WorkflowError class** — extends Error. Fields: `category` (NETWORK, SERVICE, STATE, VALIDATION, ENGINE, RESOURCE), `code` (string enum like `SERVICE_HTTP_5XX`), `agent_action` (report_to_user, provide_input, resolve_precondition, stop, wait_for_human), `retryable` (boolean), `details` (object)
 
