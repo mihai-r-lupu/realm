@@ -47,8 +47,18 @@ export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunS
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: 'text' as const, text: `Error: ${message}` }],
-          isError: true,
+          content: [{ type: 'text' as const, text: JSON.stringify({
+            command: 'submit_human_response',
+            run_id: args.run_id,
+            snapshot_id: '',
+            status: 'error',
+            data: {},
+            evidence: [],
+            warnings: [],
+            errors: [message],
+            agent_action: 'stop',
+            next_action: null,
+          }, null, 2) }],
         };
       }
     },
