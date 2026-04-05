@@ -15,6 +15,6 @@ const workflowStore = new JsonWorkflowStore();
 await workflowStore.register(definition);
 
 // Start server on stdio — the agent connects here.
-const server = createRealmMcpServer();
+const server = createRealmMcpServer({ workflowStore });
 const transport = new StdioServerTransport();
 await server.connect(transport);

@@ -31,7 +31,7 @@ export async function handleSubmitHumanResponse(
 }
 
 /** Registers the submit_human_response MCP tool on the server. */
-export function registerSubmitHumanResponse(server: McpServer): void {
+export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunStores): void {
   server.tool(
     'submit_human_response',
     'Advance a gate-waiting run by submitting the human\'s choice.',
@@ -42,7 +42,7 @@ export function registerSubmitHumanResponse(server: McpServer): void {
     },
     async (args) => {
       try {
-        const result = await handleSubmitHumanResponse(args);
+        const result = await handleSubmitHumanResponse(args, opts);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
