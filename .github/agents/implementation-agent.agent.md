@@ -14,6 +14,7 @@ tools:
   - usages
   - terminalLastCommand
   - changes
+  - realm-code-review
 ---
 
 ## Role

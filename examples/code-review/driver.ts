@@ -35,6 +35,8 @@ console.log(`Workflow: ${definition.name} v${definition.version}`);
 console.log(`Fixture: ${fixture.name}\n`);
 
 while (!currentRun.terminal_state) {
+  const prevEvidenceCount = currentRun.evidence.length;
+
   if (currentRun.state === 'gate_waiting') {
     const gate = currentRun.pending_gate!;
     const choice = fixture.gate_responses?.[gate.step_name] ?? 'approve';
@@ -65,15 +67,23 @@ while (!currentRun.terminal_state) {
       snapshotId: currentRun.version.toString(),
       dispatcher,
     });
-    for (const snap of result.evidence) {
-      printStepRow(snap.step_id, snap.duration_ms, snap.output_summary, snap.status);
-    }
     if (result.status === 'error') {
       console.error('Step failed:', result.errors.join(', '));
       process.exit(1);
     }
   }
+
   currentRun = await store.get(runId);
+
+  // Print evidence entries added during this iteration.
+  // Skip gate_response entries (printed by printGateRow) and auto-step execution
+  // entries (auto steps are represented by their gate row, not a step row).
+  const newSnaps = currentRun.evidence.slice(prevEvidenceCount);
+  for (const snap of newSnaps) {
+    if (snap.kind === 'gate_response') continue;
+    if (definition.steps[snap.step_id]?.execution === 'auto') continue;
+    printStepRow(snap.step_id, snap.duration_ms, snap.output_summary, snap.status);
+  }
 }
 
 const evidence = currentRun.evidence;
