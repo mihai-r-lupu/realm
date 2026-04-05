@@ -198,6 +198,33 @@ describe('mcp tool handlers', () => {
     expect(parsed['status']).toBe('ok');
   });
 
+  it('handleExecuteStepTool returns structured JSON on unexpected catch', async () => {
+    // Pass a runStore that throws a plain Error (not WorkflowError) so it bypasses
+    // executeStep's internal error handling and propagates to handleExecuteStepTool's catch.
+    const throwingOpts = {
+      runStore: {
+        get: async () => { throw new Error('unexpected failure'); },
+        create: async () => { throw new Error('unexpected failure'); },
+        update: async () => { throw new Error('unexpected failure'); },
+        list: async () => [],
+      } as unknown as JsonFileStore,
+    };
+
+    const result = await handleExecuteStepTool(
+      { run_id: 'test-run', command: 'review_security' },
+      throwingOpts,
+    );
+
+    expect(result.isError).toBeUndefined();
+    const parsed = JSON.parse(result.content[0]!.text) as Record<string, unknown>;
+    expect(parsed['status']).toBe('error');
+    expect(parsed['agent_action']).toBe('stop');
+    expect(parsed['next_action']).toBeNull();
+    expect((parsed['errors'] as string[])[0]).toContain('unexpected failure');
+    expect(parsed['run_id']).toBe('test-run');
+    expect(parsed['command']).toBe('review_security');
+  });
+
   it('handleGetRunState returns run summary', async () => {
     const workflowStore = new JsonWorkflowStore(workflowDir);
     await workflowStore.register(makeSimpleDef());
