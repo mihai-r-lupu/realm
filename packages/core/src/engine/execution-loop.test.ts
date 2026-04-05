@@ -127,7 +127,31 @@ describe('executeStep', () => {
     expect(envelope.blocked_reason?.current_state).toBe('created');
     expect(envelope.blocked_reason?.allowed_states).toContain('step_one_done');
     expect(envelope.agent_action).toBe('resolve_precondition');
+    expect(envelope.next_action).not.toBeNull();
+    expect(envelope.next_action?.instruction).toBeNull();
+    expect(envelope.blocked_reason?.suggestion).toContain('next_action');
+  });
+
+  it('blocked state with no valid next step includes explanation in suggestion', async () => {
+    const run = await store.create({
+      workflowId: 'test-wf',
+      workflowVersion: 1,
+      initialState: 'completed',
+      params: {},
+    });
+
+    const envelope = await executeStep(store, guard, definition, {
+      runId: run.id,
+      command: 'step-two',
+      input: {},
+      snapshotId: '0',
+      dispatcher: echoDispatcher,
+    });
+
+    expect(envelope.status).toBe('blocked');
+    expect(envelope.agent_action).toBe('resolve_precondition');
     expect(envelope.next_action).toBeNull();
+    expect(envelope.blocked_reason?.suggestion).toContain('No valid next step');
   });
 
   it('dispatcher error returns error envelope with evidence', async () => {
