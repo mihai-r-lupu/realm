@@ -1,10 +1,19 @@
 // Types for the ResponseEnvelope returned by every step execution.
 import type { EvidenceSnapshot } from './run-record.js';
 
+/** Describes a parameter the agent must supply at call time. */
+export interface RequiredParam {
+  name: string;
+  description: string;
+  valid_values?: string[];
+}
+
 export interface NextAction {
   instruction: {
     tool: string;
     params: Record<string, unknown>;
+    /** Parameters the agent must supply when calling the tool. Disjoint from params. */
+    params_required?: RequiredParam[];
   } | null;
   human_readable: string;
   context_hint: string;

@@ -245,7 +245,16 @@ export function findNextAction(
         instruction: step.handler !== undefined
           ? { tool: step.handler, params: {} }
           : step.execution === 'agent'
-            ? { tool: 'execute_step', params: { run_id: context.runId, command: stepName } }
+            ? {
+              tool: 'execute_step',
+              params: { run_id: context.runId, command: stepName },
+              params_required: [{
+                name: 'params',
+                description: step.input_schema !== undefined
+                  ? 'Your output for this step. Must conform to next_action.input_schema.'
+                  : 'Your output for this step.',
+              }],
+            }
             : null,
         ...(step.execution === 'agent' && step.input_schema !== undefined
           ? { input_schema: step.input_schema }
@@ -604,6 +613,11 @@ export async function executeStep(
         instruction: {
           tool: 'submit_human_response',
           params: { run_id: options.runId, gate_id },
+          params_required: [{
+            name: 'choice',
+            description: "The human's decision. Must be one of the values in gate.choices.",
+            valid_values: choices,
+          }],
         },
         human_readable: `Human review required for step '${options.command}'. Present gate.prompt to the user, wait for their choice from gate.choices, then call submit_human_response.`,
         context_hint: `Run is paused at gate '${gate_id}'. Available choices: ${choices.join(', ')}.`,
