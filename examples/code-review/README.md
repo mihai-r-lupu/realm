@@ -46,31 +46,23 @@ node dist/driver.js fixtures/findings-rejected.yaml
 
 ## Run it with an AI agent (any VS Code agent with MCP support)
 
-**Step 1** — Build and register:
+**Step 1** — Build:
 ```bash
 npm run build
 ```
 
-**Step 2** — Add to VS Code `settings.json`:
-```json
-{
-  "mcp": {
-    "servers": {
-      "realm-code-review": {
-        "type": "stdio",
-        "command": "node",
-        "args": ["<absolute-path>/examples/code-review/dist/mcp-server.js"]
-      }
-    }
-  }
-}
-```
+**Step 2** — VS Code picks up `.vscode/mcp.json` automatically. The `realm-code-review`
+MCP server starts on first use — no `settings.json` editing required.
 
-**Step 3** — In agent chat mode, add `skill.md` to your VS Code skills directory, then:
+**Step 3** — In Copilot chat, ask:
 > "Review this code with Realm: [paste your code]"
 
-The agent calls `start_run`, reads `next_action.prompt` at each step, and presents the
-final report for your approval before completing the run.
+The workspace instruction file (`.github/instructions/realm-code-review.instructions.md`)
+gives your existing agent the Realm protocol. It calls `start_run`, reads
+`next_action.prompt` at each step, and presents the final report for your approval before
+completing the run.
+
+If the tools don't appear in Copilot, see [examples/README.md](../README.md#troubleshooting-mcp--vs-code).
 
 ## What to look at next
 
