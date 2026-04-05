@@ -44,6 +44,13 @@ Try the rejection fixture too:
 node dist/driver.js fixtures/findings-rejected.yaml
 ```
 
+To inspect the full evidence chain of any completed run, copy the `<uuid>` from the output and run:
+```bash
+node ../../packages/cli/dist/index.js inspect <uuid>
+# or, if @sensigo/realm-cli is installed globally:
+realm inspect <uuid>
+```
+
 ## Run it with an AI agent (any VS Code agent with MCP support)
 
 **Step 1** — Build:
