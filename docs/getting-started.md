@@ -283,17 +283,21 @@ The agent has access to 6 MCP tools:
 
 The agent should call `get_workflow_protocol` first. The protocol is embedded in the workflow definition and provides exact instructions for what to do at each step.
 
+Every response includes a top-level `context_hint` string describing the current run state and what
+just happened — useful for orientation on every response, including errors where `next_action` is `null`.
+
 Every `start_run` and `execute_step` response includes a `next_action` object. The agent reads
-`next_action.prompt` for its current task, then calls `next_action.instruction.tool` with the
-complete argument set built from two disjoint sources:
+`next_action.prompt` for its current task, then calls `next_action.instruction.tool` using
+`instruction.call_with` as the ready-to-use argument template:
 
-- `instruction.params` — values pre-filled by the engine (e.g. `run_id`, `command`). Pass these as-is.
-- `instruction.params_required` — parameters the agent must supply (e.g. its output for the step,
-  or a human gate `choice`). Each entry has a `name`, a `description`, and optionally `valid_values`.
+- `instruction.call_with` — a flat argument object with agent-supplied values as placeholder strings
+  (e.g. `<YOUR_PARAMS>`, `<approve|reject>`). Copy the object, replace the placeholder(s), and call
+  the tool.
+- `instruction.params_required` — explains each placeholder: `name`, `description`, and optionally
+  `valid_values`. Use this to understand what each placeholder expects.
 
-For agent steps, `params_required` will contain `{ name: "params" }` — the agent's output shaped to
-`next_action.input_schema`. For human gate responses, it will contain
-`{ name: "choice", valid_values: [...] }` listing the allowed choices.
+For agent steps, the placeholder is `params` — the agent's output shaped to `next_action.input_schema`.
+For human gate responses, it is `choice` with `valid_values` listing the allowed choices.
 
 ### Error and blocked responses
 
