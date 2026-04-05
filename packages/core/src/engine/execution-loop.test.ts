@@ -76,6 +76,8 @@ describe('executeStep', () => {
     expect(envelope.evidence[0]?.status).toBe('success');
     expect(envelope.next_action).not.toBeNull();
     expect(envelope.next_action?.human_readable).toContain('step-two');
+    expect(envelope.context_hint).toBeDefined();
+    expect(envelope.context_hint).not.toBe('');
 
     const updated = await store.get(run.id);
     expect(updated.state).toBe('step_one_done');
@@ -104,6 +106,8 @@ describe('executeStep', () => {
     // because the next step (step-one) is auto and needs no agent call.
     expect(envelope.next_action).not.toBeNull();
     expect(envelope.next_action?.instruction).toBeNull();
+    expect(envelope.context_hint).toBeDefined();
+    expect(envelope.context_hint).not.toBe('');
   });
 
   it('blocked state returns blocked envelope with blocked_reason', async () => {
@@ -130,6 +134,8 @@ describe('executeStep', () => {
     expect(envelope.next_action).not.toBeNull();
     expect(envelope.next_action?.instruction).toBeNull();
     expect(envelope.blocked_reason?.suggestion).toContain('next_action');
+    expect(envelope.context_hint).toContain('step-two');
+    expect(envelope.context_hint).toContain('created');
   });
 
   it('blocked state with no valid next step includes explanation in suggestion', async () => {
@@ -174,6 +180,7 @@ describe('executeStep', () => {
     expect(envelope.evidence).toHaveLength(1);
     expect(envelope.evidence[0]?.status).toBe('error');
     expect(envelope.errors[0]).toContain('step failed');
+    expect(envelope.context_hint).toContain('step-one');
   });
 
   it('completing final step sets terminal_state true', async () => {
@@ -931,6 +938,10 @@ describe('executeStep', () => {
       expect(result!.instruction!.params_required).not.toBeUndefined();
       expect(result!.instruction!.params_required).toHaveLength(1);
       expect(result!.instruction!.params_required![0]!.name).toBe('params');
+      expect(result!.instruction!.call_with).toBeDefined();
+      expect((result!.instruction!.call_with as Record<string, unknown>)['run_id']).toBe('test-run-id');
+      expect((result!.instruction!.call_with as Record<string, unknown>)['command']).toBe('review-code');
+      expect((result!.instruction!.call_with as Record<string, unknown>)['params']).toBe('<YOUR_PARAMS>');
     });
 
     it('returns instruction: null for an auto step without a handler', async () => {
@@ -1003,6 +1014,14 @@ describe('executeStep', () => {
       expect(paramsRequired![0]!.valid_values).toBeDefined();
       expect(paramsRequired![0]!.valid_values).toContain('approve');
       expect(paramsRequired![0]!.valid_values).toContain('reject');
+      expect(envelope.next_action!.instruction!.call_with).toBeDefined();
+      const callWith = envelope.next_action!.instruction!.call_with as Record<string, unknown>;
+      expect(callWith['run_id']).toBe(run.id);
+      expect(callWith['gate_id']).toBe(envelope.gate!.gate_id);
+      expect(typeof callWith['choice']).toBe('string');
+      expect((callWith['choice'] as string).startsWith('<')).toBe(true);
+      expect((callWith['choice'] as string).includes('approve')).toBe(true);
+      expect(envelope.context_hint).toContain('gate');
     });
   });
 

@@ -15,6 +15,12 @@ export interface NextAction {
     params: Record<string, unknown>;
     /** Parameters the agent must supply when calling the tool. Disjoint from params. */
     params_required?: RequiredParam[];
+    /**
+     * Ready-to-use flat argument object for calling the tool.
+     * Agent-supplied params appear as placeholder strings (e.g. "<YOUR_PARAMS>", "<approve|reject>").
+     * Copy this object, replace the placeholder(s), and call the tool.
+     */
+    call_with: Record<string, unknown>;
   } | null;
   human_readable: string;
   context_hint: string;
@@ -45,13 +51,17 @@ export interface GateInfo {
 export interface ResponseEnvelope {
   command: string;
   run_id: string;
+  /** Opaque version token for optimistic concurrency. Pass back as snapshotId in your next call. For auditing only — do not parse. */
   snapshot_id: string;
   status: RunStatus;
   data: Record<string, unknown>;
+  /** Audit trail of step executions in this response. For debugging and CLI inspection only. */
   evidence: EvidenceSnapshot[];
   warnings: string[];
   errors: string[];
   agent_action?: AgentAction;
+  /** Current state orientation. Always populated — describes what just happened and what state the run is in. */
+  context_hint: string;
   next_action: NextAction | null;
   blocked_reason?: BlockedReason;
   gate?: GateInfo;

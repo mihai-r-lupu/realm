@@ -243,7 +243,7 @@ export function findNextAction(
           : undefined;
       return {
         instruction: step.handler !== undefined
-          ? { tool: step.handler, params: {} }
+          ? { tool: step.handler, params: {}, call_with: {} }
           : step.execution === 'agent'
             ? {
               tool: 'execute_step',
@@ -254,6 +254,7 @@ export function findNextAction(
                   ? 'Your output for this step. Must conform to next_action.input_schema.'
                   : 'Your output for this step.',
               }],
+              call_with: { run_id: context.runId, command: stepName, params: '<YOUR_PARAMS>' },
             }
             : null,
         ...(step.execution === 'agent' && step.input_schema !== undefined
@@ -277,6 +278,7 @@ function errorEnvelope(
   runId: string,
   snapshotId: string,
   err: WorkflowError,
+  contextHint?: string,
 ): ResponseEnvelope {
   return {
     command,
@@ -288,6 +290,7 @@ function errorEnvelope(
     warnings: [],
     errors: [err.message],
     agent_action: err.agentAction,
+    context_hint: contextHint ?? `Error during '${command}'.`,
     next_action: null,
   };
 }
@@ -298,11 +301,15 @@ function makeErrorEnvelope(
   err: WorkflowError,
   definition?: WorkflowDefinition,
 ): ResponseEnvelope {
+  const hint = run !== null
+    ? `Error during '${options.command}'. Run remains in state '${run.state}'.`
+    : undefined;
   const base = errorEnvelope(
     options.command,
     options.runId,
     run !== null ? run.version.toString() : options.snapshotId,
     err,
+    hint,
   );
   if (run !== null && definition !== undefined && err.agentAction !== 'stop') {
     const evidenceByStep: Record<string, Record<string, unknown>> = {};
@@ -378,6 +385,7 @@ export async function executeStep(
       warnings: [],
       errors: [],
       agent_action: 'resolve_precondition' as const,
+      context_hint: `Step '${options.command}' is not allowed in state '${run.state}'.`,
       next_action: nextAction,
       blocked_reason: nextAction !== null
         ? { ...blockedReason, suggestion: `Call the step indicated in next_action instead.` }
@@ -408,6 +416,7 @@ export async function executeStep(
         warnings: [],
         errors: [],
         agent_action: 'stop' as const,
+        context_hint: `Precondition failed for step '${options.command}' in state '${run.state}'.`,
         next_action: null,
         blocked_reason: {
           current_state: run.state,
@@ -583,6 +592,8 @@ export async function executeStep(
       evidence: allEvidence,
       warnings: cleanupWarning !== undefined ? [cleanupWarning] : [],
       errors: [dispatchError.message],
+      agent_action: 'stop' as const,
+      context_hint: `Dispatch error during step '${options.command}'. Run remains in state '${pendingRun.state}'.`,
       next_action: null,
     };
   }
@@ -640,6 +651,7 @@ export async function executeStep(
       evidence: allEvidence,
       warnings: [],
       errors: [],
+      context_hint: `Run is paused at gate '${gate_id}'. Available choices: ${choices.join(', ')}.`,
       next_action: {
         instruction: {
           tool: 'submit_human_response',
@@ -649,6 +661,11 @@ export async function executeStep(
             description: "The human's decision. Must be one of the values in gate.choices.",
             valid_values: choices,
           }],
+          call_with: {
+            run_id: options.runId,
+            gate_id,
+            choice: `<${choices.join('|')}>`,
+          },
         },
         human_readable: `Human review required for step '${options.command}'. Present gate.prompt to the user, wait for their choice from gate.choices, then call submit_human_response.`,
         context_hint: `Run is paused at gate '${gate_id}'. Available choices: ${choices.join(', ')}.`,
@@ -710,6 +727,9 @@ export async function executeStep(
     evidence: allEvidence,
     warnings: [],
     errors: [],
+    context_hint: nextAction !== null
+      ? nextAction.context_hint
+      : `Run completed in terminal state '${newState}'.`,
     next_action: nextAction,
   };
 }
@@ -753,6 +773,7 @@ export async function submitHumanResponse(
         retryable: true,
         details: { expected: options.snapshotId, actual: run.version.toString() },
       }),
+      `Snapshot mismatch in gate handling. Run is in state '${run.state}'.`,
     );
   }
 
@@ -768,6 +789,7 @@ export async function submitHumanResponse(
         agentAction: 'report_to_user',
         retryable: false,
       }),
+      `Submit failed — run is in state '${run.state}', not 'gate_waiting'.`,
     );
   }
 
@@ -783,6 +805,7 @@ export async function submitHumanResponse(
         agentAction: 'report_to_user',
         retryable: false,
       }),
+      `Gate ID mismatch. Run is still in state '${run.state}'.`,
     );
   }
 
@@ -802,6 +825,7 @@ export async function submitHumanResponse(
           retryable: false,
         },
       ),
+      `Invalid choice for gate '${run.pending_gate.step_name}'. Run is in state '${run.state}'.`,
     );
   }
 
@@ -843,7 +867,7 @@ export async function submitHumanResponse(
           agentAction: 'stop',
           retryable: false,
         });
-    return errorEnvelope(run.pending_gate.step_name, options.runId, run.version.toString(), e);
+    return errorEnvelope(run.pending_gate.step_name, options.runId, run.version.toString(), e, `Failed to persist gate response. Run was in state '${run.state}'.`);
   }
 
   // 7. Build response — merge step output with human choice for a complete data record.
@@ -871,6 +895,9 @@ export async function submitHumanResponse(
     evidence: [],
     warnings: [],
     errors: [],
+    context_hint: nextAction !== null
+      ? nextAction.context_hint
+      : `Run completed in terminal state '${newState}'.`,
     next_action: nextAction,
   };
 }
@@ -896,6 +923,8 @@ async function executeChainInternal(
       errors: [
         'Auto-execution chain exceeded maximum depth (50). Possible cycle in workflow definition.',
       ],
+      agent_action: 'stop' as const,
+      context_hint: `Auto-step chain exceeded depth limit (50) for run '${options.runId}'.`,
       next_action: null,
     };
   }
