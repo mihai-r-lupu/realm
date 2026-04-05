@@ -862,6 +862,60 @@ describe('executeStep', () => {
     });
   });
 
+  describe('findNextAction instruction population', () => {
+    it('populates instruction with execute_step for an agent step', async () => {
+      const agentStepDef: WorkflowDefinition = {
+        id: 'agent-instr-wf',
+        name: 'Agent Instruction Workflow',
+        version: 1,
+        initial_state: 'created',
+        steps: {
+          'review-code': {
+            description: 'Review the code',
+            execution: 'agent',
+            allowed_from_states: ['created'],
+            produces_state: 'completed',
+            input_schema: { required: ['findings'], properties: { findings: { type: 'array' } } },
+          },
+        },
+      };
+
+      const { findNextAction } = await import('./execution-loop.js');
+      const result = findNextAction('created', agentStepDef, { evidenceByStep: {}, runParams: {} });
+
+      expect(result).not.toBeNull();
+      expect(result!.instruction).not.toBeNull();
+      expect(result!.instruction!.tool).toBe('execute_step');
+      expect((result!.instruction!.params as Record<string, unknown>)['step_name']).toBe('review-code');
+      expect((result!.instruction!.params as Record<string, unknown>)['input_schema']).toEqual(
+        agentStepDef.steps['review-code']?.input_schema,
+      );
+    });
+
+    it('returns instruction: null for an auto step without a handler', async () => {
+      const autoStepDef: WorkflowDefinition = {
+        id: 'auto-instr-wf',
+        name: 'Auto Instruction Workflow',
+        version: 1,
+        initial_state: 'created',
+        steps: {
+          'fetch-data': {
+            description: 'Fetch data automatically',
+            execution: 'auto',
+            allowed_from_states: ['created'],
+            produces_state: 'completed',
+          },
+        },
+      };
+
+      const { findNextAction } = await import('./execution-loop.js');
+      const result = findNextAction('created', autoStepDef, { evidenceByStep: {}, runParams: {} });
+
+      expect(result).not.toBeNull();
+      expect(result!.instruction).toBeNull();
+    });
+  });
+
   // Cleanup
   it('cleanup', async () => {
     await rm(dir, { recursive: true, force: true });
