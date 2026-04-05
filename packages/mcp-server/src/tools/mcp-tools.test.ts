@@ -115,6 +115,8 @@ describe('mcp tool handlers', () => {
     expect(result.status).toBe('ok');
     expect(typeof result.run_id).toBe('string');
     expect(result.data).toEqual({});
+    expect(result.context_hint).toBeDefined();
+    expect(result.context_hint).not.toBe('');
 
     const run = await runStore.get(result.run_id);
     expect(run.state).toBe('completed');
