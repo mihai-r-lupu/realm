@@ -33,7 +33,7 @@ export function resolvePromptTemplate(
     context: { resources: context.evidenceByStep },
     run: { params: context.runParams },
   };
-  return template.replace(/\{\{\s*([\w.\-]+)\s*\}\}/g, (_match, path: string) => {
+  return template.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_match, path: string) => {
     const value = resolvePath(path, root);
     if (value === undefined) return `{{ ${path} }}`;
     if (typeof value === 'string') return value;
