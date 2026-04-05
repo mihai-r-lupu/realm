@@ -121,18 +121,20 @@ export function registerStartRun(server: McpServer, opts?: { registry?: import('
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({
-            command: 'start_run',
-            run_id: '',
-            snapshot_id: '',
-            status: 'error',
-            data: {},
-            evidence: [],
-            warnings: [],
-            errors: [message],
-            agent_action: 'stop',
-            next_action: null,
-          }, null, 2) }],
+          content: [{
+            type: 'text' as const, text: JSON.stringify({
+              command: 'start_run',
+              run_id: '',
+              snapshot_id: '',
+              status: 'error',
+              data: {},
+              evidence: [],
+              warnings: [],
+              errors: [message],
+              agent_action: 'stop',
+              next_action: null,
+            }, null, 2)
+          }],
         };
       }
     },

@@ -328,6 +328,7 @@ mcp-server/src/
 **Deliverables:**
 
 1. **MCP server** — 6 tools exposed via MCP protocol over stdio transport. Uses `@modelcontextprotocol/sdk`. Each tool maps to an engine function.
+   `createRealmMcpServer(options?)` accepts optional `workflowStore` and `runStore` in its options object and forwards them into every tool registration. When not provided, tools fall back to `new JsonWorkflowStore()` / `new JsonFileStore()` pointing at `~/.realm/`. This injection pattern lets example `mcp-server.ts` files pass a pre-populated store so no `realm register` step is needed at the user's machine.
 
 2. **Protocol generator** — from a WorkflowDefinition, generates the complete agent briefing: params_schema, step list with execution modes, input_schema per agent step, instructions per step, rules, error_handling with agent_action mapping, quick_start paragraph.
 
@@ -443,6 +444,7 @@ expected:
 - `skill.md` — thin 8-line dispatch file, no domain rules
 - 2 fixtures (findings-approved, findings-rejected)
 - `driver.ts` (Mode 2 headless) + `mcp-server.ts` (Mode 1 VS Code Copilot)
+  - `mcp-server.ts` registers the workflow into its own `JsonWorkflowStore` instance at startup and passes it to `createRealmMcpServer({ workflowStore })`. No `realm register` is required for the example to work.
 - `README.md` with 5-section structure including the before/after SKILL.md comparison
 - `realm test` passing on both fixtures
 
