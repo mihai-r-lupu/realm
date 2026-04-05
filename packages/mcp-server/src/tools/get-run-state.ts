@@ -48,14 +48,14 @@ export async function handleGetRunState(
 }
 
 /** Registers the get_run_state MCP tool on the server. */
-export function registerGetRunState(server: McpServer): void {
+export function registerGetRunState(server: McpServer, opts?: HandleRunStateStores): void {
   server.tool(
     'get_run_state',
     'Get the current state summary of a workflow run.',
     { run_id: z.string() },
     async (args) => {
       try {
-        const result = await handleGetRunState(args);
+        const result = await handleGetRunState(args, opts);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

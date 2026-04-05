@@ -3,6 +3,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { ExtensionRegistry } from '@sensigo/realm';
+import { JsonWorkflowStore, JsonFileStore } from '@sensigo/realm';
 import { registerListWorkflows } from './tools/list-workflows.js';
 import { registerGetWorkflowProtocol } from './tools/get-workflow-protocol.js';
 import { registerStartRun } from './tools/start-run.js';
@@ -15,6 +16,11 @@ export interface RealmMcpServerOptions {
   registry?: ExtensionRegistry;
   /** Resolved secrets to pass to adapter configs (e.g. API tokens). */
   secrets?: Record<string, string>;
+  /** Pre-populated workflow store. When provided, tools use this instead of creating
+   *  a new JsonWorkflowStore() pointing at ~/.realm/workflows/. */
+  workflowStore?: JsonWorkflowStore;
+  /** Run store. When provided, tools use this instead of creating a new JsonFileStore(). */
+  runStore?: JsonFileStore;
 }
 
 /**
@@ -28,12 +34,12 @@ export function createRealmMcpServer(options?: RealmMcpServerOptions): McpServer
     version: '0.1.0',
   });
 
-  registerListWorkflows(server);
-  registerGetWorkflowProtocol(server);
+  registerListWorkflows(server, options);
+  registerGetWorkflowProtocol(server, options);
   registerStartRun(server, options);
   registerExecuteStep(server, options);
-  registerSubmitHumanResponse(server);
-  registerGetRunState(server);
+  registerSubmitHumanResponse(server, options);
+  registerGetRunState(server, options);
 
   return server;
 }

@@ -19,14 +19,14 @@ export async function handleGetWorkflowProtocol(
 }
 
 /** Registers the get_workflow_protocol MCP tool on the server. */
-export function registerGetWorkflowProtocol(server: McpServer): void {
+export function registerGetWorkflowProtocol(server: McpServer, opts?: HandleStores): void {
   server.tool(
     'get_workflow_protocol',
     'Get the full agent protocol briefing for a registered workflow.',
     { workflow_id: z.string() },
     async (args) => {
       try {
-        const result = await handleGetWorkflowProtocol(args);
+        const result = await handleGetWorkflowProtocol(args, opts);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         const message = err instanceof WorkflowError ? err.message : String(err);

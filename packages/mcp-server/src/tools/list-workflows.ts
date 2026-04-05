@@ -21,12 +21,12 @@ export async function handleListWorkflows(
 }
 
 /** Registers the list_workflows MCP tool on the server. */
-export function registerListWorkflows(server: McpServer): void {
+export function registerListWorkflows(server: McpServer, opts?: HandleStores): void {
   server.tool(
     'list_workflows',
     'List all registered Realm workflows.',
     async () => {
-      const result = await handleListWorkflows();
+      const result = await handleListWorkflows(opts);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     },
   );
