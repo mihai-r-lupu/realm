@@ -8,7 +8,7 @@ import type { WorkflowDefinition } from '@sensigo/realm';
 import { handleListWorkflows } from './list-workflows.js';
 import { handleGetWorkflowProtocol } from './get-workflow-protocol.js';
 import { handleStartRun } from './start-run.js';
-import { handleExecuteStep } from './execute-step.js';
+import { handleExecuteStep, handleExecuteStepTool } from './execute-step.js';
 import { handleSubmitHumanResponse } from './submit-human-response.js';
 import { handleGetRunState } from './get-run-state.js';
 
@@ -173,6 +173,29 @@ describe('mcp tool handlers', () => {
     expect(finalRun.state).toBe('approved');
     // Suppress unused-variable warning for gateRun
     void gateRun;
+  });
+
+  it('handleExecuteStepTool strips data from the MCP response', async () => {
+    const workflowStore = new JsonWorkflowStore(workflowDir);
+    await workflowStore.register(makeAgentDef());
+    const runStore = new JsonFileStore(runDir);
+
+    // Start run: chains through the auto step, stops at agent step.
+    const startResult = await handleStartRun(
+      { workflow_id: 'agent-wf', params: {} },
+      { runStore, workflowStore },
+    );
+    expect(startResult.status).toBe('ok');
+
+    // Call the MCP-layer handler (not the raw handleExecuteStep).
+    const result = await handleExecuteStepTool(
+      { run_id: startResult.run_id, command: 'step-agent', params: { result: 'done' } },
+      { runStore, workflowStore },
+    );
+
+    const parsed = JSON.parse(result.content[0]!.text) as Record<string, unknown>;
+    expect(parsed['data']).toEqual({});
+    expect(parsed['status']).toBe('ok');
   });
 
   it('handleGetRunState returns run summary', async () => {
