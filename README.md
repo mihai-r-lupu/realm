@@ -199,7 +199,7 @@ Full API: `InMemoryStore`, `MockServiceRecorder`, `createAgentDispatcher`, `crea
 ```bash
 npm install          # install all workspace dependencies
 npm run build        # compile all packages
-npm run test         # run all tests (267 total)
+npm run test         # run all tests (285 total)
 npm run lint         # lint all packages
 ```
 

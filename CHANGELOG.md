@@ -68,9 +68,18 @@ All notable changes to this project are documented here.
 - Dead code removed from `execution-loop.ts`: the unreachable `throw err` branch in the
   `validateInputSchema` catch block (which could only be reached if `validateInputSchema` threw a
   non-`WorkflowError` — it does not) has been removed.
+- `FileSystemAdapter` — new built-in adapter in `@sensigo/realm` that reads a local file and returns
+  `{ content, path, line_count, size_bytes }`. Add it to an `ExtensionRegistry` and reference it from
+  a step with `uses_service: <name>` and `operation: read`. Validates that the path is non-empty and
+  absolute; throws structured `WorkflowError` on ENOENT or read failure.
+- `code-review` example upgraded to v2: now accepts `path: string` (absolute file path) instead of
+  `code: string`. A `read_code` auto step reads the file via `FileSystemAdapter` with
+  `trust: engine_delivered`; the file content is injected into the security and quality review prompts
+  via `{{ context.resources.read_code.content }}`. Security review step now requires `owasp_category`,
+  `location`, and `remediation` per finding. Quality review step adds a required `summary` field.
 
 ### Tests
-267 tests across all packages (172 core, 42 CLI, 13 MCP, 40 testing).
+285 tests across all packages (181 core, 42 CLI, 13 MCP, 40 testing).
 
 ---
 
