@@ -49,6 +49,15 @@ export interface ResponseEnvelope {
   run_id: string;
   /** Opaque version token for optimistic concurrency. Pass back as snapshotId in your next call. For auditing only — do not parse. */
   snapshot_id: string;
+  /**
+   * Chain progress status.
+   * - 'ok': the chain made forward progress; follow next_action for what to do next.
+   *   Does NOT imply the original requested step succeeded — a branched recovery path
+   *   also returns 'ok' with a warning carrying the original error.
+   * - 'error': unrecoverable failure; agent_action tells you how to respond.
+   * - 'blocked': wrong step for current state; next_action redirects.
+   * - 'confirm_required': a human gate is open; gate carries the display content.
+   */
   status: RunStatus;
   data: Record<string, unknown>;
   /** Audit trail of step executions in this response. For debugging and CLI inspection only. */
@@ -66,5 +75,5 @@ export interface ResponseEnvelope {
    * Only present when at least one auto step was chained. Useful for debugging and orientation
    * after start_run or after an agent step that triggers subsequent auto steps.
    */
-  chained_auto_steps?: Array<{ step: string; produced_state: string }>;
+  chained_auto_steps?: Array<{ step: string; produced_state: string; branched_via?: string }>;
 }

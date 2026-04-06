@@ -230,8 +230,7 @@ describe('mcp tool handlers', () => {
     expect(parsed['command']).toBe('review_security');
   });
 
-  it('handleGetRunState returns run summary', async () => {
-    const workflowStore = new JsonWorkflowStore(workflowDir);
+  it('handleGetRunState returns run summary', async () => {    const workflowStore = new JsonWorkflowStore(workflowDir);
     await workflowStore.register(makeSimpleDef());
     const runStore = new JsonFileStore(runDir);
 
@@ -246,5 +245,63 @@ describe('mcp tool handlers', () => {
     expect(state.state).toBe('completed');
     expect(state.terminal_state).toBe(true);
     expect(typeof state.evidence_count).toBe('number');
+  });
+
+  it('gate on_reject transition: submit_human_response routes to target step', async () => {
+    const gateTransitionDef: WorkflowDefinition = {
+      id: 'gate-trans-wf',
+      name: 'Gate Transition Workflow',
+      version: 1,
+      initial_state: 'created',
+      steps: {
+        'review': {
+          description: 'Human gate with on_reject',
+          execution: 'auto',
+          trust: 'human_confirmed',
+          allowed_from_states: ['created'],
+          produces_state: 'approved',
+          gate: { choices: ['approve', 'reject'] },
+          transitions: {
+            on_reject: { step: 'revise', produces_state: 'revision_needed' },
+          },
+        },
+        'revise': {
+          description: 'Agent revision step',
+          execution: 'agent',
+          allowed_from_states: ['revision_needed'],
+          produces_state: 'completed',
+        },
+      },
+    };
+    const workflowStore = new JsonWorkflowStore(workflowDir);
+    await workflowStore.register(gateTransitionDef);
+    const runStore = new JsonFileStore(runDir);
+
+    // Start run — chains into gate step
+    const startResult = await handleStartRun(
+      { workflow_id: 'gate-trans-wf', params: {} },
+      { runStore, workflowStore },
+    );
+    expect(startResult.status).toBe('confirm_required');
+    const gateId = startResult.gate!.gate_id;
+    const gateRun = await runStore.get(startResult.run_id);
+
+    // Submit reject
+    const rejectResult = await handleSubmitHumanResponse(
+      { run_id: startResult.run_id, gate_id: gateId, choice: 'reject' },
+      { runStore, workflowStore },
+    );
+
+    expect(rejectResult.status).toBe('ok');
+    expect(rejectResult.next_action).not.toBeNull();
+    expect((rejectResult.next_action!.instruction!.params as Record<string, unknown>)['command']).toBe('revise');
+    expect(rejectResult.chained_auto_steps).toBeDefined();
+    expect(rejectResult.chained_auto_steps![0]!.branched_via).toBe('on_reject');
+
+    const finalRun = await runStore.get(startResult.run_id);
+    expect(finalRun.state).toBe('revision_needed');
+
+    // Suppress unused-variable warning
+    void gateRun;
   });
 });

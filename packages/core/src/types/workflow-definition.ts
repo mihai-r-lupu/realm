@@ -66,6 +66,10 @@ export interface StepDefinition {
    * For human_confirmed steps, delivered as gate.prompt when the gate opens.
    */
   prompt?: string;
+  /** Gate configuration — choices available to the human reviewer. */
+  gate?: { choices?: string[] };
+  /** Conditional routing based on step outcome or gate response. */
+  transitions?: Record<string, { step: string; produces_state: string }>;
 }
 
 export interface WorkflowDefinition {

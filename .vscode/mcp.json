@@ -7,6 +7,14 @@
         "${workspaceFolder}/examples/code-review/dist/mcp-server.js"
       ],
       "autoStart": true
+    },
+    "realm-document-intake": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/examples/document-intake/dist/mcp-server.js"
+      ],
+      "autoStart": true
     }
   }
 }

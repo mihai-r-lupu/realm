@@ -101,6 +101,17 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
     if (typeof step['produces_state'] === 'string') {
       reachableStates.add(step['produces_state']);
     }
+    // Transition produces_state values are intermediate states written directly;
+    // add them so that target steps listing them in allowed_from_states pass reachability.
+    const transitions = step['transitions'];
+    if (typeof transitions === 'object' && transitions !== null) {
+      for (const [, tRaw] of Object.entries(transitions as Record<string, unknown>)) {
+        const t = tRaw as Record<string, unknown>;
+        if (typeof t['produces_state'] === 'string') {
+          reachableStates.add(t['produces_state']);
+        }
+      }
+    }
   }
 
   // Step 3: Per-step validation
@@ -164,6 +175,52 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
           errors.push(
             `Step '${stepName}': allowed_from_state '${String(state)}' is never produced`,
           );
+        }
+      }
+    }
+
+    // Validate transitions.
+    const transitions = step['transitions'];
+    if (typeof transitions === 'object' && transitions !== null) {
+      for (const [transitionKey, tRaw] of Object.entries(transitions as Record<string, unknown>)) {
+        if (typeof tRaw !== 'object' || tRaw === null) {
+          errors.push(`Step '${stepName}': transition '${transitionKey}' must be an object`);
+          continue;
+        }
+        const t = tRaw as Record<string, unknown>;
+
+        // on_error is only valid on auto steps.
+        if (transitionKey === 'on_error') {
+          if (step['execution'] !== 'auto') {
+            errors.push(`Step '${stepName}': 'on_error' transition is only valid on execution: auto steps`);
+          }
+        } else {
+          // Non-on_error keys must match a gate choice (if gate.choices is declared).
+          const gateChoices = (step['gate'] as Record<string, unknown> | undefined)?.['choices'];
+          if (Array.isArray(gateChoices)) {
+            const choice = transitionKey.startsWith('on_') ? transitionKey.slice(3) : transitionKey;
+            if (!(gateChoices as unknown[]).includes(choice)) {
+              errors.push(`Step '${stepName}': transition key '${transitionKey}' is not in gate choices [${(gateChoices as string[]).join(', ')}]`);
+            }
+          }
+        }
+
+        // Transition target step must exist.
+        const targetStep = t['step'];
+        if (typeof targetStep !== 'string') {
+          errors.push(`Step '${stepName}': transition '${transitionKey}' is missing 'step' field`);
+        } else if (!(targetStep in stepsRaw)) {
+          errors.push(`Step '${stepName}': transition '${transitionKey}' targets unknown step '${targetStep}'`);
+        } else {
+          // produces_state must be in target step's allowed_from_states.
+          const transitionProducesState = t['produces_state'];
+          if (typeof transitionProducesState === 'string') {
+            const targetStepRaw = stepsRaw[targetStep] as Record<string, unknown> | undefined;
+            const targetAllowedFrom = targetStepRaw?.['allowed_from_states'];
+            if (Array.isArray(targetAllowedFrom) && !(targetAllowedFrom as unknown[]).includes(transitionProducesState)) {
+              errors.push(`Step '${stepName}': transition '${transitionKey}' produces_state '${transitionProducesState}' is not in step '${targetStep}'.allowed_from_states`);
+            }
+          }
         }
       }
     }

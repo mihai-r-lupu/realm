@@ -98,6 +98,109 @@ describe('loadWorkflowFromString', () => {
   });
 });
 
+describe('transitions validation', () => {
+  const TRANSITIONS_BASE = `
+id: transitions-wf
+name: Transitions Workflow
+version: 1
+initial_state: created
+steps:
+  auto_step:
+    description: Auto step with handler
+    execution: auto
+    handler: my_handler
+    allowed_from_states: [created]
+    produces_state: processed
+  recovery_step:
+    description: Agent recovery step
+    execution: agent
+    allowed_from_states: [recovery_needed]
+    produces_state: completed
+`;
+
+  it('valid on_error transition parses correctly', () => {
+    const content = TRANSITIONS_BASE.replace(
+      'produces_state: processed',
+      'produces_state: processed\n    transitions:\n      on_error:\n        step: recovery_step\n        produces_state: recovery_needed',
+    );
+    const def = loadWorkflowFromString(content);
+    expect(def.steps['auto_step']?.transitions?.['on_error']?.step).toBe('recovery_step');
+    expect(def.steps['auto_step']?.transitions?.['on_error']?.produces_state).toBe('recovery_needed');
+  });
+
+  it('on_error on an agent step throws WorkflowError', () => {
+    const content = TRANSITIONS_BASE.replace(
+      'produces_state: completed',
+      'produces_state: completed\n    transitions:\n      on_error:\n        step: auto_step\n        produces_state: created',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("'on_error' transition is only valid on execution: auto steps");
+    }
+  });
+
+  it('transition targeting unknown step throws WorkflowError', () => {
+    const content = TRANSITIONS_BASE.replace(
+      'produces_state: processed',
+      'produces_state: processed\n    transitions:\n      on_error:\n        step: nonexistent_step\n        produces_state: recovery_needed',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("targets unknown step 'nonexistent_step'");
+    }
+  });
+
+  it('transition produces_state not in target allowed_from_states throws WorkflowError', () => {
+    const content = TRANSITIONS_BASE.replace(
+      'produces_state: processed',
+      'produces_state: processed\n    transitions:\n      on_error:\n        step: recovery_step\n        produces_state: wrong_state',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("produces_state 'wrong_state' is not in step 'recovery_step'.allowed_from_states");
+    }
+  });
+
+  it('gate-response transition key not in gate choices throws WorkflowError', () => {
+    const content = `
+id: gate-transition-wf
+name: Gate Transition Workflow
+version: 1
+initial_state: created
+steps:
+  gate_step:
+    description: Gate step
+    execution: auto
+    trust: human_confirmed
+    allowed_from_states: [created]
+    produces_state: approved
+    gate:
+      choices: [approve, reject]
+    transitions:
+      on_cancel:
+        step: recovery_step
+        produces_state: recovery_needed
+  recovery_step:
+    description: Recovery step
+    execution: agent
+    allowed_from_states: [recovery_needed]
+    produces_state: completed
+`;
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("transition key 'on_cancel' is not in gate choices");
+    }
+  });
+});
+
 describe('loadWorkflowFromFile', () => {
   it('nonexistent file throws WorkflowError with code RESOURCE_FETCH_FAILED', () => {
     expect(() => loadWorkflowFromFile('/nonexistent/path/workflow.yaml')).toThrow(WorkflowError);

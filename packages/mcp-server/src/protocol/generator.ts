@@ -18,6 +18,8 @@ export interface ProtocolStep {
   instructions?: string;
   /** Present when the step may open a human gate. */
   possible_gate?: ProtocolStepGate;
+  /** Conditional routing paths from this step, keyed by transition name (e.g. 'on_error', 'on_reject'). */
+  transitions?: Record<string, { step: string; produces_state: string }>;
 }
 
 export interface WorkflowProtocol {
@@ -112,6 +114,9 @@ export function generateProtocol(definition: WorkflowDefinition): WorkflowProtoc
     }
     if (possible_gate !== undefined) {
       protocolStep.possible_gate = possible_gate;
+    }
+    if (step.transitions !== undefined) {
+      protocolStep.transitions = step.transitions;
     }
 
     steps.push(protocolStep);
