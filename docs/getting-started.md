@@ -326,6 +326,12 @@ Every `start_run`, `execute_step`, and `submit_human_response` response includes
 
 For agent steps, the field to replace is `params` — shaped to `next_action.input_schema`.
 
+When `start_run` or `execute_step` chains through one or more `execution: auto` steps before returning,
+the response also includes `chained_auto_steps: Array<{ step: string; produced_state: string }>` — an
+ordered record of every auto step the engine ran silently in this call. Useful for orientation when the
+engine advances several states without agent involvement. The field is omitted when no auto steps were
+chained.
+
 For human gates (`status: confirm_required`), the agent:
 1. Reads `gate.agent_hint` for instructions on how to present the gate (if set).
 2. Presents `gate.display` to the user verbatim.

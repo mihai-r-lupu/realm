@@ -7,6 +7,12 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Added
+- `chained_auto_steps: Array<{ step: string; produced_state: string }>` on `ResponseEnvelope` — when
+  `start_run` or `execute_step` chains through one or more `execution: auto` steps, the response
+  includes an ordered record of every auto step that ran silently. Omitted when no auto steps were
+  chained. Gives consuming agents visibility into engine-driven state advances without agent involvement.
+- `hint` field on `list_workflows` response — instructs agents to call `get_workflow_protocol` with a
+  `workflow_id` before calling `start_run`.
 - `call_with` field on `NextAction.instruction` — a ready-to-use flat argument object for calling the
   tool. For agent steps, `call_with.params` is a minimal schema skeleton object derived from
   `input_schema` (e.g. `{ findings: [{ severity: "<critical|high|medium|low>", description: "" }] }`)
@@ -43,6 +49,14 @@ All notable changes to this project are documented here.
   the current state.
 
 ### Fixed
+- MCP `start_run`: `command` in the response is now always `'start_run'`, regardless of whether the
+  engine chained an initial `execution: auto` step. Previously the field reflected the internal auto
+  step name (e.g. `'read_code'`), causing agents to misinterpret which tool they had called.
+- Protocol generator: rewrote misleading agent guidance for `execution: auto, trust: human_confirmed`
+  steps — `agent_involvement` previously read `"none — engine executes..."`. It now correctly states
+  that the agent will receive `status: confirm_required` and must present `gate.display` / collect a
+  choice from `gate.response_spec.choices`. `DEFAULT_RULES` updated to reference `gate.display`
+  instead of vague "preview" language.
 - `command` in `executeChain` responses now echoes the step name submitted by the caller, not the
   internally chained step name. Previously, chain-wrapped responses reported the wrong `command`,
   which caused agents to misinterpret which step had just completed.
@@ -90,7 +104,7 @@ All notable changes to this project are documented here.
   `location`, and `remediation` per finding. Quality review step adds a required `summary` field.
 
 ### Tests
-285 tests across all packages (181 core, 42 CLI, 13 MCP, 40 testing).
+276 tests across all packages (181 core, 42 CLI, 13 MCP, 40 testing).
 
 ---
 
