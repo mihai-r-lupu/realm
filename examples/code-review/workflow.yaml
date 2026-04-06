@@ -79,6 +79,8 @@ steps:
                 type: string
               suggestion:
                 type: string
+              location:
+                type: string
         overall_risk:
           type: string
           enum: [low, medium, high]
