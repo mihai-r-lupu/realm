@@ -290,13 +290,15 @@ Every `start_run` and `execute_step` response includes a `next_action` object. T
 `next_action.prompt` for its current task, then calls `next_action.instruction.tool` using
 `instruction.call_with` as the ready-to-use argument template:
 
-- `instruction.call_with` — a flat argument object with agent-supplied values as placeholder strings
-  (e.g. `<YOUR_PARAMS>`, `<approve|reject>`). Copy the object, replace the placeholder(s), and call
-  the tool.
-- `instruction.params_required` — explains each placeholder: `name`, `description`, and optionally
-  `valid_values`. Use this to understand what each placeholder expects.
+- `instruction.call_with` — a ready-to-use argument object. For agent steps, `call_with.params` is a
+  minimal schema skeleton derived from `input_schema` — a navigable object with placeholder strings
+  for enums (e.g. `<critical|high|medium|low>`) and zero values for scalars. Copy it, fill in your
+  values, and call the tool. For human gate responses, the agent-supplied field is a string placeholder
+  (e.g. `<approve|reject>`).
+- `instruction.params_required` — explains each agent-supplied field: `name`, `description`, and
+  optionally `valid_values`. Use this to understand what each placeholder expects.
 
-For agent steps, the placeholder is `params` — the agent's output shaped to `next_action.input_schema`.
+For agent steps, the field to replace is `params` — shaped to `next_action.input_schema`.
 For human gate responses, it is `choice` with `valid_values` listing the allowed choices.
 
 ### Error and blocked responses

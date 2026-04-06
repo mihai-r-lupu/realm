@@ -8,9 +8,14 @@ All notable changes to this project are documented here.
 
 ### Added
 - `call_with` field on `NextAction.instruction` — a ready-to-use flat argument object for calling the
-  tool. Agent-supplied params appear as placeholder strings (e.g. `<YOUR_PARAMS>`, `<approve|reject>`).
-  The agent copies the object, replaces the placeholder(s), and calls the tool — no manual merging of
-  `params` and `params_required` required.
+  tool. For agent steps, `call_with.params` is a minimal schema skeleton object derived from
+  `input_schema` (e.g. `{ findings: [{ severity: "<critical|high|medium|low>", description: "" }] }`)
+  rather than a bare `<YOUR_PARAMS>` string — the agent can navigate and fill it in directly. For human
+  gate responses, the placeholder remains a string (e.g. `<approve|reject>`).
+- Optional `get_workflow_protocol` call documented as step 0 in the code-review skill — agents that
+  prefer upfront schema discovery can call it before `start_run`.
+- Optional `location` field added to `assess_quality.findings` items in the code-review example
+  workflow (symmetric with the existing `location` field in `review_security`).
 - `context_hint` promoted to a required top-level field on `ResponseEnvelope` — every response now
   carries orientation about the current run state and what just happened, including error and blocked
   responses where `next_action` is `null`. Previously only appeared inside `next_action`.
@@ -33,6 +38,12 @@ All notable changes to this project are documented here.
   the current state.
 
 ### Fixed
+- `command` in `executeChain` responses now echoes the step name submitted by the caller, not the
+  internally chained step name. Previously, chain-wrapped responses reported the wrong `command`,
+  which caused agents to misinterpret which step had just completed.
+- Terminal `context_hint` (emitted when a run reaches a terminal state) now explicitly directs the
+  agent to call `get_run_state` with the run ID to retrieve the full evidence record, instead of
+  ending without guidance.
 - MCP `start_run`: returns a populated `next_action` when the first step is an agent step (previously
   returned `null`, causing the agent to stall on the very first call).
 - MCP `execute_step`: evidence payloads in MCP tool responses are now truncated to avoid injecting
@@ -46,7 +57,7 @@ All notable changes to this project are documented here.
   responses are now JSON-parseable on every code path.
 
 ### Tests
-253 tests across all packages (158 core, 42 CLI, 13 MCP, 40 testing).
+267 tests across all packages (172 core, 42 CLI, 13 MCP, 40 testing).
 
 ---
 
