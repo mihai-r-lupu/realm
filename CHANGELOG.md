@@ -55,6 +55,19 @@ All notable changes to this project are documented here.
 - MCP tool catch handlers (`start_run`, `execute_step`, `submit_human_response`) now return
   structured JSON on unexpected exceptions instead of a bare `Error: <message>` string. All MCP
   responses are now JSON-parseable on every code path.
+- `get_run_state`: error path replaced — was `isError: true` with plain-text `"Error: <message>"`;
+  now returns a structured JSON envelope with `status: 'error'`, `agent_action: 'stop'`, and
+  `context_hint`. No MCP tool now uses `isError: true`.
+- `submit_human_response`: success path now strips `data` and `evidence` (same guard already applied
+  by `execute_step`) — gate approval responses are no longer larger than regular step responses.
+- `start_run`: all three return paths (no-steps, agent-step-first, auto-chain) now return a full
+  `ResponseEnvelope` including `command`, `snapshot_id`, `evidence`, and `warnings`. Previously the
+  non-auto paths returned a narrower object missing several envelope fields.
+- `slimEvidence` extracted from `execute-step.ts` into a shared MCP utility (`slim-evidence.ts`),
+  imported by `execute-step`, `submit-human-response`, and `start-run`.
+- Dead code removed from `execution-loop.ts`: the unreachable `throw err` branch in the
+  `validateInputSchema` catch block (which could only be reached if `validateInputSchema` threw a
+  non-`WorkflowError` — it does not) has been removed.
 
 ### Tests
 267 tests across all packages (172 core, 42 CLI, 13 MCP, 40 testing).
