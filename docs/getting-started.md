@@ -295,11 +295,9 @@ Every `start_run`, `execute_step`, and `submit_human_response` response includes
   for enums (e.g. `<critical|high|medium|low>`) and zero values for scalars. Copy it, fill in your
   values, and call the tool. For human gate responses, the agent-supplied field is a string placeholder
   (e.g. `<approve|reject>`).
-- `instruction.params_required` — explains each agent-supplied field: `name`, `description`, and
-  optionally `valid_values`. Use this to understand what each placeholder expects.
 
 For agent steps, the field to replace is `params` — shaped to `next_action.input_schema`.
-For human gate responses, it is `choice` with `valid_values` listing the allowed choices.
+For human gate responses, it is `choice` — allowed values are listed in `gate.response_spec.choices`.
 
 ### Error and blocked responses
 
