@@ -7,6 +7,28 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Added
+- `agent_profile` field on `StepDefinition` — associates a named agent persona with an
+  `execution: agent` step. The profile content is loaded at register time from a Markdown file
+  under the workflow's `profiles_dir` (defaults to `<workflow-dir>/agents/`). Using `agent_profile`
+  on an `execution: auto` step is a hard validation error.
+- `profiles_dir` field on `WorkflowDefinition` — optional path (relative to the workflow YAML
+  file) pointing to the directory that contains `.md` profile files. Defaults to `agents/` adjacent
+  to the workflow YAML when omitted.
+- `resolved_profiles` on `WorkflowDefinition` (runtime-only) — populated by `loadWorkflowFromFile`
+  after register-time resolution. Each entry holds `{ content, content_hash }` where `content_hash`
+  is the SHA-256 hex digest of the profile file at load time.
+- `agent_profile_instructions` field on `ProtocolStep` in the MCP protocol — when a step has a
+  resolved profile, the full profile content is included in the workflow protocol so the consuming
+  agent loads the persona before executing the step.
+- `agent_profile` and `agent_profile_hash` fields on `EvidenceSnapshot` — when a step ran with a
+  profile, the snapshot records both the profile name and the SHA-256 content hash for auditability.
+- `realm inspect` profile display — when a step's evidence snapshot includes `agent_profile`, the
+  step name is followed by a cyan `[profile: <name>]` annotation.
+- `code-review` example agent profiles — `agents/security-reviewer.md` and
+  `agents/quality-reviewer.md` added; `review_security` and `assess_quality` steps reference them
+  via `agent_profile`.
+- Hard validation error on missing profiles — `realm validate` and `realm register` fail immediately
+  with the searched path in the error message when a referenced profile file cannot be found.
 - `chained_auto_steps: Array<{ step: string; produced_state: string }>` on `ResponseEnvelope` — when
   `start_run` or `execute_step` chains through one or more `execution: auto` steps, the response
   includes an ordered record of every auto step that ran silently. Omitted when no auto steps were
