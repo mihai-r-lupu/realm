@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { executeStep } from './execution-loop.js';
+import { executeStep, executeChain } from './execution-loop.js';
 import { StateGuard } from './state-guard.js';
 import { JsonFileStore } from '../store/json-file-store.js';
 import { WorkflowError } from '../types/workflow-error.js';
@@ -201,6 +201,8 @@ describe('executeStep', () => {
 
     expect(envelope.status).toBe('ok');
     expect(envelope.next_action).toBeNull();
+    expect(envelope.context_hint).toContain('get_run_state');
+    expect(envelope.context_hint).toContain(run.id);
 
     const updated = await store.get(run.id);
     expect(updated.state).toBe('completed');
@@ -941,7 +943,10 @@ describe('executeStep', () => {
       expect(result!.instruction!.call_with).toBeDefined();
       expect((result!.instruction!.call_with as Record<string, unknown>)['run_id']).toBe('test-run-id');
       expect((result!.instruction!.call_with as Record<string, unknown>)['command']).toBe('review-code');
-      expect((result!.instruction!.call_with as Record<string, unknown>)['params']).toBe('<YOUR_PARAMS>');
+      // input_schema is present → params should be a skeleton object, not a string
+      const callWithParams = (result!.instruction!.call_with as Record<string, unknown>)['params'];
+      expect(typeof callWithParams).toBe('object');
+      expect(callWithParams).not.toBeNull();
     });
 
     it('returns instruction: null for an auto step without a handler', async () => {
@@ -1065,6 +1070,55 @@ describe('executeStep', () => {
       } finally {
         vi.restoreAllMocks();
       }
+    });
+  });
+
+  describe('executeChain command override', () => {
+    it('executeChain echoes the submitted command even when chaining into an auto step', async () => {
+      const chainWorkflow: WorkflowDefinition = {
+        id: 'chain-cmd-wf',
+        name: 'Chain Command Workflow',
+        version: 1,
+        initial_state: 'created',
+        steps: {
+          agent_step: {
+            description: 'Agent step',
+            execution: 'agent',
+            allowed_from_states: ['created'],
+            produces_state: 'auto_pending',
+          },
+          auto_step: {
+            description: 'Auto step',
+            execution: 'auto',
+            trust: 'human_confirmed',
+            allowed_from_states: ['auto_pending'],
+            produces_state: 'completed',
+          },
+        },
+      };
+      const chainGuard = new StateGuard(chainWorkflow);
+
+      const run = await store.create({
+        workflowId: 'chain-cmd-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const envelope = await executeChain(store, chainGuard, chainWorkflow, {
+        runId: run.id,
+        command: 'agent_step',
+        input: {},
+        snapshotId: run.version.toString(),
+        dispatcher: echoDispatcher,
+      });
+
+      // The agent submitted 'agent_step'; the chain ran into 'auto_step' (gate).
+      // The returned envelope's command must reflect the submitted step.
+      expect(envelope.command).toBe('agent_step');
+      // Inner step info is preserved via gate.
+      expect(envelope.status).toBe('confirm_required');
+      expect(envelope.gate!.step_name).toBe('auto_step');
     });
   });
 });
