@@ -21,11 +21,16 @@ All notable changes to this project are documented here.
   responses where `next_action` is `null`. Previously only appeared inside `next_action`.
 - JSDoc on `ResponseEnvelope.snapshot_id` (audit-only — do not parse) and `ResponseEnvelope.evidence`
   (debugging and CLI inspection only) to reduce agent confusion about opaque fields.
-- `params_required` field on `NextAction.instruction` — each tool instruction now declares which
-  parameters the agent must supply, separately from parameters pre-filled by the engine. Agent steps
-  include `{ name: "params" }` (output shaped to `input_schema`). Human gate instructions include
-  `{ name: "choice", valid_values: [...] }` so the agent knows both the key name and the allowed values
-  without having to guess.
+- `GateInfo.display` — the human-facing summary text for a gate (renamed from `GateInfo.prompt`).
+- `GateInfo.agent_hint` — optional agent-facing instruction text derived from the gate step's
+  `instructions:` field in the workflow YAML. Tells the agent how to present the gate to the user.
+- `GateInfo.response_spec` — `{ choices: string[] }` object on every gate response. Replaces the
+  removed `params_required` on `NextAction.instruction` as the canonical source for valid choices.
+- `orientation` field on `NextAction` — replaces `context_hint` inside `next_action`. Describes
+  the current run state and what just happened from the perspective of the next step to take.
+  The top-level `ResponseEnvelope.context_hint` field is unchanged.
+- `instructions:` field on the `confirm_review` gate step in the code-review example workflow —
+  tells the agent how to present the gate display content to the user and how to submit the response.
 - `agent_action` field on `ResponseEnvelope` — every `error` and `blocked` response now includes
   `agent_action: AgentAction` (`stop`, `report_to_user`, `provide_input`, `resolve_precondition`,
   `wait_for_human`) so consuming agents can determine recovery strategy without parsing error text.
@@ -63,8 +68,12 @@ All notable changes to this project are documented here.
 - `start_run`: all three return paths (no-steps, agent-step-first, auto-chain) now return a full
   `ResponseEnvelope` including `command`, `snapshot_id`, `evidence`, and `warnings`. Previously the
   non-auto paths returned a narrower object missing several envelope fields.
-- `slimEvidence` extracted from `execute-step.ts` into a shared MCP utility (`slim-evidence.ts`),
-  imported by `execute-step`, `submit-human-response`, and `start-run`.
+- `slimEvidence` extracted from `execute-step.ts` into a shared MCP utility; that utility has
+  since been removed — MCP tools now return `evidence: []` unconditionally. Evidence is available
+  via `get_run_state` (count) or `realm inspect` (full data); it is never needed in MCP tool
+  responses and was inflating context window usage.
+- `snapshot_id` removed from all MCP tool response envelopes — the field was annotated
+  "audit-only", was confusing agents that tried to parse it, and is not needed by any tool caller.
 - Dead code removed from `execution-loop.ts`: the unreachable `throw err` branch in the
   `validateInputSchema` catch block (which could only be reached if `validateInputSchema` threw a
   non-`WorkflowError` — it does not) has been removed.
@@ -75,7 +84,9 @@ All notable changes to this project are documented here.
 - `code-review` example upgraded to v2: now accepts `path: string` (absolute file path) instead of
   `code: string`. A `read_code` auto step reads the file via `FileSystemAdapter` with
   `trust: engine_delivered`; the file content is injected into the security and quality review prompts
-  via `{{ context.resources.read_code.content }}`. Security review step now requires `owasp_category`,
+  via `{{ context.resources.read_code.content }}`. The `assess_quality` step prompt no longer
+  re-injects the file content — the agent already has the content from the `read_code` step context.
+  Security review step now requires `owasp_category`,
   `location`, and `remediation` per finding. Quality review step adds a required `summary` field.
 
 ### Tests

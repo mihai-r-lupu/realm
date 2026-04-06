@@ -64,7 +64,6 @@ export function registerGetRunState(server: McpServer, opts?: HandleRunStateStor
             type: 'text' as const, text: JSON.stringify({
               command: 'get_run_state',
               run_id: args.run_id,
-              snapshot_id: '',
               status: 'error',
               data: {},
               evidence: [],

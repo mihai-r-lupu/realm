@@ -23,14 +23,12 @@ When asked to review code with Realm:
    - `instruction.call_with` is the ready-to-use argument template. Replace the
      placeholder string(s) (e.g. `<YOUR_PARAMS>`, `<approve|reject>`) with your
      actual values, then call the tool with the resulting object.
-   - `instruction.params_required` lists the params you must supply — use this to
-     understand what each placeholder expects (description, valid_values if applicable).
-   - For agent steps: the tool is `execute_step`. `params_required` will contain `{ name: "params" }` — supply your work output there, shaped according to `next_action.input_schema`.
+   - For agent steps: the tool is `execute_step`. Supply your work output in `params`, shaped according to `next_action.input_schema`.
    - Example: `execute_step({ run_id: "...", command: "review_security", params: { findings: [...] } })`
 4. Repeat from step 2 until `status` is `confirm_required` or `completed`.
-5. On `confirm_required`: show `gate.prompt` to the user and wait for their reply.
-   `next_action.instruction` will be `{ tool: "submit_human_response", params: { run_id, gate_id }, params_required: [{ name: "choice", valid_values: [...] }] }`.
-   Call `submit_human_response` with `run_id`, `gate_id`, and `choice` set to the user's selection from `gate.choices` (or `params_required[0].valid_values`).
+5. On `confirm_required`: show `gate.display` to the user and wait for their reply.
+   `next_action.instruction` will be `{ tool: "submit_human_response", params: { run_id, gate_id } }`.
+   Call `submit_human_response` with `run_id`, `gate_id`, and `choice` set to the user's selection from `gate.response_spec.choices`.
 
 ## Error and Blocked Responses
 

@@ -2,19 +2,10 @@
 import type { EvidenceSnapshot } from './run-record.js';
 import type { AgentAction } from './workflow-error.js';
 
-/** Describes a parameter the agent must supply at call time. */
-export interface RequiredParam {
-  name: string;
-  description: string;
-  valid_values?: string[];
-}
-
 export interface NextAction {
   instruction: {
     tool: string;
     params: Record<string, unknown>;
-    /** Parameters the agent must supply when calling the tool. Disjoint from params. */
-    params_required?: RequiredParam[];
     /**
      * Ready-to-use flat argument object for calling the tool.
      * Agent-supplied params appear as placeholder strings (e.g. "<YOUR_PARAMS>", "<approve|reject>").
@@ -23,7 +14,8 @@ export interface NextAction {
     call_with: Record<string, unknown>;
   } | null;
   human_readable: string;
-  context_hint: string;
+  /** Current state orientation — describes what state the run is in and what just happened. */
+  orientation: string;
   expected_timeout?: string;
   /** The step's declared input schema — use this to structure the params argument of your execute_step call. */
   input_schema?: Record<string, unknown>;
@@ -44,8 +36,12 @@ export interface GateInfo {
   step_name: string;
   preview: Record<string, unknown>;
   choices: string[];
-  /** Template-resolved prompt for this gate step — present the human with this before asking for choice. */
-  prompt?: string;
+  /** Template-resolved display content for this gate step — present to the human verbatim before asking for their choice. */
+  display?: string;
+  /** Agent-facing instructions for this gate step — how the agent should present the gate to the human. */
+  agent_hint?: string;
+  /** Structured response specification — the choices the human may select. */
+  response_spec?: { choices: string[] };
 }
 
 export interface ResponseEnvelope {

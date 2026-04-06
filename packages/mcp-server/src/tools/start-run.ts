@@ -11,7 +11,6 @@ import {
   type ResponseEnvelope,
   ExtensionRegistry,
 } from '@sensigo/realm';
-import { slimEvidence } from './slim-evidence.js';
 
 export interface HandleRunStores {
   runStore?: JsonFileStore;
@@ -82,7 +81,7 @@ export async function handleStartRun(
       evidence: [],
       warnings: [],
       errors: [],
-      context_hint: nextAction?.context_hint ?? `Run '${run.id}' created in state '${run.state}'.`,
+      context_hint: nextAction?.orientation ?? `Run '${run.id}' created in state '${run.state}'.`,
       next_action: nextAction,
     };
   }
@@ -101,7 +100,7 @@ export async function handleStartRun(
     ...result,
     run_id: run.id,
     data: {},
-    evidence: slimEvidence(result.evidence),
+    evidence: [],
   };
 }
 
@@ -117,7 +116,8 @@ export function registerStartRun(server: McpServer, opts?: { registry?: import('
     async (args) => {
       try {
         const result = await handleStartRun(args, opts);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+        const { snapshot_id: _snap, ...slimResult } = result;
+        return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -125,7 +125,6 @@ export function registerStartRun(server: McpServer, opts?: { registry?: import('
             type: 'text' as const, text: JSON.stringify({
               command: 'start_run',
               run_id: '',
-              snapshot_id: '',
               status: 'error',
               data: {},
               evidence: [],

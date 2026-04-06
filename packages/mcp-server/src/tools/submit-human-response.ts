@@ -8,7 +8,6 @@ import {
   type ResponseEnvelope,
 } from '@sensigo/realm';
 import type { HandleRunStores } from './start-run.js';
-import { slimEvidence } from './slim-evidence.js';
 
 /**
  * Business logic for the submit_human_response tool.
@@ -44,7 +43,7 @@ export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunS
     async (args) => {
       try {
         const result = await handleSubmitHumanResponse(args, opts);
-        const slimResult = { ...result, data: {}, evidence: slimEvidence(result.evidence) };
+        const { snapshot_id: _snap, ...slimResult } = { ...result, data: {}, evidence: [] };
         return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
       } catch (err) {
         // submitHumanResponse handles all WorkflowErrors internally and always returns a ResponseEnvelope.
@@ -56,7 +55,6 @@ export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunS
             type: 'text' as const, text: JSON.stringify({
               command: 'submit_human_response',
               run_id: args.run_id,
-              snapshot_id: '',
               status: 'error',
               data: {},
               evidence: [],
