@@ -832,10 +832,13 @@ export async function submitHumanResponse(
     );
   }
 
-  // 5. Get step definition.
-  const stepDef = definition.steps[run.pending_gate.step_name]!;
-  const newState = stepDef.produces_state;
-  const isTerminal = isTerminalState(newState);
+  // 5. Get step definition and check for gate-response transition.
+  const gateStepName = run.pending_gate.step_name;
+  const stepDef = definition.steps[gateStepName]!;
+  const transitionKey = `on_${options.choice}`;
+  const transition = stepDef.transitions?.[transitionKey];
+  const newState = transition !== undefined ? transition.produces_state : stepDef.produces_state;
+  const isTerminal = transition !== undefined ? false : isTerminalState(stepDef.produces_state);
 
   // 6. Strip pending_gate and terminal_reason, then advance state.
   // Capture a gate_response evidence entry so the human's decision is permanently recorded.
@@ -870,7 +873,7 @@ export async function submitHumanResponse(
           agentAction: 'stop',
           retryable: false,
         });
-    return errorEnvelope(run.pending_gate.step_name, options.runId, run.version.toString(), e, `Failed to persist gate response. Run was in state '${run.state}'.`);
+    return errorEnvelope(gateStepName, options.runId, run.version.toString(), e, `Failed to persist gate response. Run was in state '${run.state}'.`);
   }
 
   // 7. Build response — merge step output with human choice for a complete data record.
@@ -890,7 +893,7 @@ export async function submitHumanResponse(
     });
 
   return {
-    command: run.pending_gate.step_name,
+    command: gateStepName,
     run_id: options.runId,
     snapshot_id: savedRun.version.toString(),
     status: 'ok',
@@ -902,6 +905,9 @@ export async function submitHumanResponse(
       ? nextAction.orientation
       : `Run completed in terminal state '${newState}'. Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`,
     next_action: nextAction,
+    ...(transition !== undefined ? {
+      chained_auto_steps: [{ step: gateStepName, produced_state: newState, branched_via: transitionKey }],
+    } : {}),
   };
 }
 
@@ -913,7 +919,7 @@ async function executeChainInternal(
   definition: WorkflowDefinition,
   options: ExecuteChainOptions,
   depth: number,
-  chainedSteps: Array<{ step: string; produced_state: string }>,
+  chainedSteps: Array<{ step: string; produced_state: string; branched_via?: string }>,
 ): Promise<ResponseEnvelope> {
   if (depth > MAX_CHAIN_DEPTH) {
     return {
@@ -937,6 +943,74 @@ async function executeChainInternal(
 
   // Stop chaining on any non-ok result (error, blocked, confirm_required, etc.).
   if (result.status !== 'ok') {
+    // Check for on_error transition when the step failed.
+    if (result.status === 'error') {
+      const stepDef = definition.steps[options.command];
+      const onError = stepDef?.transitions?.['on_error'];
+      if (onError !== undefined) {
+        const warningMessage = `Step '${options.command}' failed: ${result.errors[0] ?? 'unknown error'}. Routed to '${onError.step}' via on_error transition.`;
+        // Load the failed run (terminal state) and transition to the branch intermediate state.
+        const failedRun = await store.get(options.runId);
+        const { terminal_reason: _tr, ...runBase } = failedRun;
+        const savedBranchRun = await store.update({
+          ...runBase,
+          state: onError.produces_state,
+          terminal_state: false,
+        });
+        // Record the branch hop in the accumulator.
+        chainedSteps.push({
+          step: options.command,
+          produced_state: onError.produces_state,
+          branched_via: 'on_error',
+        });
+        const recoveryStepDef = definition.steps[onError.step];
+        if (recoveryStepDef?.execution === 'auto') {
+          // Auto recovery step — chain continues through it.
+          const branchResult = await executeChainInternal(
+            store, guard, definition,
+            {
+              runId: options.runId,
+              command: onError.step,
+              input: {},
+              snapshotId: savedBranchRun.version.toString(),
+              dispatcher: options.dispatcher,
+              ...(options.registry !== undefined ? { registry: options.registry } : {}),
+              ...(options.secrets !== undefined ? { secrets: options.secrets } : {}),
+            },
+            depth + 1,
+            chainedSteps,
+          );
+          return {
+            ...branchResult,
+            warnings: [warningMessage, ...branchResult.warnings],
+          };
+        } else {
+          // Agent (or undefined) recovery step — stop chain and return next_action pointing at it.
+          const evidenceByStep: Record<string, Record<string, unknown>> = {};
+          for (const snap of savedBranchRun.evidence) {
+            if (snap.kind === 'gate_response') continue;
+            evidenceByStep[snap.step_id] = snap.output_summary;
+          }
+          const nextAction = findNextAction(onError.produces_state, definition, {
+            evidenceByStep,
+            runParams: savedBranchRun.params,
+            runId: options.runId,
+          });
+          return {
+            command: options.command,
+            run_id: options.runId,
+            snapshot_id: savedBranchRun.version.toString(),
+            status: 'ok',
+            data: {},
+            evidence: result.evidence,
+            warnings: [warningMessage],
+            errors: [],
+            context_hint: nextAction?.orientation ?? `Branched via on_error to '${onError.step}'.`,
+            next_action: nextAction,
+          };
+        }
+      }
+    }
     return result;
   }
 
@@ -1001,7 +1075,7 @@ export async function executeChain(
   definition: WorkflowDefinition,
   options: ExecuteChainOptions,
 ): Promise<ResponseEnvelope> {
-  const chained: Array<{ step: string; produced_state: string }> = [];
+  const chained: Array<{ step: string; produced_state: string; branched_via?: string }> = [];
   const result = await executeChainInternal(store, guard, definition, options, 0, chained);
   const envelope = { ...result, command: options.command };
   return chained.length > 0 ? { ...envelope, chained_auto_steps: chained } : envelope;
