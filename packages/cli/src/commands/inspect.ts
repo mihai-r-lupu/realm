@@ -115,7 +115,9 @@ export async function inspectRun(
       const snap = snaps[0]!;
       const statusColored = colorStatus(snap.status);
       const hashShort = chalk.dim(`hash: ${snap.evidence_hash.slice(0, 8)}`);
-      lines.push(`  ${idx + 1}. ${stepId.padEnd(22)} ${statusColored}   ${snap.duration_ms}ms   ${hashShort}`);
+      const profileLabel =
+        snap.agent_profile !== undefined ? chalk.cyan(` [profile: ${snap.agent_profile}]`) : '';
+      lines.push(`  ${idx + 1}. ${stepId.padEnd(22)}${profileLabel} ${statusColored}   ${snap.duration_ms}ms   ${hashShort}`);
       lines.push(`     Input:  ${formatSummary(snap.input_summary)}`);
       lines.push(`     Output: ${formatSummary(snap.output_summary)}`);
       if (snap.diagnostics !== undefined) {

@@ -1,5 +1,7 @@
 // Workflow YAML loader — parses workflow.yaml files into typed WorkflowDefinition objects.
 import { readFileSync } from 'node:fs';
+import { dirname, resolve, join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { load } from 'js-yaml';
 import type { WorkflowDefinition } from '../types/workflow-definition.js';
 import { WorkflowError } from '../types/workflow-error.js';
@@ -24,7 +26,52 @@ export function loadWorkflowFromFile(filePath: string): WorkflowDefinition {
       retryable: false,
     });
   }
-  return loadWorkflowFromString(content);
+  const definition = loadWorkflowFromString(content);
+
+  // Resolve agent profiles — only possible when we have a file path.
+  const workflowDir = dirname(resolve(filePath));
+  const profilesDir =
+    definition.profiles_dir !== undefined
+      ? resolve(workflowDir, definition.profiles_dir)
+      : join(workflowDir, 'agents');
+
+  const resolvedProfiles: Record<string, { content: string; content_hash: string }> = {};
+  const profileErrors: string[] = [];
+
+  for (const [stepName, step] of Object.entries(definition.steps)) {
+    if (step.agent_profile === undefined) continue;
+    const profileName = step.agent_profile;
+    if (profileName in resolvedProfiles) continue; // already resolved (shared across steps)
+
+    const profilePath = join(profilesDir, `${profileName}.md`);
+    let profileContent: string;
+    try {
+      profileContent = readFileSync(profilePath, 'utf8');
+    } catch {
+      profileErrors.push(
+        `Step '${stepName}': agent_profile '${profileName}' not found. Searched: ${profilePath}`,
+      );
+      continue;
+    }
+
+    const contentHash = createHash('sha256').update(profileContent).digest('hex');
+    resolvedProfiles[profileName] = { content: profileContent, content_hash: contentHash };
+  }
+
+  if (profileErrors.length > 0) {
+    throw new WorkflowError(`Invalid workflow: ${profileErrors.join('; ')}`, {
+      code: 'VALIDATION_WORKFLOW_SCHEMA',
+      category: 'VALIDATION',
+      agentAction: 'report_to_user',
+      retryable: false,
+    });
+  }
+
+  if (Object.keys(resolvedProfiles).length > 0) {
+    definition.resolved_profiles = resolvedProfiles;
+  }
+
+  return definition;
 }
 
 /**
@@ -136,6 +183,11 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
         `Step '${stepName}': invalid execution value '${String(step['execution'])}'; must be 'auto' or 'agent'`,
 
       );
+    }
+
+    // agent_profile is only valid on agent steps.
+    if ('agent_profile' in step && step['execution'] !== 'agent') {
+      errors.push(`Step '${stepName}': 'agent_profile' is only valid on execution: agent steps`);
     }
 
     if ('uses_service' in step && typeof step['uses_service'] === 'string') {

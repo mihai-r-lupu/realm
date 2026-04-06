@@ -70,6 +70,8 @@ export interface StepDefinition {
   gate?: { choices?: string[] };
   /** Conditional routing based on step outcome or gate response. */
   transitions?: Record<string, { step: string; produces_state: string }>;
+  /** Name of the agent profile for this step. Only valid on execution: 'agent' steps. */
+  agent_profile?: string;
 }
 
 export interface WorkflowDefinition {
@@ -83,4 +85,14 @@ export interface WorkflowDefinition {
   protocol?: ProtocolConfig;
   services?: Record<string, ServiceDefinition>;
   steps: Record<string, StepDefinition>;
+  /** Optional: directory containing shared profile markdown files.
+   *  Resolved relative to the workflow YAML file at load time.
+   *  Falls back to <workflow-dir>/agents/ if omitted. */
+  profiles_dir?: string;
+  /**
+   * Map of resolved profile content keyed by profile name.
+   * Populated by loadWorkflowFromFile — absent when loaded from string.
+   * Do not serialize/write to workflow YAML — this is a runtime-only field.
+   */
+  resolved_profiles?: Record<string, { content: string; content_hash: string }>;
 }

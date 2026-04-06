@@ -1114,4 +1114,70 @@ describe('executeStep', () => {
       expect(envelope.gate!.step_name).toBe('auto_step');
     });
   });
+
+  describe('agent profile evidence', () => {
+    it('agent step with resolved profile records agent_profile and agent_profile_hash in evidence', async () => {
+      const profileHash = 'a'.repeat(64);
+      const profiledWorkflow: WorkflowDefinition = {
+        id: 'profile-wf',
+        name: 'Profile Workflow',
+        version: 1,
+        initial_state: 'created',
+        steps: {
+          profiled_step: {
+            description: 'Profiled agent step',
+            execution: 'agent',
+            allowed_from_states: ['created'],
+            produces_state: 'done',
+            agent_profile: 'my-profile',
+          },
+        },
+        resolved_profiles: {
+          'my-profile': { content: 'You are a specialist.', content_hash: profileHash },
+        },
+      };
+      const profileGuard = new StateGuard(profiledWorkflow);
+
+      const run = await store.create({
+        workflowId: 'profile-wf',
+        workflowVersion: 1,
+        initialState: 'created',
+        params: {},
+      });
+
+      const envelope = await executeStep(store, profileGuard, profiledWorkflow, {
+        runId: run.id,
+        command: 'profiled_step',
+        input: { data: 'value' },
+        snapshotId: run.version.toString(),
+        dispatcher: echoDispatcher,
+      });
+
+      expect(envelope.status).toBe('ok');
+      expect(envelope.evidence).toHaveLength(1);
+      expect(envelope.evidence[0]?.agent_profile).toBe('my-profile');
+      expect(envelope.evidence[0]?.agent_profile_hash).toBe(profileHash);
+    });
+
+    it('agent step without profile has no agent_profile on evidence', async () => {
+      const run = await store.create({
+        workflowId: 'test-wf',
+        workflowVersion: 1,
+        initialState: 'step_one_done',
+        params: {},
+      });
+
+      const envelope = await executeStep(store, guard, definition, {
+        runId: run.id,
+        command: 'step-two',
+        input: { data: 'value' },
+        snapshotId: run.version.toString(),
+        dispatcher: echoDispatcher,
+      });
+
+      expect(envelope.status).toBe('ok');
+      expect(envelope.evidence[0]?.agent_profile).toBeUndefined();
+      expect(envelope.evidence[0]?.agent_profile_hash).toBeUndefined();
+    });
+  });
 });

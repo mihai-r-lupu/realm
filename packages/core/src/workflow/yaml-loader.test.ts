@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loadWorkflowFromString, loadWorkflowFromFile } from './yaml-loader.js';
 import { WorkflowError } from '../types/workflow-error.js';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const VALID_YAML = `
 id: test-workflow
@@ -210,5 +213,134 @@ describe('loadWorkflowFromFile', () => {
       expect(err).toBeInstanceOf(WorkflowError);
       expect((err as WorkflowError).code).toBe('RESOURCE_FETCH_FAILED');
     }
+  });
+});
+
+describe('loadWorkflowFromString — agent_profile validation', () => {
+  it('agent_profile on auto step throws WorkflowError', () => {
+    const content = `
+id: test-wf
+name: Test
+version: 1
+initial_state: created
+steps:
+  bad-step:
+    description: Bad
+    execution: auto
+    agent_profile: some-profile
+    allowed_from_states: [created]
+    produces_state: done
+`;
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("agent_profile' is only valid on execution: agent steps");
+    }
+  });
+});
+
+describe('loadWorkflowFromFile — agent profile resolution', () => {
+  let tmpDir: string;
+  const workflowYaml = `
+id: profile-wf
+name: Profile Workflow
+version: 1
+initial_state: created
+steps:
+  agent-step:
+    description: Agent step with profile
+    execution: agent
+    agent_profile: my-profile
+    allowed_from_states: [created]
+    produces_state: done
+`;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'realm-profile-test-'));
+    mkdirSync(join(tmpDir, 'agents'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('resolves profile content and hash when agents/ directory exists', () => {
+    writeFileSync(join(tmpDir, 'workflow.yaml'), workflowYaml);
+    writeFileSync(join(tmpDir, 'agents', 'my-profile.md'), 'You are a helpful agent.');
+
+    const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
+    expect(def.resolved_profiles).toBeDefined();
+    expect(def.resolved_profiles!['my-profile']).toBeDefined();
+    expect(def.resolved_profiles!['my-profile']!.content).toBe('You are a helpful agent.');
+    expect(def.resolved_profiles!['my-profile']!.content_hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('throws WorkflowError when profile file is missing', () => {
+    writeFileSync(join(tmpDir, 'workflow.yaml'), workflowYaml);
+    // no agents/my-profile.md written
+
+    expect(() => loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'))).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("agent_profile 'my-profile' not found");
+      expect((err as WorkflowError).message).toContain('my-profile.md');
+    }
+  });
+
+  it('shared profile used by two steps is resolved once with the same hash', () => {
+    const sharedYaml = `
+id: shared-profile-wf
+name: Shared Profile Workflow
+version: 1
+initial_state: created
+steps:
+  step-a:
+    description: First agent step
+    execution: agent
+    agent_profile: shared-profile
+    allowed_from_states: [created]
+    produces_state: step_a_done
+  step-b:
+    description: Second agent step
+    execution: agent
+    agent_profile: shared-profile
+    allowed_from_states: [step_a_done]
+    produces_state: done
+`;
+    writeFileSync(join(tmpDir, 'workflow.yaml'), sharedYaml);
+    writeFileSync(join(tmpDir, 'agents', 'shared-profile.md'), 'Shared persona content.');
+
+    const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
+    expect(def.resolved_profiles).toBeDefined();
+    const keys = Object.keys(def.resolved_profiles!);
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).toBe('shared-profile');
+    expect(def.resolved_profiles!['shared-profile']!.content_hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('custom profiles_dir is used when declared', () => {
+    const customProfilesDir = join(tmpDir, 'custom-profiles');
+    mkdirSync(customProfilesDir);
+    const customDirYaml = `
+id: custom-dir-wf
+name: Custom Dir Workflow
+version: 1
+initial_state: created
+profiles_dir: ./custom-profiles
+steps:
+  agent-step:
+    description: Agent step
+    execution: agent
+    agent_profile: custom-profile
+    allowed_from_states: [created]
+    produces_state: done
+`;
+    writeFileSync(join(tmpDir, 'workflow.yaml'), customDirYaml);
+    writeFileSync(join(customProfilesDir, 'custom-profile.md'), 'Custom profile content.');
+
+    const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
+    expect(def.resolved_profiles!['custom-profile']!.content).toBe('Custom profile content.');
   });
 });

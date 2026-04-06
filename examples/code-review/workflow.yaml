@@ -33,6 +33,7 @@ steps:
   review_security:
     description: Analyze code for security vulnerabilities against OWASP Top 10
     execution: agent
+    agent_profile: security-reviewer
     allowed_from_states: [code_loaded]
     produces_state: security_reviewed
     prompt: |
@@ -90,6 +91,7 @@ steps:
   assess_quality:
     description: Assess code quality — architecture, maintainability, correctness, and test coverage
     execution: agent
+    agent_profile: quality-reviewer
     allowed_from_states: [security_reviewed]
     produces_state: quality_assessed
     prompt: |
