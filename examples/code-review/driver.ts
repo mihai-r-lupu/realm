@@ -1,13 +1,23 @@
 #!/usr/bin/env node
 // driver.ts — headless runner for the code-review example.
-// Usage: node dist/driver.js fixtures/findings-approved.yaml
+// Usage: node dist/driver.js fixtures/clean-file.yaml
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
-import { loadWorkflowFromFile, StateGuard, executeChain, submitHumanResponse } from '@sensigo/realm';
+import {
+  loadWorkflowFromFile,
+  StateGuard,
+  executeChain,
+  submitHumanResponse,
+  FileSystemAdapter,
+  ExtensionRegistry,
+} from '@sensigo/realm';
 import { InMemoryStore, loadFixtureFromFile } from '@sensigo/realm-testing';
 import type { StepDispatcher } from '@sensigo/realm';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const registry = new ExtensionRegistry();
+registry.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
 
 const fixturePath = process.argv[2];
 if (fixturePath === undefined) {
@@ -58,14 +68,19 @@ while (!currentRun.terminal_state) {
       console.error(`No allowed steps from state '${currentRun.state}'`);
       process.exit(1);
     }
-    const agentResponse = (fixture.agent_responses[nextStep] ?? {}) as Record<string, unknown>;
+    const stepDef = definition.steps[nextStep];
+    const isAutoStep = stepDef?.execution === 'auto';
+    // Auto steps (e.g. service reads) use run.params as input; agent steps use fixture responses.
+    const agentResponse = isAutoStep ? {} : (fixture.agent_responses[nextStep] ?? {}) as Record<string, unknown>;
+    const stepInput = isAutoStep ? currentRun.params : agentResponse;
     const dispatcher: StepDispatcher = async () => agentResponse;
     const result = await executeChain(store, guard, definition, {
       runId,
       command: nextStep,
-      input: agentResponse,
+      input: stepInput,
       snapshotId: currentRun.version.toString(),
       dispatcher,
+      registry,
     });
     if (result.status === 'error') {
       console.error('Step failed:', result.errors.join(', '));

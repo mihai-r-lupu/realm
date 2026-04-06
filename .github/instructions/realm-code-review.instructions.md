@@ -13,7 +13,8 @@ Before starting, confirm the `realm-code-review` MCP server is connected:
 ## Protocol
 
 When asked to review code with Realm:
-1. Call `start_run` with `workflow_id: "code-review"` and `params: { code: "<the code>" }`.
+1. Call `start_run` with `workflow_id: "code-review"` and `params: { path: "<absolute path to the file>" }`.
+   You do not need to read the file yourself — Realm reads it automatically via the registered filesystem adapter.
 2. Read `next_action.prompt` from the response — that is your complete task for this step.
    `context_hint` at the top level names the current run state and what just happened —
    use it for orientation on every response, including errors where `next_action` is null.
