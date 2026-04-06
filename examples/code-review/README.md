@@ -73,7 +73,7 @@ If the tools don't appear in Copilot, see [examples/README.md](../README.md#trou
 
 ## What to look at next
 
-- [Example 2 — CHANGELOG Entry Extraction](../changelog-extract/) — adds a `FileSystemAdapter`
-  and the `pipeline` field: fetch → normalize → hash → agent extracts → handler validates
+- [Example 2 — Document Intake](../document-intake/) — conditional branching with `on_error` and
+  gate-response `transitions`, `FileSystemAdapter`, handler validation
 - [Engine: step.prompt](../../packages/core/src/engine/prompt-template.ts) — the template resolver
   behind `next_action.prompt`

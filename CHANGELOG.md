@@ -52,6 +52,42 @@ All notable changes to this project are documented here.
   wrong state, the blocked response now includes `next_action` redirecting to the correct step.
   `blocked_reason.suggestion` indicates either the redirect or that no valid next step exists from
   the current state.
+- `transitions` field on `StepDefinition` — declares conditional routing paths from a step.
+  Two transition types are supported:
+  - `on_error` — for `execution: auto` steps only: when the step's handler throws, the engine
+    demotes the error to a `warnings` entry, transitions the run to `transition.produces_state`,
+    and continues the chain from `transition.step`. A `status: ok` envelope is returned so the
+    agent is not required to take a recovery action on its own — the engine already has.
+  - Gate-response keys (`on_reject`, `on_approve`, etc.) — on `trust: human_confirmed` steps:
+    when the human submits a choice, the engine looks up `on_<choice>` in `transitions` and, if
+    present, routes the run to the branch target instead of the step's normal `produces_state`.
+- `branched_via` field on `chained_auto_steps` entries — populated with the transition key
+  (e.g. `"on_error"`, `"on_reject"`) for branch hops; omitted on normal progression entries.
+- `ResponseEnvelope.status` JSDoc — documents that `status: ok` means "forward progress" (the
+  chain advanced and there is a next action), not "the original requested step succeeded". An
+  `on_error` branch also returns `status: ok` with the original error demoted to `warnings`.
+- Protocol generator: `transitions` field added to `ProtocolStep` — when a step declares
+  `transitions`, the briefing includes the full routing map so consuming agents can anticipate
+  divergent paths before executing.
+- YAML validation at register time for all transition constraints:
+  - `on_error` is only permitted on `execution: auto` steps.
+  - Non-`on_error` keys must appear in the step's `gate.choices`.
+  - Transition target step must exist in the workflow.
+  - Transition `produces_state` must be in the target step's `allowed_from_states`.
+- `examples/document-intake/` — new end-to-end example demonstrating both branching mechanisms:
+  a 5-step intake workflow where `validate_fields` routes back to `extract_fields` on `on_error`
+  and `confirm_submission` routes back on `on_reject`.
+- `FileSystemAdapter` — new built-in adapter in `@sensigo/realm` that reads a local file and returns
+  `{ content, path, line_count, size_bytes }`. Add it to an `ExtensionRegistry` and reference it from
+  a step with `uses_service: <name>` and `operation: read`. Validates that the path is non-empty and
+  absolute; throws structured `WorkflowError` on ENOENT or read failure.
+- `code-review` example upgraded to v2: now accepts `path: string` (absolute file path) instead of
+  `code: string`. A `read_code` auto step reads the file via `FileSystemAdapter` with
+  `trust: engine_delivered`; the file content is injected into the security and quality review prompts
+  via `{{ context.resources.read_code.content }}`. The `assess_quality` step prompt no longer
+  re-injects the file content — the agent already has the content from the `read_code` step context.
+  Security review step now requires `owasp_category`, `location`, and `remediation` per finding.
+  Quality review step adds a required `summary` field.
 
 ### Fixed
 - MCP `start_run`: `command` in the response is now always `'start_run'`, regardless of whether the
@@ -96,42 +132,6 @@ All notable changes to this project are documented here.
 - Dead code removed from `execution-loop.ts`: the unreachable `throw err` branch in the
   `validateInputSchema` catch block (which could only be reached if `validateInputSchema` threw a
   non-`WorkflowError` — it does not) has been removed.
-- `transitions` field on `StepDefinition` — declares conditional routing paths from a step.
-  Two transition types are supported:
-  - `on_error` — for `execution: auto` steps only: when the step's handler throws, the engine
-    demotes the error to a `warnings` entry, transitions the run to `transition.produces_state`,
-    and continues the chain from `transition.step`. A `status: ok` envelope is returned so the
-    agent is not required to take a recovery action on its own — the engine already has.
-  - Gate-response keys (`on_reject`, `on_approve`, etc.) — on `trust: human_confirmed` steps:
-    when the human submits a choice, the engine looks up `on_<choice>` in `transitions` and, if
-    present, routes the run to the branch target instead of the step's normal `produces_state`.
-- `branched_via` field on `chained_auto_steps` entries — populated with the transition key
-  (e.g. `"on_error"`, `"on_reject"`) for branch hops; omitted on normal progression entries.
-- `ResponseEnvelope.status` JSDoc — documents that `status: ok` means "forward progress" (the
-  chain advanced and there is a next action), not "the original requested step succeeded". An
-  `on_error` branch also returns `status: ok` with the original error demoted to `warnings`.
-- Protocol generator: `transitions` field added to `ProtocolStep` — when a step declares
-  `transitions`, the briefing includes the full routing map so consuming agents can anticipate
-  divergent paths before executing.
-- YAML validation at register time for all transition constraints:
-  - `on_error` is only permitted on `execution: auto` steps.
-  - Non-`on_error` keys must appear in the step's `gate.choices`.
-  - Transition target step must exist in the workflow.
-  - Transition `produces_state` must be in the target step's `allowed_from_states`.
-- `examples/document-intake/` — new end-to-end example demonstrating both branching mechanisms:
-  a 5-step intake workflow where `validate_fields` routes back to `extract_fields` on `on_error`
-  and `confirm_submission` routes back on `on_reject`.
-- `FileSystemAdapter` — new built-in adapter in `@sensigo/realm` that reads a local file and returns
-  `{ content, path, line_count, size_bytes }`. Add it to an `ExtensionRegistry` and reference it from
-  a step with `uses_service: <name>` and `operation: read`. Validates that the path is non-empty and
-  absolute; throws structured `WorkflowError` on ENOENT or read failure.
-- `code-review` example upgraded to v2: now accepts `path: string` (absolute file path) instead of
-  `code: string`. A `read_code` auto step reads the file via `FileSystemAdapter` with
-  `trust: engine_delivered`; the file content is injected into the security and quality review prompts
-  via `{{ context.resources.read_code.content }}`. The `assess_quality` step prompt no longer
-  re-injects the file content — the agent already has the content from the `read_code` step context.
-  Security review step now requires `owasp_category`,
-  `location`, and `remediation` per finding. Quality review step adds a required `summary` field.
 
 ### Tests
 290 tests across all packages (194 core, 42 CLI, 14 MCP, 40 testing).
