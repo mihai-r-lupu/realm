@@ -176,8 +176,12 @@ steps:
     trust: human_confirmed
     allowed_from_states: [findings_ready]
     produces_state: findings_approved
+    prompt: |
+      The following findings have been identified. Reply with 'approve' to accept or 'reject' to flag for re-review.
+    instructions: |
+      Present the display content to the user verbatim. Ask for their choice from gate.response_spec.choices,
+      then call submit_human_response with run_id, gate_id, and choice.
     gate:
-      preview: "{{ steps.collect_findings.output.summary }}"
       choices:
         - approve
         - reject
@@ -193,11 +197,16 @@ realm respond <run-id>
 
 **To resume via the MCP tool:** call `submit_human_response` with the `run_id`, `gate_id`, and `choice` from the `confirm_required` response.
 
-### The `gate.preview` field
+### Gate response fields
 
-`gate.preview` is a Jinja-style template resolved when the gate opens. Its resolved value is sent inline in the response and is what the human sees when deciding whether to approve or reject. It must be a bounded, human-readable summary — not raw agent output.
+When the engine opens a gate, the `confirm_required` response includes a `gate` object:
 
-**Authoring constraint:** the preview is sent to the agent and forwarded to the human. It must contain only the information needed to make the decision: a concise summary, a count, or a short excerpt. Do not surface unbounded payloads — full document text, raw finding arrays, or large JSON objects — as the preview value. Workflow authors are responsible for ensuring gate previews remain small.
+- `gate.display` — the human-facing content resolved from `step.prompt`. Present this to the user verbatim before asking for their choice.
+- `gate.agent_hint` — optional agent protocol instruction resolved from `step.instructions`. If present, the agent follows this to determine how to present the gate.
+- `gate.response_spec.choices` — the valid choice values (e.g. `["approve", "reject"]`). Pass one of these as `choice` when calling `submit_human_response`.
+- `gate.preview` — the full step output at point of gate opening, for reference and debugging.
+
+**Authoring constraint:** keep `step.prompt` content bounded and human-readable — a concise summary, a count, or a short excerpt. Do not surface unbounded payloads (full document text, large JSON objects) as the gate display. Workflow authors are responsible for ensuring gate content remains manageable.
 
 ---
 
@@ -286,18 +295,19 @@ The agent should call `get_workflow_protocol` first. The protocol is embedded in
 Every response includes a top-level `context_hint` string describing the current run state and what
 just happened — useful for orientation on every response, including errors where `next_action` is `null`.
 
-Every `start_run`, `execute_step`, and `submit_human_response` response includes a `next_action` object. The agent reads
-`next_action.prompt` for its current task, then calls `next_action.instruction.tool` using
-`instruction.call_with` as the ready-to-use argument template:
+Every `start_run`, `execute_step`, and `submit_human_response` response includes a `next_action` object:
 
-- `instruction.call_with` — a ready-to-use argument object. For agent steps, `call_with.params` is a
-  minimal schema skeleton derived from `input_schema` — a navigable object with placeholder strings
-  for enums (e.g. `<critical|high|medium|low>`) and zero values for scalars. Copy it, fill in your
-  values, and call the tool. For human gate responses, the agent-supplied field is a string placeholder
-  (e.g. `<approve|reject>`).
+- `next_action.orientation` — a forward-looking state description: what state the run is in and what step comes next. Distinct from the top-level `context_hint`, which describes what just happened.
+- `next_action.prompt` — the resolved task prompt for the current agent step. Read this and act on it.
+- `next_action.instruction.call_with` — a ready-to-use argument object. For agent steps, `call_with.params` is a minimal schema skeleton derived from `input_schema` — a navigable object with placeholder strings for enums (e.g. `<critical|high|medium|low>`) and zero values for scalars. Copy it, fill in your values, and call the tool. For human gate responses, the agent-supplied field is a string placeholder (e.g. `<approve|reject>`).
 
 For agent steps, the field to replace is `params` — shaped to `next_action.input_schema`.
-For human gate responses, it is `choice` — allowed values are listed in `gate.response_spec.choices`.
+
+For human gates (`status: confirm_required`), the agent:
+1. Reads `gate.agent_hint` for instructions on how to present the gate (if set).
+2. Presents `gate.display` to the user verbatim.
+3. Collects the user's choice from `gate.response_spec.choices`.
+4. Calls `submit_human_response` using `next_action.instruction.call_with` with the choice filled in.
 
 ### Error and blocked responses
 
