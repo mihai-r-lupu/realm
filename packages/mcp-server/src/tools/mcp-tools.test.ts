@@ -90,6 +90,7 @@ describe('mcp tool handlers', () => {
 
     expect(result.workflows.length).toBe(1);
     expect(result.workflows[0]!.id).toBe('simple-wf');
+    expect(result.hint).toContain('get_workflow_protocol');
   });
 
   it('handleGetWorkflowProtocol returns protocol for known workflow', async () => {
@@ -117,6 +118,7 @@ describe('mcp tool handlers', () => {
     expect(result.data).toEqual({});
     expect(result.context_hint).toBeDefined();
     expect(result.context_hint).not.toBe('');
+    expect(result.chained_auto_steps).toEqual([{ step: 'step-a', produced_state: 'completed' }]);
 
     const run = await runStore.get(result.run_id);
     expect(run.state).toBe('completed');
@@ -133,6 +135,8 @@ describe('mcp tool handlers', () => {
       { runStore, workflowStore },
     );
     expect(startResult.status).toBe('ok');
+    // The auto step ran silently during start_run — it must be reported.
+    expect(startResult.chained_auto_steps).toEqual([{ step: 'step-auto', produced_state: 'state_a' }]);
 
     // Run is now at state_a waiting for the agent step.
     const midRun = await runStore.get(startResult.run_id);

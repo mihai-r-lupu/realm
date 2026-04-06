@@ -61,4 +61,10 @@ export interface ResponseEnvelope {
   next_action: NextAction | null;
   blocked_reason?: BlockedReason;
   gate?: GateInfo;
+  /**
+   * Names and produced states of auto steps that ran silently as part of an executeChain call.
+   * Only present when at least one auto step was chained. Useful for debugging and orientation
+   * after start_run or after an agent step that triggers subsequent auto steps.
+   */
+  chained_auto_steps?: Array<{ step: string; produced_state: string }>;
 }

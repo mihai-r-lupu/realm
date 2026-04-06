@@ -913,6 +913,7 @@ async function executeChainInternal(
   definition: WorkflowDefinition,
   options: ExecuteChainOptions,
   depth: number,
+  chainedSteps: Array<{ step: string; produced_state: string }>,
 ): Promise<ResponseEnvelope> {
   if (depth > MAX_CHAIN_DEPTH) {
     return {
@@ -937,6 +938,12 @@ async function executeChainInternal(
   // Stop chaining on any non-ok result (error, blocked, confirm_required, etc.).
   if (result.status !== 'ok') {
     return result;
+  }
+
+  // Record this step in the accumulator so callers know what ran silently.
+  const currentStepDef = definition.steps[options.command];
+  if (currentStepDef?.execution === 'auto') {
+    chainedSteps.push({ step: options.command, produced_state: currentStepDef.produces_state });
   }
 
   // Load the current run to determine what step comes next.
@@ -979,6 +986,7 @@ async function executeChainInternal(
       dispatcher: options.dispatcher,
     },
     depth + 1,
+    chainedSteps,
   );
 }
 
@@ -993,8 +1001,10 @@ export async function executeChain(
   definition: WorkflowDefinition,
   options: ExecuteChainOptions,
 ): Promise<ResponseEnvelope> {
-  const result = await executeChainInternal(store, guard, definition, options, 0);
-  return { ...result, command: options.command };
+  const chained: Array<{ step: string; produced_state: string }> = [];
+  const result = await executeChainInternal(store, guard, definition, options, 0, chained);
+  const envelope = { ...result, command: options.command };
+  return chained.length > 0 ? { ...envelope, chained_auto_steps: chained } : envelope;
 }
 
 // Re-export TERMINAL_STATES so existing importers via execution-loop.js still resolve.

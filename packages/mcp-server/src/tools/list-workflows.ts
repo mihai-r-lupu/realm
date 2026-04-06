@@ -12,11 +12,12 @@ export interface HandleStores {
  */
 export async function handleListWorkflows(
   stores?: HandleStores,
-): Promise<{ workflows: Array<{ id: string; name: string; version: number }> }> {
+): Promise<{ workflows: Array<{ id: string; name: string; version: number }>; hint: string }> {
   const store = stores?.workflowStore ?? new JsonWorkflowStore();
   const workflows = await store.list();
   return {
     workflows: workflows.map((w) => ({ id: w.id, name: w.name, version: w.version })),
+    hint: 'Call get_workflow_protocol with a workflow_id before calling start_run.',
   };
 }
 

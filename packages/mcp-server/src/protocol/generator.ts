@@ -33,7 +33,7 @@ export interface WorkflowProtocol {
 
 const DEFAULT_RULES = [
   "Follow the next_action instruction in each response exactly.",
-  "When you receive status 'confirm_required', stop and show the preview to the user. Wait for their response. Then call submit_human_response with their choice and the gate_id.",
+  "When you receive status 'confirm_required', read gate.agent_hint for instructions, present gate.display to the user verbatim, wait for their response, then call submit_human_response with their choice and the gate_id.",
   "Do NOT auto-confirm any human gate. The user must decide.",
   "Do NOT ask the user for permission between steps unless the system tells you to.",
 ];
@@ -66,7 +66,7 @@ export function generateProtocol(definition: WorkflowDefinition): WorkflowProtoc
       autoStepCount++;
     } else if (step.execution === 'auto' && hasGate) {
       agent_involvement =
-        "none — engine executes, then pauses for human confirmation. When you receive status 'confirm_required', show the preview to the user, collect their choice, and call submit_human_response.";
+        "YOU will receive `status: confirm_required` after this step runs — the engine executes it automatically, then opens a gate. Read `gate.agent_hint` for presentation instructions, present `gate.display` to the user verbatim, collect their choice from `gate.response_spec.choices`, and call `submit_human_response`.";
       possible_gate = { choices: ['approve', 'reject'] };
       autoStepCount++;
     } else if (step.execution === 'agent' && !hasGate) {
