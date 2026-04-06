@@ -1,12 +1,11 @@
 # Realm — Examples
 
-Three progressive examples, each runnable in under five minutes.
+Two progressive examples, each runnable in under five minutes.
 
 | Example | What it demonstrates |
 |---|---|
 | [code-review/](code-review/) | Three-step agent workflow, `step.prompt` delivery, human gate |
-| changelog-extract/ | `FileSystemAdapter`, pipeline field, handler validation |
-| pr-description/ | Conditional branching, `GitHubAdapter`, multi-step identity gate |
+| [document-intake/](document-intake/) | Conditional branching — `on_error` and gate-response `transitions`, `FileSystemAdapter` |
 
 Each example ships with a headless driver (`node dist/driver.js <fixture>`) and an MCP server
 (`node dist/mcp-server.js`) for use with a VS Code agent.
