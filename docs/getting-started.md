@@ -73,6 +73,39 @@ steps:
 `execution: auto` — the engine runs this step immediately, optionally calling a registered `handler`.  
 `trust: human_confirmed` — the engine pauses and waits for `submit_human_response` before advancing.
 
+Steps can also declare **conditional routing** via the `transitions` field:
+
+```yaml
+steps:
+  validate_fields:
+    execution: auto
+    handler: validate_intake_fields
+    allowed_from_states: [fields_extracted]
+    produces_state: validated
+    transitions:
+      on_error:                          # auto steps only
+        step: extract_fields             # route here if handler throws
+        produces_state: revision_requested
+
+  confirm_submission:
+    execution: auto
+    trust: human_confirmed
+    allowed_from_states: [validated]
+    produces_state: submitted
+    gate:
+      choices: [approve, reject]
+    transitions:
+      on_reject:                         # gate-response keys match gate choices
+        step: extract_fields
+        produces_state: revision_requested
+```
+
+`on_error` — when an `auto` step's handler throws, the engine routes to the named step rather than
+failing the run. The original error is demoted to a `warnings` entry; the response returns `status: ok`
+with `next_action` pointing at the recovery step.  
+Gate-response keys (e.g. `on_reject`) — when a human submits a gate choice, the engine routes to
+the branch target instead of the step's normal `produces_state`.
+
 ---
 
 ## 4. Validate and Register
