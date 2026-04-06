@@ -64,10 +64,10 @@ MCP server starts on first use — no `settings.json` editing required.
 **Step 3** — In Copilot chat, ask:
 > "Review this code with Realm: [paste your code]"
 
-The workspace instruction file (`.github/instructions/realm-code-review.instructions.md`)
-gives your existing agent the Realm protocol. It calls `start_run`, reads
-`next_action.prompt` at each step, and presents the final report for your approval before
-completing the run.
+The workspace instruction file (`.github/instructions/realm.instructions.md`)
+gives your existing agent the generic Realm protocol: discover workflows, read the step
+protocol, and follow `next_action`. The code-review-specific skill (`skill.md` in this
+directory) layers the workflow-specific behaviour on top.
 
 If the tools don't appear in Copilot, see [examples/README.md](../README.md#troubleshooting-mcp--vs-code).
 

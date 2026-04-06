@@ -290,7 +290,30 @@ The agent has access to 6 MCP tools:
 | `submit_human_response` | Approve or reject a human gate |
 | `get_run_state` | Inspect the current state of a run |
 
-The agent should call `get_workflow_protocol` first. The protocol is embedded in the workflow definition and provides exact instructions for what to do at each step.
+The agent should call `list_workflows` first to discover what is registered, then
+`get_workflow_protocol` for the matched workflow before calling `start_run`. The protocol is
+embedded in each workflow definition and provides exact instructions for what to do at each step.
+
+### Using multiple workflows
+
+Realm supports any number of registered workflows in one store. To add more workflows:
+
+```bash
+realm register ./my-other-workflow
+```
+
+When the agent calls `list_workflows`, it receives the full list of registered IDs and names. It
+matches the user's request to the right workflow ID, calls `get_workflow_protocol` to retrieve
+that workflow's step-by-step briefing, then proceeds with `start_run`.
+
+For VS Code, place a generic `.github/instructions/realm.instructions.md` in your repository
+(see [examples/code-review/](../examples/code-review/)) — it teaches any connected agent the
+full discovery-and-execute loop without being tied to a specific workflow.
+
+For workflow-specific agent behaviour (custom trigger phrases, UX instructions, step-level
+schemas), add a `skill.md` file alongside the workflow. The generic instructions and per-workflow
+skill files compose cleanly: an agent trained on both knows both the Realm protocol and the
+workflow-specific details.
 
 Every response includes a top-level `context_hint` string describing the current run state and what
 just happened — useful for orientation on every response, including errors where `next_action` is `null`.
@@ -383,5 +406,5 @@ realm cleanup --older-than 30d    # abandon runs idle for 30+ days
 
 ## Next Steps
 
-- Browse the example workflow in [`workflows/playbook-extraction/`](../workflows/playbook-extraction/workflow.yaml) for a realistic 4-step pattern.
+- Browse the [`examples/code-review/`](../examples/code-review/workflow.yaml) workflow for a realistic 3-step pattern with a service adapter, OWASP security review, and a human gate.
 - Read the [`@sensigo/realm` source](../packages/core/src/index.ts) for the full public API.

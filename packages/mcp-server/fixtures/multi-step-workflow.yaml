@@ -1,7 +1,8 @@
-# workflows/playbook-extraction/workflow.yaml
-# Simplified playbook field extraction — demonstrates the 4-step engine lifecycle.
-id: playbook-extraction
-name: Playbook Field Extraction
+# packages/mcp-server/fixtures/multi-step-workflow.yaml
+# Test fixture for the protocol generator — demonstrates the full 4-step engine lifecycle:
+# auto service fetch → agent step → auto handler → human gate.
+id: multi-step-demo
+name: Multi-Step Demo
 version: 1
 initial_state: created
 
@@ -14,7 +15,7 @@ params_schema:
       description: "Extracted field candidates to validate"
 
 protocol:
-  quick_start: "Call start_run with workflow_id 'playbook-extraction'. The engine runs fetch_document automatically. You execute extract_fields by calling execute_step with command 'extract_fields' and your extracted candidates. The engine validates them, then pauses at finalize for human approval."
+  quick_start: "Call start_run with workflow_id 'multi-step-demo'. The engine runs fetch_document automatically. You execute extract_fields by calling execute_step with command 'extract_fields' and your extracted candidates. The engine validates them, then pauses at finalize for human approval."
   rules:
     - "At extract_fields, extract candidates from the document text in the previous step's data. Submit them using execute_step."
     - "At finalize, show the validation summary to the user before calling submit_human_response."
@@ -29,7 +30,7 @@ services:
 
 steps:
   fetch_document:
-    description: Fetch the target playbook document from Google Docs
+    description: Fetch the target document from Google Docs
     execution: auto
     uses_service: source
     allowed_from_states: [created]
