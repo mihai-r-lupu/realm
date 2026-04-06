@@ -27,6 +27,10 @@ export interface EvidenceSnapshot {
   kind?: 'execution' | 'gate_response';
   /** Diagnostic metadata. Present on snapshots captured after Week 7. */
   diagnostics?: StepDiagnostics;
+  /** Name of the agent profile active at this step, if any. */
+  agent_profile?: string;
+  /** SHA-256 hash of the profile content at register time. Auditable even if the file changes. */
+  agent_profile_hash?: string;
 }
 
 export interface PendingGate {

@@ -83,4 +83,49 @@ describe('generateProtocol', () => {
     expect(step.possible_gate!.choices).toContain('approve');
     expect(step.agent_involvement).toContain('confirm');
   });
+
+  it('agent step with resolved profile includes agent_profile_instructions', () => {
+    const definition: WorkflowDefinition = {
+      id: 'test-wf',
+      name: 'Test',
+      version: 1,
+      initial_state: 'created',
+      steps: {
+        'profiled-step': {
+          description: 'A profiled agent step',
+          execution: 'agent',
+          allowed_from_states: ['created'],
+          produces_state: 'done',
+          agent_profile: 'my-profile',
+        },
+      },
+      resolved_profiles: {
+        'my-profile': { content: 'You are a specialist.', content_hash: 'abc123' },
+      },
+    };
+    const protocol = generateProtocol(definition);
+    const step = protocol.steps[0]!;
+    expect(step.agent_profile_instructions).toBe('You are a specialist.');
+  });
+
+  it('agent step with agent_profile but no resolved_profiles omits agent_profile_instructions', () => {
+    const definition: WorkflowDefinition = {
+      id: 'test-wf',
+      name: 'Test',
+      version: 1,
+      initial_state: 'created',
+      steps: {
+        'profiled-step': {
+          description: 'A profiled agent step',
+          execution: 'agent',
+          allowed_from_states: ['created'],
+          produces_state: 'done',
+          agent_profile: 'my-profile',
+        },
+      },
+    };
+    const protocol = generateProtocol(definition);
+    const step = protocol.steps[0]!;
+    expect(step.agent_profile_instructions).toBeUndefined();
+  });
 });

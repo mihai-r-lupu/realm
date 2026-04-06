@@ -512,6 +512,9 @@ export async function executeStep(
     }
 
     const completedAt = new Date();
+    const profile = stepDef?.agent_profile;
+    const profileData =
+      profile !== undefined ? definition.resolved_profiles?.[profile] : undefined;
     const baseSnap = captureEvidence({
       stepId: options.command,
       startedAt,
@@ -523,6 +526,9 @@ export async function executeStep(
         input_token_estimate: inputTokenEstimate,
         precondition_trace: preconditionTrace,
       },
+      ...(profileData !== undefined
+        ? { agentProfile: profile!, agentProfileHash: profileData.content_hash }
+        : {}),
     });
     // Annotate with attempt number when retries are configured.
     const snap: EvidenceSnapshot =

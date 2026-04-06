@@ -51,4 +51,20 @@ describe('captureEvidence', () => {
     const ev = captureEvidence({ ...base, diagnostics: diag });
     expect(ev.diagnostics).toEqual(diag);
   });
+
+  it('includes agent_profile and agent_profile_hash when provided', () => {
+    const ev = captureEvidence({
+      ...base,
+      agentProfile: 'security-reviewer',
+      agentProfileHash: 'abc123',
+    });
+    expect(ev.agent_profile).toBe('security-reviewer');
+    expect(ev.agent_profile_hash).toBe('abc123');
+  });
+
+  it('omits agent_profile and agent_profile_hash when not provided', () => {
+    const ev = captureEvidence(base);
+    expect(ev.agent_profile).toBeUndefined();
+    expect(ev.agent_profile_hash).toBeUndefined();
+  });
 });
