@@ -13,6 +13,11 @@ All notable changes to this project are documented here.
   chained. Gives consuming agents visibility into engine-driven state advances without agent involvement.
 - `hint` field on `list_workflows` response — instructs agents to call `get_workflow_protocol` with a
   `workflow_id` before calling `start_run`.
+- Protocol generator: `agent_involvement` for `execution: agent` steps now includes a forward-looking
+  note when the step's produced state leads immediately into an `execution: auto` + gate step. The note
+  names the downstream step and tells the agent to expect `status: confirm_required` directly in
+  response to their `execute_step` call — not `status: ok`. Guards ensure the note is omitted for
+  terminal-producing steps and for plain auto steps with no gate trust.
 - `call_with` field on `NextAction.instruction` — a ready-to-use flat argument object for calling the
   tool. For agent steps, `call_with.params` is a minimal schema skeleton object derived from
   `input_schema` (e.g. `{ findings: [{ severity: "<critical|high|medium|low>", description: "" }] }`)
