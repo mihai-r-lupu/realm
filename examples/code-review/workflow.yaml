@@ -1,34 +1,70 @@
 # examples/code-review/workflow.yaml
-# Structured Code Review — Example 1: Hello Realm
-# Three steps: two agent steps + one human gate.
-# Demonstrates: step.prompt delivery, sequential schema enforcement, human gate.
+# File-Aware Structured Code Reviewer — reads a file from disk, runs security
+# and quality analysis via agent steps, then asks the human for approval.
+# Demonstrates: service adapter (filesystem), agent step schemas, human gate.
 id: code-review
 name: Structured Code Review
-version: 1
+version: 2
 initial_state: created
 
 params_schema:
   type: object
-  required: [code]
+  required: [path]
   properties:
-    code:
+    path:
       type: string
-      description: "Source code to review"
+      description: "Absolute path to the source file to review"
+
+services:
+  filesystem:
+    adapter: filesystem
+    trust: engine_delivered
 
 steps:
-  review_security:
-    description: Analyze the code for security vulnerabilities
-    execution: agent
+  read_code:
+    description: Load source file contents from disk for analysis
+    execution: auto
+    trust: engine_delivered
+    uses_service: filesystem
+    operation: read
     allowed_from_states: [created]
+    produces_state: code_loaded
+
+  review_security:
+    description: Analyze code for security vulnerabilities against OWASP Top 10
+    execution: agent
+    allowed_from_states: [code_loaded]
     produces_state: security_reviewed
     prompt: |
-      Analyze the code below for security vulnerabilities.
-      Look for: SQL injection, XSS, authentication bypass, insecure deserialization,
-      hardcoded credentials, and path traversal.
-      Submit your findings using the required schema. Do not suggest fixes yet.
+      You are a senior security engineer performing a formal code review.
 
-      Code:
-      {{ run.params.code }}
+      Analyze the code below against the OWASP Top 10 (2021):
+        A01 Broken Access Control
+        A02 Cryptographic Failures
+        A03 Injection (SQL, command, LDAP, XPath, template injection)
+        A04 Insecure Design
+        A05 Security Misconfiguration
+        A06 Vulnerable and Outdated Components
+        A07 Identification and Authentication Failures
+        A08 Software and Data Integrity Failures
+        A09 Security Logging and Monitoring Failures
+        A10 Server-Side Request Forgery
+
+      For each finding:
+      - Assign a severity: critical, high, medium, or low
+      - Cite the OWASP category it falls under
+      - Identify the exact location (file line or function name)
+      - Write a one-sentence description of the vulnerability
+      - Write a one-sentence remediation guidance
+
+      If no vulnerability is found for a category, do not invent one.
+      If the file has no security findings at all, return an empty findings array.
+
+      File: {{ run.params.path }}
+
+      ```
+      {{ context.resources.read_code.content }}
+      ```
     input_schema:
       type: object
       required: [findings]
@@ -37,44 +73,65 @@ steps:
           type: array
           items:
             type: object
-            required: [severity, description]
+            required: [severity, owasp_category, location, description, remediation]
             properties:
               severity:
                 type: string
                 enum: [critical, high, medium, low]
-              description:
+              owasp_category:
                 type: string
               location:
                 type: string
+              description:
+                type: string
+              remediation:
+                type: string
 
   assess_quality:
-    description: Assess overall code quality taking security findings into account
+    description: Assess code quality — architecture, maintainability, correctness, and test coverage
     execution: agent
     allowed_from_states: [security_reviewed]
     produces_state: quality_assessed
     prompt: |
-      Review the code below for overall quality issues.
-      Security findings from the previous step are provided — do not repeat them as quality findings.
-      Assess: naming, structure, error handling, test coverage, and maintainability.
-      Submit your assessment using the required schema.
+      You are a senior software engineer performing a code quality review.
 
-      Code:
-      {{ run.params.code }}
+      The file below has already been reviewed for security. Do not repeat security findings.
 
-      Security findings already identified:
+      Assess the code for:
+      - Architecture and design: separation of concerns, coupling, cohesion
+      - Naming: clarity, consistency, use of conventions
+      - Error handling: completeness, specificity, silent failures
+      - Maintainability: code duplication, complexity, readability
+      - Test coverage: missing tests, poor test isolation, untested edge cases
+      - Dead code: unreachable branches, commented-out blocks, unused exports
+
+      For each finding:
+      - Assign a category (one of: architecture, naming, error-handling, maintainability, test-coverage, dead-code, other)
+      - Describe the issue in one sentence
+      - Provide a concrete improvement suggestion in one sentence
+      - Cite the location (line or function)
+
+      File: {{ run.params.path }}
+
+      ```
+      {{ context.resources.read_code.content }}
+      ```
+
+      Security findings already identified (for context only — do not repeat):
       {{ context.resources.review_security.findings }}
     input_schema:
       type: object
-      required: [findings, overall_risk]
+      required: [findings, overall_risk, summary]
       properties:
         findings:
           type: array
           items:
             type: object
-            required: [category, description, suggestion]
+            required: [category, description, suggestion, location]
             properties:
               category:
                 type: string
+                enum: [architecture, naming, error-handling, maintainability, test-coverage, dead-code, other]
               description:
                 type: string
               suggestion:
@@ -83,23 +140,34 @@ steps:
                 type: string
         overall_risk:
           type: string
-          enum: [low, medium, high]
+          enum: [low, medium, high, critical]
+          description: "Combined risk verdict across security and quality findings"
+        summary:
+          type: string
+          description: "2-3 sentence executive summary of the review"
 
   confirm_review:
-    description: Human reviews the combined findings report and approves or rejects
+    description: Present the consolidated review report to the human for approval
     execution: auto
     trust: human_confirmed
     allowed_from_states: [quality_assessed]
     produces_state: completed
+    gate:
+      choices:
+        - approve
+        - reject
     prompt: |
-      Code review complete. Present this report to the user and ask for approval.
+      Code review complete for: {{ run.params.path }}
 
-      --- SECURITY FINDINGS ---
+      EXECUTIVE SUMMARY
+      {{ context.resources.assess_quality.summary }}
+
+      SECURITY FINDINGS (OWASP Top 10)
       {{ context.resources.review_security.findings }}
 
-      --- QUALITY FINDINGS ---
+      QUALITY FINDINGS
       {{ context.resources.assess_quality.findings }}
 
       Overall risk: {{ context.resources.assess_quality.overall_risk }}
 
-      Ask: "Shall I mark this review as approved? Reply with approve or reject."
+      Reply with 'approve' to mark this review as complete, or 'reject' to flag it for re-review.

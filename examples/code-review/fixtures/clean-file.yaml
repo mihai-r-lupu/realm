@@ -1,0 +1,27 @@
+name: clean-file
+params:
+  path: /home/mihai/code/realm/packages/core/src/adapters/mock-adapter.ts
+agent_responses:
+  review_security:
+    findings: []
+  assess_quality:
+    findings:
+      - category: maintainability
+        description: The private resolve method is called identically by fetch, create, and update with no variation.
+        suggestion: Document that this symmetry is intentional, or collapse into a single dispatch method.
+        location: "resolve()"
+    overall_risk: low
+    summary: "MockAdapter is a clean, well-structured test utility with no security concerns. It has a single minor maintainability observation around method symmetry, but is otherwise clear and idiomatic."
+gate_responses:
+  confirm_review: approve
+expected:
+  final_state: completed
+  evidence:
+    - step_id: read_code
+      status: success
+    - step_id: review_security
+      status: success
+    - step_id: assess_quality
+      status: success
+    - step_id: confirm_review
+      status: success
