@@ -173,6 +173,21 @@ registry.register('handler', 'validate_verbatim_quotes', validateQuotes);
 
 In `workflow.yaml`, reference it with `handler: validate_verbatim_quotes` on an `execution: auto` step.
 
+## Built-in Service Adapters
+
+`@sensigo/realm` ships `FileSystemAdapter` out of the box. Register it and reference it from any
+`execution: auto` step to read a local file:
+
+```typescript
+import { ExtensionRegistry, FileSystemAdapter } from '@sensigo/realm';
+
+const registry = new ExtensionRegistry();
+registry.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
+```
+
+The step receives `{ content, path, line_count, size_bytes }` with `trust: engine_delivered` —
+the agent cannot see or alter the file content. See `examples/code-review/` for a working example.
+
 See [docs/getting-started.md](docs/getting-started.md) for a complete end-to-end walkthrough including service adapters and MCP integration.
 
 ## Testing Workflows

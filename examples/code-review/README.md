@@ -2,14 +2,13 @@
 
 ## What this shows
 
-A three-step, evidence-tracked code review. The engine enforces step order: security analysis
-must complete before quality assessment can run. The agent receives its task instruction
-at each step via `next_action.prompt` — not from a static skill file. A human gate requires
-explicit approval before the run completes. Every step's input, output, and timing is captured
-in an immutable evidence chain.
-
-Compare `skill.md` in this directory (8 lines) to the SKILL.md in the `before/` comments
-at the top of `workflow.yaml`. That diff is Realm's value proposition.
+A four-step, evidence-tracked code review. An auto step reads the source file via the
+built-in `FileSystemAdapter` — the agent never sees the raw file path. The engine enforces step
+order: security analysis must complete before quality assessment can run. Each agent step runs
+with a dedicated persona loaded from `agents/` at register time — see **Agent profiles** below.
+The agent receives its task at each step via `next_action.prompt`. A human gate requires explicit
+approval before the run completes. Every step's input, output, and timing is captured in an
+immutable evidence chain.
 
 ## Install
 
@@ -70,6 +69,24 @@ protocol, and follow `next_action`. The code-review-specific skill (`skill.md` i
 directory) layers the workflow-specific behaviour on top.
 
 If the tools don't appear in Copilot, see [examples/README.md](../README.md#troubleshooting-mcp--vs-code).
+
+## Agent profiles
+
+The two agent steps (`review_security`, `assess_quality`) each reference a dedicated persona file:
+
+```
+agents/
+  security-reviewer.md   # loaded by review_security
+  quality-reviewer.md    # loaded by assess_quality
+```
+
+Each profile defines the agent's role, scope, and constraints. At `realm register` time the engine
+reads both files, computes a SHA-256 hash of each, and embeds the content in the workflow protocol
+as `agent_profile_instructions`. The consuming agent receives the profile alongside the step's
+`prompt`. The profile name and hash are recorded in the evidence snapshot — `realm inspect` shows
+them in cyan after the step name.
+
+---
 
 ## What to look at next
 
