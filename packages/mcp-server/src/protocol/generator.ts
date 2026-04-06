@@ -1,6 +1,7 @@
 // Protocol generator — produces the full agent briefing from a WorkflowDefinition.
 // This is what an AI agent reads before starting a workflow run.
 import type { WorkflowDefinition, JsonSchema } from '@sensigo/realm';
+import { TERMINAL_STATES } from '@sensigo/realm';
 
 export interface ProtocolStepGate {
   choices: string[];
@@ -71,6 +72,23 @@ export function generateProtocol(definition: WorkflowDefinition): WorkflowProtoc
       autoStepCount++;
     } else if (step.execution === 'agent' && !hasGate) {
       agent_involvement = `YOU execute this step. Call execute_step with command '${id}' and the required params.`;
+
+      // If this step's produced state leads immediately into an auto+gate step,
+      // warn the agent upfront — they will receive confirm_required, not ok.
+      if (!TERMINAL_STATES.has(step.produces_state)) {
+        const immediateNext = Object.entries(definition.steps).find(
+          ([, s]) =>
+            s.execution === 'auto' &&
+            (s.trust === 'human_confirmed' || s.trust === 'human_reviewed') &&
+            Array.isArray(s.allowed_from_states) &&
+            s.allowed_from_states.includes(step.produces_state),
+        );
+        if (immediateNext) {
+          agent_involvement +=
+            ` After you submit, you will receive status: confirm_required directly in response to this call — the engine runs '${immediateNext[0]}' automatically before returning.`;
+        }
+      }
+
       agentStepCount++;
     } else {
       // execution === 'agent' with gate
