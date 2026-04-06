@@ -17,6 +17,7 @@ import { ExtensionRegistry } from '../extensions/registry.js';
 import type { ServiceResponse } from '../extensions/service-adapter.js';
 import { resolveSecret } from '../config/secrets.js';
 import { resolvePromptTemplate } from './prompt-template.js';
+import { generateSchemaSkeleton } from '../utils/schema-skeleton.js';
 
 export type StepDispatcher = (
   stepName: string,
@@ -254,7 +255,13 @@ export function findNextAction(
                   ? 'Your output for this step. Must conform to next_action.input_schema.'
                   : 'Your output for this step.',
               }],
-              call_with: { run_id: context.runId, command: stepName, params: '<YOUR_PARAMS>' },
+              call_with: {
+                run_id: context.runId,
+                command: stepName,
+                params: step.input_schema !== undefined
+                  ? generateSchemaSkeleton(step.input_schema as Record<string, unknown>)
+                  : '<YOUR_PARAMS>',
+              },
             }
             : null,
         ...(step.execution === 'agent' && step.input_schema !== undefined
@@ -729,7 +736,7 @@ export async function executeStep(
     errors: [],
     context_hint: nextAction !== null
       ? nextAction.context_hint
-      : `Run completed in terminal state '${newState}'.`,
+      : `Run completed in terminal state '${newState}'. Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`,
     next_action: nextAction,
   };
 }
@@ -897,7 +904,7 @@ export async function submitHumanResponse(
     errors: [],
     context_hint: nextAction !== null
       ? nextAction.context_hint
-      : `Run completed in terminal state '${newState}'.`,
+      : `Run completed in terminal state '${newState}'. Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`,
     next_action: nextAction,
   };
 }
@@ -990,7 +997,8 @@ export async function executeChain(
   definition: WorkflowDefinition,
   options: ExecuteChainOptions,
 ): Promise<ResponseEnvelope> {
-  return executeChainInternal(store, guard, definition, options, 0);
+  const result = await executeChainInternal(store, guard, definition, options, 0);
+  return { ...result, command: options.command };
 }
 
 // Re-export TERMINAL_STATES so existing importers via execution-loop.js still resolve.
