@@ -5,16 +5,16 @@ import { join } from 'node:path';
 import { generateProtocol } from './generator.js';
 import type { WorkflowDefinition } from '@sensigo/realm';
 
-const PLAYBOOK_YAML = join(
-  new URL('../../../../workflows/playbook-extraction/workflow.yaml', import.meta.url).pathname,
+const MULTI_STEP_FIXTURE = join(
+  new URL('../../fixtures/multi-step-workflow.yaml', import.meta.url).pathname,
 );
 
 describe('generateProtocol', () => {
   it('generates protocol for a 4-step workflow', () => {
-    const definition = loadWorkflowFromFile(PLAYBOOK_YAML);
+    const definition = loadWorkflowFromFile(MULTI_STEP_FIXTURE);
     const protocol = generateProtocol(definition);
 
-    expect(protocol.workflow_id).toBe('playbook-extraction');
+    expect(protocol.workflow_id).toBe('multi-step-demo');
     expect(protocol.steps.length).toBe(4);
 
     const fetchDoc = protocol.steps.find((s) => s.id === 'fetch_document')!;

@@ -128,7 +128,9 @@ npx @sensigo/realm-mcp
 
 Once connected the agent has access to 6 tools: `list_workflows`, `get_workflow_protocol`, `start_run`, `execute_step`, `submit_human_response`, and `get_run_state`.
 
-The agent calls `get_workflow_protocol` first to receive explicit step-by-step instructions embedded in the workflow definition. It cannot execute a step out of order or submit output that fails schema validation.
+The agent calls `list_workflows` to discover registered workflows, then `get_workflow_protocol` for the matched workflow to receive explicit step-by-step instructions. It cannot execute a step out of order or submit output that fails schema validation.
+
+**Multiple workflows:** register as many as you need with `realm register`. The agent discovers them all via `list_workflows` and picks the right one by ID. Add a `skill.md` alongside each workflow for workflow-specific agent behaviour.
 
 ## CLI Reference
 
