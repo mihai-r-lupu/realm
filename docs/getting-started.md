@@ -106,6 +106,30 @@ with `next_action` pointing at the recovery step.
 Gate-response keys (e.g. `on_reject`) — when a human submits a gate choice, the engine routes to
 the branch target instead of the step's normal `produces_state`.
 
+### Agent profiles
+
+An `execution: agent` step can declare a reusable persona via `agent_profile`:
+
+```yaml
+profiles_dir: agents          # relative to this YAML file; default when omitted
+
+steps:
+  review_security:
+    execution: agent
+    agent_profile: security-reviewer   # loads agents/security-reviewer.md
+    prompt: |
+      Review the following code for security vulnerabilities.
+      ...
+```
+
+Create `agents/security-reviewer.md` (or whatever `profiles_dir` resolves to) with the persona
+definition. The content is loaded at `realm register` time — if the file is missing, registration
+fails immediately with the searched path in the error message.
+
+The profile content is delivered to the consuming agent as `agent_profile_instructions` on the
+protocol step, alongside the per-step `prompt`. The profile SHA-256 hash is recorded in the
+evidence snapshot for auditability. `realm inspect` annotates steps that ran with a profile.
+
 ---
 
 ## 4. Validate and Register
