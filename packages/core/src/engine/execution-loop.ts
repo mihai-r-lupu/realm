@@ -249,12 +249,6 @@ export function findNextAction(
             ? {
               tool: 'execute_step',
               params: { run_id: context.runId, command: stepName },
-              params_required: [{
-                name: 'params',
-                description: step.input_schema !== undefined
-                  ? 'Your output for this step. Must conform to next_action.input_schema.'
-                  : 'Your output for this step.',
-              }],
               call_with: {
                 run_id: context.runId,
                 command: stepName,
@@ -268,7 +262,7 @@ export function findNextAction(
           ? { input_schema: step.input_schema }
           : {}),
         human_readable: `Execute step '${stepName}': ${step.description}`,
-        context_hint: `Current state is '${newState}'. Next step is '${stepName}'.`,
+        orientation: `Current state is '${newState}'. Next step is '${stepName}'.`,
         ...(step.timeout_seconds !== undefined
           ? { expected_timeout: `${step.timeout_seconds}s` }
           : {}),
@@ -637,11 +631,18 @@ export async function executeStep(
       );
     }
 
-    // Resolve gate prompt with the full evidence context (including current step output).
+    // Resolve gate display (from step.prompt) and agent_hint (from step.instructions) with full evidence context.
     const gateEvidenceCtx = { ...evidenceByStep, [options.command]: output };
-    const resolvedGatePrompt =
+    const resolvedGateDisplay =
       stepDef!.prompt !== undefined
         ? resolvePromptTemplate(stepDef!.prompt, {
+          evidenceByStep: gateEvidenceCtx,
+          runParams: run.params,
+        })
+        : undefined;
+    const resolvedGateInstructions =
+      stepDef!.instructions !== undefined
+        ? resolvePromptTemplate(stepDef!.instructions, {
           evidenceByStep: gateEvidenceCtx,
           runParams: run.params,
         })
@@ -661,26 +662,23 @@ export async function executeStep(
         instruction: {
           tool: 'submit_human_response',
           params: { run_id: options.runId, gate_id },
-          params_required: [{
-            name: 'choice',
-            description: "The human's decision. Must be one of the values in gate.choices.",
-            valid_values: choices,
-          }],
           call_with: {
             run_id: options.runId,
             gate_id,
             choice: `<${choices.join('|')}>`,
           },
         },
-        human_readable: `Human review required for step '${options.command}'. Present gate.prompt to the user, wait for their choice from gate.choices, then call submit_human_response.`,
-        context_hint: `Run is paused at gate '${gate_id}'. Available choices: ${choices.join(', ')}.`,
+        human_readable: `Human review required for step '${options.command}'. Present gate.display to the user, wait for their choice from gate.response_spec.choices, then call submit_human_response.`,
+        orientation: `Run is paused at gate '${gate_id}'. Available choices: ${choices.join(', ')}.`,
       },
       gate: {
         gate_id,
         step_name,
         preview: output,
         choices,
-        ...(resolvedGatePrompt !== undefined ? { prompt: resolvedGatePrompt } : {}),
+        ...(resolvedGateDisplay !== undefined ? { display: resolvedGateDisplay } : {}),
+        ...(resolvedGateInstructions !== undefined ? { agent_hint: resolvedGateInstructions } : {}),
+        response_spec: { choices },
       },
     };
   }
@@ -733,7 +731,7 @@ export async function executeStep(
     warnings: [],
     errors: [],
     context_hint: nextAction !== null
-      ? nextAction.context_hint
+      ? nextAction.orientation
       : `Run completed in terminal state '${newState}'. Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`,
     next_action: nextAction,
   };
@@ -901,7 +899,7 @@ export async function submitHumanResponse(
     warnings: [],
     errors: [],
     context_hint: nextAction !== null
-      ? nextAction.context_hint
+      ? nextAction.orientation
       : `Run completed in terminal state '${newState}'. Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`,
     next_action: nextAction,
   };

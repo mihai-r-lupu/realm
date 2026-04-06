@@ -10,7 +10,6 @@ import {
   type ResponseEnvelope,
 } from '@sensigo/realm';
 import type { HandleRunStores } from './start-run.js';
-import { slimEvidence } from './slim-evidence.js';
 
 /**
  * Business logic for the execute_step tool.
@@ -55,7 +54,7 @@ export async function handleExecuteStepTool(
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
   try {
     const result = await handleExecuteStep(args, opts);
-    const slimResult = { ...result, data: {}, evidence: slimEvidence(result.evidence) };
+    const { snapshot_id: _snap, ...slimResult } = { ...result, data: {}, evidence: [] };
     return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
   } catch (err) {
     // executeChain handles all WorkflowErrors internally and always returns a ResponseEnvelope.
@@ -67,7 +66,7 @@ export async function handleExecuteStepTool(
         type: 'text' as const, text: JSON.stringify({
           command: args.command,
           run_id: args.run_id,
-          snapshot_id: '',
+
           status: 'error',
           data: {},
           evidence: [],

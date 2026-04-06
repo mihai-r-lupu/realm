@@ -111,11 +111,7 @@ steps:
       - Provide a concrete improvement suggestion in one sentence
       - Cite the location (line or function)
 
-      File: {{ run.params.path }}
-
-      ```
-      {{ context.resources.read_code.content }}
-      ```
+      File: (The file content was provided to you via the read_code step context.)
 
       Security findings already identified (for context only — do not repeat):
       {{ context.resources.review_security.findings }}
@@ -171,3 +167,7 @@ steps:
       Overall risk: {{ context.resources.assess_quality.overall_risk }}
 
       Reply with 'approve' to mark this review as complete, or 'reject' to flag it for re-review.
+    instructions: |
+      Present the display content to the user verbatim without modification. Ask for their choice
+      from gate.response_spec.choices. Then call submit_human_response with run_id, gate_id, and
+      the user's choice.
