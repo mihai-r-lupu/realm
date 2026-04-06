@@ -286,7 +286,7 @@ The agent should call `get_workflow_protocol` first. The protocol is embedded in
 Every response includes a top-level `context_hint` string describing the current run state and what
 just happened — useful for orientation on every response, including errors where `next_action` is `null`.
 
-Every `start_run` and `execute_step` response includes a `next_action` object. The agent reads
+Every `start_run`, `execute_step`, and `submit_human_response` response includes a `next_action` object. The agent reads
 `next_action.prompt` for its current task, then calls `next_action.instruction.tool` using
 `instruction.call_with` as the ready-to-use argument template:
 
