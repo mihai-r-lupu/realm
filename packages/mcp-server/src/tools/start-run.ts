@@ -116,7 +116,9 @@ export function registerStartRun(server: McpServer, opts?: { registry?: import('
     async (args) => {
       try {
         const result = await handleStartRun(args, opts);
-        const { snapshot_id: _snap, ...slimResult } = result;
+        // command is intentionally overridden to 'start_run': MCP callers invoked start_run, not
+        // the first auto step that executeChain happened to execute. Do not revert this override.
+        const { snapshot_id: _snap, ...slimResult } = { ...result, command: 'start_run' };
         return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
