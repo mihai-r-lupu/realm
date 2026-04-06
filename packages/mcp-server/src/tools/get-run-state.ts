@@ -60,8 +60,21 @@ export function registerGetRunState(server: McpServer, opts?: HandleRunStateStor
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: 'text' as const, text: `Error: ${message}` }],
-          isError: true,
+          content: [{
+            type: 'text' as const, text: JSON.stringify({
+              command: 'get_run_state',
+              run_id: args.run_id,
+              snapshot_id: '',
+              status: 'error',
+              data: {},
+              evidence: [],
+              warnings: [],
+              errors: [message],
+              agent_action: 'stop',
+              context_hint: `Error retrieving state for run '${args.run_id}'.`,
+              next_action: null,
+            }, null, 2)
+          }],
         };
       }
     },

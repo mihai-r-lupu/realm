@@ -446,10 +446,8 @@ export async function executeStep(
     try {
       validateInputSchema(options.input, stepDef.input_schema, options.command);
     } catch (err) {
-      if (err instanceof WorkflowError) {
-        return makeErrorEnvelope(options, run, err, definition);
-      }
-      throw err;
+      // validateInputSchema only throws WorkflowError — cast is safe.
+      return makeErrorEnvelope(options, run, err as WorkflowError, definition);
     }
   }
 

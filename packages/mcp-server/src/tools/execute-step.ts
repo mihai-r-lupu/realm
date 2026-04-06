@@ -10,18 +10,7 @@ import {
   type ResponseEnvelope,
 } from '@sensigo/realm';
 import type { HandleRunStores } from './start-run.js';
-
-/** Strips verbose I/O summaries and diagnostics from evidence entries for MCP responses. */
-function slimEvidence(evidence: ResponseEnvelope['evidence']): unknown[] {
-  return evidence.map(snap => ({
-    step_id: snap.step_id,
-    status: snap.status,
-    duration_ms: snap.duration_ms,
-    evidence_hash: snap.evidence_hash,
-    ...(snap.attempt !== undefined ? { attempt: snap.attempt } : {}),
-    ...(snap.error !== undefined ? { error: snap.error } : {}),
-  }));
-}
+import { slimEvidence } from './slim-evidence.js';
 
 /**
  * Business logic for the execute_step tool.
@@ -69,6 +58,9 @@ export async function handleExecuteStepTool(
     const slimResult = { ...result, data: {}, evidence: slimEvidence(result.evidence) };
     return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
   } catch (err) {
+    // executeChain handles all WorkflowErrors internally and always returns a ResponseEnvelope.
+    // This catch exists only for unexpected infrastructure exceptions (e.g. store driver bug)
+    // where envelope construction is not possible.
     const message = err instanceof Error ? err.message : String(err);
     return {
       content: [{
@@ -82,6 +74,7 @@ export async function handleExecuteStepTool(
           warnings: [],
           errors: [message],
           agent_action: 'stop',
+          context_hint: `Error executing step '${args.command}' for run '${args.run_id}'.`,
           next_action: null,
         }, null, 2)
       }],
