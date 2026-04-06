@@ -4,7 +4,7 @@ Two progressive examples, each runnable in under five minutes.
 
 | Example | What it demonstrates |
 |---|---|
-| [code-review/](code-review/) | Three-step agent workflow, `step.prompt` delivery, human gate |
+| [code-review/](code-review/) | Four-step workflow: auto file read via `FileSystemAdapter`, two agent steps with persona profiles (`agents/`), human gate |
 | [document-intake/](document-intake/) | Conditional branching — `on_error` and gate-response `transitions`, `FileSystemAdapter` |
 
 Each example ships with a headless driver (`node dist/driver.js <fixture>`) and an MCP server

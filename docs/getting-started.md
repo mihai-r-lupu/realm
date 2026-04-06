@@ -178,7 +178,43 @@ Every step produces a tamper-evident evidence record containing the input receiv
 
 ## 7. Adding a Service
 
-Services let the engine fetch, create, or update data in external systems. Add one to `workflow.yaml`:
+Services let the engine fetch, create, or update data in external systems.
+
+### Built-in: FileSystemAdapter
+
+`@sensigo/realm` ships `FileSystemAdapter`, which reads a local file and returns
+`{ content, path, line_count, size_bytes }`. No custom TypeScript required:
+
+```typescript
+import { ExtensionRegistry, FileSystemAdapter } from '@sensigo/realm';
+
+const registry = new ExtensionRegistry();
+registry.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
+```
+
+```yaml
+services:
+  filesystem:
+    adapter: filesystem
+    trust: engine_delivered
+
+steps:
+  read_file:
+    execution: auto
+    uses_service: filesystem
+    operation: read
+    allowed_from_states: [created]
+    produces_state: file_loaded
+```
+
+The file path is taken from the run's `params` — declare it in `params_schema` and pass it when
+calling `start_run`. The step result is injected directly into the evidence; the agent cannot see
+or alter it. See `examples/code-review/` and `examples/document-intake/` for working examples.
+
+### Custom adapters
+
+To fetch from any other source — an API, a database, a cloud service — implement `ServiceAdapter`
+and register it the same way. Add the service declaration to `workflow.yaml`:
 
 ```yaml
 services:

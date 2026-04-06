@@ -1,4 +1,4 @@
-# Example 3 — Document Intake with Conditional Branching
+# Example 2 — Document Intake with Conditional Branching
 
 ## What this shows
 
