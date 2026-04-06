@@ -11,6 +11,7 @@ import {
   type ResponseEnvelope,
   ExtensionRegistry,
 } from '@sensigo/realm';
+import { slimEvidence } from './slim-evidence.js';
 
 export interface HandleRunStores {
   runStore?: JsonFileStore;
@@ -33,15 +34,7 @@ const passthroughDispatcher: StepDispatcher = async () => ({});
 export async function handleStartRun(
   args: { workflow_id: string; params?: Record<string, unknown> },
   stores?: HandleRunStores,
-): Promise<{
-  run_id: string;
-  status: string;
-  data: Record<string, unknown>;
-  context_hint: string;
-  next_action: ResponseEnvelope['next_action'];
-  gate: ResponseEnvelope['gate'];
-  errors: string[];
-}> {
+): Promise<ResponseEnvelope> {
   const workflowStore = stores?.workflowStore ?? new JsonWorkflowStore();
   const runStore = stores?.runStore ?? new JsonFileStore();
   const definition = await workflowStore.get(args.workflow_id);
@@ -60,13 +53,16 @@ export async function handleStartRun(
 
   if (firstStep === undefined) {
     return {
+      command: 'start_run',
       run_id: run.id,
+      snapshot_id: run.version.toString(),
       status: 'ok',
       data: {},
+      evidence: [],
+      warnings: [],
+      errors: [],
       context_hint: `Run '${run.id}' created. No steps available from state '${definition.initial_state}'.`,
       next_action: null,
-      gate: undefined,
-      errors: [],
     };
   }
 
@@ -78,13 +74,16 @@ export async function handleStartRun(
       runId: run.id,
     });
     return {
+      command: 'start_run',
       run_id: run.id,
+      snapshot_id: run.version.toString(),
       status: 'ok',
       data: {},
+      evidence: [],
+      warnings: [],
+      errors: [],
       context_hint: nextAction?.context_hint ?? `Run '${run.id}' created in state '${run.state}'.`,
       next_action: nextAction,
-      gate: undefined,
-      errors: [],
     };
   }
 
@@ -99,13 +98,10 @@ export async function handleStartRun(
   });
 
   return {
+    ...result,
     run_id: run.id,
-    status: result.status,
     data: {},
-    context_hint: result.context_hint,
-    next_action: result.next_action,
-    gate: result.gate,
-    errors: result.errors,
+    evidence: slimEvidence(result.evidence),
   };
 }
 
