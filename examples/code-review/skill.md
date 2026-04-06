@@ -8,7 +8,10 @@ description: "Run a structured, evidence-tracked code review through Realm.
 # Realm Code Review
 
 When asked to review code with Realm:
-1. Call `start_run` with `workflow_id: "code-review"` and `params: { code: "<the code>" }`.
+0. Optionally call `get_workflow_protocol` with `workflow_id: "code-review"` to see the full step
+   graph and all step schemas before starting — useful if you want to plan your outputs upfront.
+1. Call `start_run` with:
+   `{ workflow_id: "code-review", params: { code: "<the code to review>" } }`
 2. Read `next_action.prompt` from the response — that is your complete task for this step.
 3. Call `next_action.instruction.tool` using `instruction.call_with` as the ready-to-use argument
    template — replace the placeholder(s) with your actual values, then call the tool.
