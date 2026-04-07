@@ -5,7 +5,7 @@ Two progressive examples, each runnable in under five minutes.
 | Example | What it demonstrates |
 |---|---|
 | [code-review/](code-review/) | Four-step workflow: auto file read via `FileSystemAdapter`, two agent steps with persona profiles (`agents/`), human gate |
-| [document-intake/](document-intake/) | Conditional branching — `on_error` and gate-response `transitions`, `FileSystemAdapter` |
+| [document-intake/](document-intake/) | Conditional branching — `on_error`, gate-response `transitions`, and `on_success` output-field routing; `FileSystemAdapter` |
 
 Each example ships with a headless driver (`node dist/driver.js <fixture>`) and an MCP server
 (`node dist/mcp-server.js`) for use with a VS Code agent.
