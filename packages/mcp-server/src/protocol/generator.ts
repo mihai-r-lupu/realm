@@ -1,6 +1,6 @@
 // Protocol generator — produces the full agent briefing from a WorkflowDefinition.
 // This is what an AI agent reads before starting a workflow run.
-import type { WorkflowDefinition, JsonSchema } from '@sensigo/realm';
+import type { WorkflowDefinition, JsonSchema, SimpleTransition, OnSuccessTransition } from '@sensigo/realm';
 import { TERMINAL_STATES } from '@sensigo/realm';
 
 export interface ProtocolStepGate {
@@ -19,7 +19,11 @@ export interface ProtocolStep {
   /** Present when the step may open a human gate. */
   possible_gate?: ProtocolStepGate;
   /** Conditional routing paths from this step, keyed by transition name (e.g. 'on_error', 'on_reject'). */
-  transitions?: Record<string, { step: string; produces_state: string }>;
+  transitions?: {
+    on_error?: SimpleTransition;
+    on_success?: OnSuccessTransition;
+    [key: string]: SimpleTransition | OnSuccessTransition | undefined;
+  };
   /** Specialist profile instructions for the agent at this step. Present when the step
    *  declares agent_profile and the profile was resolved at register time. */
   agent_profile_instructions?: string;

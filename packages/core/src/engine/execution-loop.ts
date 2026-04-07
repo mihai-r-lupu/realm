@@ -707,7 +707,13 @@ export async function executeStep(
 
   // Step 6: Determine new state.
   // stepDef was declared after step 3; isAllowed passed so it is defined here.
-  const newState = stepDef!.produces_state;
+  let newState = stepDef!.produces_state;
+  const onSuccess = stepDef!.transitions?.on_success;
+  if (onSuccess !== undefined) {
+    const fieldValue = String((output as Record<string, unknown>)[onSuccess.field] ?? '');
+    const route = onSuccess.routes[fieldValue] ?? onSuccess.default;
+    newState = route.produces_state;
+  }
   const isTerminal = isTerminalState(newState);
 
   // Step 7: Update run record
@@ -858,7 +864,7 @@ export async function submitHumanResponse(
   const gateStepName = run.pending_gate.step_name;
   const stepDef = definition.steps[gateStepName]!;
   const transitionKey = `on_${options.choice}`;
-  const transition = stepDef.transitions?.[transitionKey];
+  const transition = stepDef.transitions?.[transitionKey] as { step: string; produces_state: string } | undefined;
   const newState = transition !== undefined ? transition.produces_state : stepDef.produces_state;
   const isTerminal = transition !== undefined ? false : isTerminalState(stepDef.produces_state);
 
@@ -1036,19 +1042,27 @@ async function executeChainInternal(
     return result;
   }
 
-  // Record this step in the accumulator so callers know what ran silently.
-  const currentStepDef = definition.steps[options.command];
-  if (currentStepDef?.execution === 'auto') {
-    chainedSteps.push({ step: options.command, produced_state: currentStepDef.produces_state });
-  }
-
   // Load the current run to determine what step comes next.
+  const currentStepDef = definition.steps[options.command];
   let run: RunRecord;
   try {
     run = await store.get(options.runId);
   } catch {
     // If we can't load the run, return the last good result — the step did complete.
     return result;
+  }
+
+  // Record this step in the accumulator using the actual persisted state.
+  // When on_success routing takes a route, run.state differs from currentStepDef.produces_state.
+  if (currentStepDef?.execution === 'auto') {
+    const onSuccessTaken =
+      currentStepDef.transitions?.on_success !== undefined &&
+      run.state !== currentStepDef.produces_state;
+    chainedSteps.push({
+      step: options.command,
+      produced_state: run.state,
+      ...(onSuccessTaken ? { branched_via: 'on_success' } : {}),
+    });
   }
 
   if (run.terminal_state) {

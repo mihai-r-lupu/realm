@@ -464,9 +464,9 @@ expected:
 
 ---
 
-### Week 10-11 — Example 3 + Agent Profiles (20-30 hrs)
+### Week 10-11 — Example 3 + Agent Profiles + Contractor Adapters (20-30 hrs)
 
-**Goal:** Ship Example 3 — the PR Description Generator. Add agent profiles for the multi-agent demo blog post.
+**Goal:** Ship Example 3 — the PR Description Generator. Add agent profiles for the multi-agent demo blog post. Ship SlackAdapter and NotionAdapter to unlock the AI contractor story before cloud launch.
 
 **New adapters and servers:**
 
@@ -477,6 +477,20 @@ expected:
    Configurable `base_url` so it points at mock server in demo and at `https://api.github.com` in production.
 
 2. **`GitHubMockServer`** (`packages/testing/src/servers/github-mock-server.ts`) — lightweight Node.js `http` server (no framework). Accepts GitHub API routes, returns fixture data from `github-fixture-data.json`. Started by the example's setup script on `localhost:3032`.
+
+3. **`SlackAdapter`** (`packages/core/src/adapters/slack-adapter.ts`) — two operations:
+   - `create('post_message', { channel, text, blocks? })` → `{ message_ts, channel }` — posts the gate content (or any workflow output) to a Slack channel
+   - `fetch('get_thread_reply', { channel, thread_ts })` → `{ replies: [{ user, text, ts }] }` — fetches replies to a posted message for use in a subsequent step
+   
+   **Implementation note:** SlackAdapter does not replace the human gate state machine. The pattern is **notify-then-trigger**: an `auto` step posts gate content to Slack; the run pauses at the subsequent `human_gate` step; the client's Slack reply (or a webhook from Slack) triggers a Workflow Player submission with the decision. SlackAdapter is a notification + data-fetch adapter, not a gate bypass. Use `IncomingWebhook` for posting (no scopes required); use Bot token + `conversations.replies` for fetching replies.
+
+4. **`NotionAdapter`** (`packages/core/src/adapters/notion-adapter.ts`) — four operations:
+   - `fetch('get_page', { page_id })` → `{ title, content, blocks[] }`
+   - `fetch('query_database', { database_id, filter? })` → `{ rows[] }`
+   - `create('create_page', { parent_id, title, content })` → `{ page_id }`
+   - `update('update_page', { page_id, content })` → `{ ok }`
+   
+   Notion is the document layer for the majority of contractor client relationships. This is the real-world replacement for `FileSystemAdapter` in client-facing workflows. Auth: Notion Integration token stored in adapter config (`auth.token_from`). Use the official `@notionhq/client` npm package.
 
 **New handler in `packages/core/src/handlers/`:**
 
@@ -612,13 +626,31 @@ steps:
 
 ---
 
-### Weeks 19-20 — RAG + Cloud-Only Features (20-30 hrs)
+### Weeks 19-20 — RAG + Cloud-Only Features + Phase 4 Adapters (20-30 hrs)
 
 1. **Vector DB adapters** — Pinecone and pgvector. Engine calls vector search, logs queries + results + scores as evidence.
 2. **Quote verification against retrieved chunks** — the agent claims an answer came from chunk X, engine verifies.
 3. **Auditable RAG step template** — pre-built YAML template wrapping any vector DB in evidence chain.
 4. **Cross-run analytics** — field performance trending, error patterns, RAG retrieval quality.
 5. **Scheduled workflows** — cron triggers via cloud scheduler.
+
+**Phase 4 adapters (ship alongside RAG — these directly support the contractor audience the Builder tier targets):**
+
+6. **`LinearAdapter`** (`packages/core/src/adapters/linear-adapter.ts`) — three operations:
+   - `create('create_issue', { title, description, team_id, priority? })` → `{ issue_id, url }`
+   - `update('update_status', { issue_id, state })` → `{ ok }`
+   - `fetch('get_issue', { issue_id })` → `{ title, state, assignee, description }`
+   
+   Issue-tracking agents ("AI found a security issue, filed it with evidence, assigned it, a human confirmed severity") are a perfect Realm-shaped workflow. Linear is the developer community darling; build Linear before Jira.
+
+7. **`AirtableAdapter`** (`packages/core/src/adapters/airtable-adapter.ts`) — three operations:
+   - `fetch('list_records', { base_id, table_name, filter_formula? })` → `{ records[] }`
+   - `create('create_record', { base_id, table_name, fields })` → `{ record_id }`
+   - `update('update_record', { base_id, table_name, record_id, fields })` → `{ ok }`
+   
+   Airtable acts as the client's "database" in many freelance engagements. The certified evidence chain makes "I updated 200 Airtable records and here's proof each one was validated" a premium service offering. Broader market reach than Bubble for the general contractor audience.
+
+8. **`GoogleDocsAdapter`** — document fetch + append operations. Paired with Clozr case study blog post.
 
 ---
 
