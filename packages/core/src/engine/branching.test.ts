@@ -25,14 +25,6 @@ class FailingHandler implements StepHandler {
   }
 }
 
-/** A handler that always succeeds. */
-class SucceedingHandler implements StepHandler {
-  readonly id = 'always_succeed';
-  async execute(_inputs: StepHandlerInputs, _ctx: StepContext): Promise<StepHandlerResult> {
-    return { data: { ok: true } };
-  }
-}
-
 /** Workflow: auto failing step → on_error → agent recovery step */
 function makeOnErrorToAgentWorkflow(): WorkflowDefinition {
   return {
