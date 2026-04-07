@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { JsonFileStore, JsonWorkflowStore } from '@sensigo/realm';
 import { handleCreateWorkflow, type CreateWorkflowArgs } from './create-workflow.js';
+import { handleExecuteStep } from './execute-step.js';
 
 describe('handleCreateWorkflow', () => {
   let runDir: string;
@@ -169,5 +170,64 @@ describe('handleCreateWorkflow', () => {
     expect(result.status).toBe('error');
     // Both "invalid id" and "description must be non-empty" should appear
     expect(result.errors.length).toBeGreaterThan(1);
+  });
+});
+
+describe('end-to-end — create_workflow + execute_step walk to completion', () => {
+  let runDir: string;
+  let workflowDir: string;
+  let stores: { runStore: JsonFileStore; workflowStore: JsonWorkflowStore };
+
+  beforeEach(async () => {
+    runDir = await mkdtemp(join(tmpdir(), 'realm-e2e-run-'));
+    workflowDir = await mkdtemp(join(tmpdir(), 'realm-e2e-wf-'));
+    stores = {
+      runStore: new JsonFileStore(runDir),
+      workflowStore: new JsonWorkflowStore(workflowDir),
+    };
+  });
+
+  it('two-step plan: create_workflow → execute step 1 → execute step 2 → completed', async () => {
+    const createResult = await handleCreateWorkflow(
+      {
+        steps: [
+          { id: 'step_one', description: 'Produce the first output.' },
+          { id: 'step_two', description: 'Produce the second output.' },
+        ],
+        metadata: { name: 'smoke-test' },
+      },
+      stores,
+    );
+
+    expect(createResult.status).toBe('ok');
+    expect(createResult.next_action?.instruction?.call_with.command).toBe('step_one');
+
+    const step1Result = await handleExecuteStep(
+      {
+        run_id: createResult.run_id,
+        command: createResult.next_action!.instruction!.call_with.command as string,
+        params: { output: 'first output' },
+      },
+      stores,
+    );
+
+    expect(step1Result.status).toBe('ok');
+    expect(step1Result.next_action?.instruction?.call_with.command).toBe('step_two');
+
+    const step2Result = await handleExecuteStep(
+      {
+        run_id: step1Result.run_id,
+        command: step1Result.next_action!.instruction!.call_with.command as string,
+        params: { output: 'second output' },
+      },
+      stores,
+    );
+
+    expect(step2Result.status).toBe('ok');
+    expect(step2Result.next_action).toBeNull();
+
+    // Verify the run itself reached the terminal state.
+    const finalRun = await stores.runStore.get(step2Result.run_id);
+    expect(finalRun.state).toBe('completed');
   });
 });

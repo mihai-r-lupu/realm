@@ -11,7 +11,11 @@ This plan translates the design document (5,900+ lines, 26 decisions) and the pr
 - First customer: clozr playbook extraction (existing Python CLI, rewritten on Realm)
 - Revenue starts at Phase 4 (week 14). Everything before is adoption and validation.
 
-**The one metric that matters:** Can a developer go from `npm install @sensigo/realm-cli` to a running workflow in under 10 minutes?
+**The two metrics that matter:** 
+1. Can a developer go from `npm install @sensigo/realm-cli` to a running workflow in under 10 minutes?
+2. Can a developer invite a client to their workflow dashboard and have the client trigger a run without MCP?
+
+Both must be true before the public launch.
 
 ---
 
@@ -536,19 +540,29 @@ steps:
 
 ## Phase 4: Public Launch + Cloud MVP + RAG (Weeks 13-21)
 
-### Week 13 — Documentation (10-15 hrs)
+### Week 13 — Documentation + Cloud Soft-Launch Infrastructure (10-15 hrs)
 
 1. **Getting-started guide** — from `npm install` to running first workflow in under 10 minutes. Entry point is Example 1 (code review). Links to Examples 2 and 3 for progressive depth.
 
-2. **Building-extensions guide** — how to write a `ServiceAdapter`, `Processor`, `StepHandler`. Uses `FileSystemAdapter` and `validate_verbatim_quotes` from the examples as reference implementations.
+2. **Building-extensions guide** — how to write a `ServiceAdapter`, `Processor`, `StepHandler`.
 
 3. **Protocol spec** — how the engine works, for contributors.
 
-4. **Data flow guide** — how data moves between steps via `context.resources`. Includes the authoring rule: never rely on the agent's context window for cross-step data; always reference prior step output via `context.resources.STEP_NAME.FIELD` in `step.prompt`. The engine resolves these references against the evidence chain before delivery.
+4. **Data flow guide** — how data moves between steps via `context.resources`.
 
-5. **Demo assets** — GIF screen recordings for all three examples (Mode 2 headless terminal recording + `realm inspect` output). Embedded in root README.
+5. **Demo assets** — GIF screen recordings for all three examples.
 
 6. **JSON Schema for workflow YAML** — published at `sensigo.dev/realm/schema/workflow.json` for IDE autocomplete.
+
+7. **`realm deploy` CLI command** — pushes a registered workflow to Realm Cloud. Authenticates via API key stored in `~/.realm/credentials`. Returns a dashboard URL.
+
+8. **Minimal cloud backend** — Postgres store (same `RunStore` interface as JsonFileStore, via `pg`). Express API server. User auth via API keys. Deployed to Railway or Fly.io + Neon/Supabase Postgres.
+
+9. **Workflow Player UI (minimal)** — Next.js page at `app.realm.dev/workflows/:workflowId`. Client can: see workflow steps, trigger a run with runtime input parameters, respond to human gate prompts, view the run status and evidence trail. No MCP, no AI agent required. This is the client delivery mechanism — the Builder tier has no value without it.
+
+10. **Stripe billing** — two plans only at launch: Solo ($29/month) and Builder ($79/month). Free 30-day trial on signup. Client Workspace ($19/month) purchasable from the Builder dashboard.
+
+11. **Startup program page** — `realm.dev/startups`. Simple form: company name, funding stage (must be under $5M), 2-sentence description of what they're building with Realm. 6 months free Builder tier on approval. Approved submissions become case studies.
 
 ---
 
@@ -556,35 +570,35 @@ steps:
 
 1. **GitHub repo goes public**
 2. **`npm publish` — @sensigo/realm, @sensigo/realm-cli, @sensigo/realm-mcp, @sensigo/realm-testing**
-3. **Blog post:** "Three AI agents, one document, zero trust issues — how Realm coordinates multi-agent workflows with proof"
-4. **Post to:** Hacker News, Reddit r/programming, r/artificial, Dev.to, Twitter/X
-5. **Second blog post (queue for week after launch):** "Your RAG pipeline is lying to you — and you can't prove it isn't"
-6. **Third blog post:** "Why your autonomous AI agent needs a flight recorder" (Mode 2 — self-directed execution)
+3. **Cloud goes live simultaneously** — soft-launch. Free 30-day trial. Builder and Solo tiers billing via Stripe. Client Workspace purchasable. Startup program form active.
+4. **Blog post:** "Three AI agents, one document, zero trust issues — how Realm coordinates multi-agent workflows with proof"
+5. **Post to:** Hacker News, Reddit r/programming, r/artificial, Dev.to, Twitter/X
+6. **LinkedIn post (separate angle):** "How I turned my AI workflow into a verifiable deliverable for clients" — targets the AI contractor audience directly
+7. **Second blog post (queue for week after launch):** "Your RAG pipeline is lying to you — and you can't prove it isn't"
+8. **Third blog post:** "What to include in an AI project deliverable beyond the code"
 
-**Revenue:** $0. Goal: 500+ GitHub stars, 100+ npm installs in first month.
+**Revenue:** $0-137 (soft-launch trials converting to first paying users). Goal: 500+ GitHub stars, 100+ npm installs in first month, 5+ Builder trial signups.
 
-**CRITICAL:** Do not start cloud development until you have signal from launch. If zero engagement, reassess positioning before investing 7 more weeks.
+**CRITICAL:** Do not abandon cloud development after launch. The cloud is live. Monitor trial-to-paid conversion. If zero trials after 2 weeks, reassess positioning — do not wait 6 months.
 
 ---
 
-### Weeks 15-16 — Cloud API + Mode 3 Delegation (20-30 hrs)
+### Weeks 15-16 — Cloud Full Feature Set + Mode 3 Delegation (20-30 hrs)
 
-**Only proceed if launch shows signal (stars, installs, questions, interest).**
+**Proceed in parallel with monitoring launch signal. The cloud is already live from Week 13 — this phase expands it.**
 
-1. **Postgres store** — same `RunStore` interface as JsonFileStore. Uses `pg` or Prisma. Optimistic concurrency via `WHERE version = $expected`.
+1. **Client Workspace full feature set** — affiliate commission tracking (developer gets credit toward their subscription for each Client Workspace their invite converts), client workspace parameter editor (client edits run-time input params, not workflow YAML), run history and evidence trail readable in the Workflow Player UI.
 
-2. **HTTP API** — Express or Fastify server. Same operations as MCP tools, exposed as REST endpoints. Auth via API keys.
-
-3. **Mode 3: Delegated execution MCP tools:**
+2. **Mode 3: Delegated execution MCP tools:**
    - `create_delegated_workflow` — master agent creates workflow, receives scoped handles
    - `get_step_context` — sub-agent retrieves its assigned task via handle
    - `submit_result` — sub-agent submits work, Realm validates
    - `get_delegation_status` — master agent reviews all sub-agent performance
    - `retry_step` — master agent re-assigns failed steps
 
-4. **Deploy** — Railway or Fly.io. Postgres via Neon or Supabase.
+5. **Deploy** — already live from Week 13. This phase adds the expanded Workflow Player UI and delegation features to the existing deployment.
 
-5. **User registration** — sign up, get API key, register workflows via API.
+6. **User registration** — already live from Week 13. This phase adds team seats (up to 3 on Solo, unlimited on Builder) and the Client Workspace invite flow.
 
 6. **A2A Agent Card generation** — emit delegation handles as A2A-compatible Agent Cards. `handle_id` maps to A2A `task_id`. Enables Mode 3 workflows to interoperate with any A2A-speaking agent runtime without changing the core engine.
 
@@ -610,9 +624,9 @@ steps:
 
 ### Week 21 — Billing (10-15 hrs)
 
-1. **Stripe integration** — $49/month plan.
-2. **Usage metering** — runs per month, documents indexed (for RAG pricing).
-3. **Free tier** — 100 runs/month, 500 indexed documents.
+1. **Stripe integration** — Solo ($29/month), Builder ($79/month), Client Workspace ($19/month per workspace). Already live from Week 13 for basic plans; this phase adds Client Workspace billing, usage metering for RAG, and affiliate commission payouts.
+2. **Usage metering** — runs per month, documents indexed (for RAG pricing). Free tier: 100 runs/month, 500 indexed documents.
+3. **Startup program backend** — manual approval queue, 6-month free Builder coupon generation, case study submission flow.
 
 **Milestone: Phase 4 complete. Cloud service live. First paying customers. RAG support.**
 
@@ -713,9 +727,96 @@ Every commit should leave the project in a working state. Every week should prod
 | 11 | Example 3 ships | `node examples/pr-description/driver.js` exits 0; full evidence chain printed |
 | 11 | Platform is general | Three different-complexity examples run on the same engine |
 | 11 | Multi-agent demo works | Example 3 uses 2 agent profiles, evidence records which profile ran each step |
-| 12 | Mode 2 works | An agent creates its own dynamic workflow via `create_workflow` and self-tracks |
-| 13 | Public launch | Repo public, npm published, multi-agent blog post live |
+| 12 | Mode 2 works | An agent creates its own dynamic workflow via `create_workflow` and self-tracks; runs appear in the cloud dashboard identically to YAML workflow runs |
+| 13 | Public launch | Repo public, npm published, multi-agent blog post live; cloud soft-launch live with Solo + Builder billing |
 | 15 | Mode 3 works | Master agent creates delegated workflow, sub-agents use handles, quality reports work. Handles emitted as A2A Agent Cards (MCP or A2A). |
 | 17 | Dashboard works | Web UI shows runs, evidence, workflow versions, per-agent performance |
-| 20 | Revenue | First paying customer on $49/month plan |
+| 20 | Revenue | First paying customers on Solo ($29) and Builder ($79) plans; Client Workspace ($19) active |
 | 30 | Ecosystem | 5+ adapters, 3+ domain bundles, Mode 4 if demand, $5K MRR |
+
+---
+
+## Backlog — Unscheduled Improvements
+
+Items identified through agent field testing (April 2026). Not yet assigned to a phase. Schedule when evidence from real usage confirms the priority.
+
+### 1. `output_schema` — symmetric output validation (Priority: High)
+
+**Origin:** Agent noted that step verification is "on-agent-honour" — a step succeeds as soon as `execute_step` is called regardless of what the agent actually produced.
+
+**Design:** Add an optional `output_schema` field to `StepDefinition`, symmetric with `input_schema`. The engine validates the agent's submitted `params` against this JSON Schema before committing the state transition. On failure, return `agent_action: 'provide_input'` and the agent must resubmit with corrected output. No backwards transition — the state does not change until validation passes.
+
+**Key design constraint:** `output_schema` must have access to the submitted `params` (not just run state) — otherwise it can only verify that the step was called, not what was produced. Validation that only sees run state adds no value over the existing model.
+
+**Distinction from shell command postconditions:** Shell command verification (e.g., "run `tsc` and check exit code") is a separate, harder problem requiring the engine to have shell access. It should not be designed alongside `output_schema` — different trust model, different security surface, different phase.
+
+**Cloud value:** Stronger evidence chain → stronger audit trail → stronger cloud conversion argument for compliance use cases (Pain Points 4 and 5).
+
+**Placement:** Likely Phase 4 (cloud launch window) or as a late Phase 3 engine addition. Depends on whether it's needed for any example.
+
+---
+
+### 2. Step evidence trace array (Priority: Medium)
+
+**Origin:** Agent observed that parallel internal work (e.g., reading 55 files in one turn) is completely invisible to Realm — the evidence only captures that the step ran, not what happened inside it.
+
+**Design:** Add an optional `trace` array to the `EvidenceSnapshot` structure. During `execute_step`, the agent may include a `trace` field in its submitted `params`, which is an array of structured observation records (e.g., `{ action, file, finding }`). The engine stores this in the evidence snapshot. No state machine changes — this is a schema extension to the existing evidence payload.
+
+**Distinction from parallel branches:** This is explicitly not parallel branches in the state machine. It is a way for an agent to record internal fan-out within a single step. The state machine stays linear.
+
+**Note:** The `output_summary` field already exists on `EvidenceSnapshot`. The `trace` array is additive alongside it, not a replacement.
+
+**Cloud value:** Richer evidence trail → more useful evidence viewer in the cloud dashboard → stronger observability story (Pain Point 4).
+
+**Placement:** Phase 4 or 5. Low implementation cost; high dashboard value.
+
+---
+
+### 3. Fork from step N (Priority: Medium-Low)
+
+**Origin:** Agent wanted to re-run a step with different inputs without restarting the entire run. "Step-level replay" was the original framing; "fork from step N" is the correct reframe.
+
+**Design:** Clone a run record up to step N-1 (assigning a new `run_id`, recording a `forked_from` reference to the origin run), then start execution from step N. No backwards state transitions — the fork is a new forward-only run that inherits evidence from the origin up to the fork point. The origin run record is not modified.
+
+**Implementation requirements:**
+- `RunRecord` needs a `forked_from?: { run_id: string; step: string }` field for audit trail integrity.
+- If the origin workflow was dynamically created (Mode 2), the workflow definition must be cloned alongside the run record — not just referenced, since dynamic workflow IDs may not persist.
+- CLI: `realm fork <run-id> --from <step-id>` creates the new run and prints the new `run_id`.
+
+**Distinction from `realm replay`:** `realm replay` re-evaluates stored evidence with overridden parameters, read-only, no new run. Fork from step N creates a live run that actually executes from that point.
+
+**Placement:** Phase 5 or later. Depends on demand — useful for iterative refinement workflows, not critical for initial adoption.
+
+---
+
+### 4. File diff capture in evidence (Priority: Low)
+
+**Origin:** Agent noted that after a step that modifies files, the evidence only records that the step ran — not what changed.
+
+**Design:** When a step produces output that includes a `modified_files` array (file paths), the engine captures a before/after diff for each file as part of the evidence snapshot. Scoped to file diffs only — JSON output deltas are underspecified and context-dependent. Diff format: unified diff, stored as a string field in the evidence snapshot alongside `output_summary`.
+
+**Trigger:** Opt-in via step definition (`capture_file_diffs: true`) rather than automatic, to avoid performance cost on steps that don't modify files.
+
+**Cloud value:** Directly useful in the evidence viewer — "show me what changed" is a natural audit question.
+
+**Placement:** Phase 5 or later. Useful but not critical for initial cloud adoption.
+
+---
+
+### 5. AbortSignal propagation through `withTimeout` (Priority: Pre-Phase-4 prerequisite)
+
+**Origin:** GitHub issue. Introduced in Phase 1b Week 4 (step timeouts). Deferred with the comment `"Acceptable for Phase 1"` in `execution-loop.ts`. Phase 1, 2, and 3 are now complete — the comment is stale.
+
+**Problem:** `withTimeout` uses `Promise.race`. When the timeout fires, the underlying `StepDispatcher` promise continues running in the background. For `GenericHttpAdapter`, the `fetch()` call holds a connection slot open and can cause duplicate side effects on retried steps. No `AbortController` is created; no signal is propagated anywhere in the chain.
+
+**Required changes (five files, all bounded):**
+
+1. `StepDispatcher` type — add `signal?: AbortSignal` as 4th parameter.
+2. `ServiceAdapter.fetch / create / update` — add `signal?: AbortSignal` as 4th parameter.
+3. `withTimeout` in `execution-loop.ts` — create `AbortController`, call `controller.abort()` after the timeout fires, pass `controller.signal` to the dispatcher call.
+4. `GenericHttpAdapter.request()` in `http-adapter.ts` — accept `signal?: AbortSignal`, forward to `fetch(url, { ...fetchOptions, signal })`.
+5. `MockAdapter` — accept `signal?: AbortSignal`, check `signal?.aborted` at the start of each method and reject with an `AbortError`-shaped error if aborted.
+
+**Timing constraint:** All Phase 1-3 tests use `MockAdapter` or inline lambda dispatchers — no real HTTP calls flow through `GenericHttpAdapter` today. The practical impact is still theoretical. However, `StepDispatcher` and `ServiceAdapter` are public interfaces. Adding optional parameters is backward-compatible in TypeScript, but the zero-cost window for any interface change closes at the first `npm publish` (Phase 4 Week 14). This must be done **before Week 14**, not after.
+
+**Placement:** Complete during the pre-publication documentation pass (Phase 4 Week 13), before `npm publish`. Remove the stale `"Acceptable for Phase 1"` comment as part of the change.

@@ -372,7 +372,7 @@ Configure your AI client. **Claude Desktop** (`~/Library/Application Support/Cla
 }
 ```
 
-The agent has access to 6 MCP tools:
+The agent has access to 7 MCP tools:
 
 | Tool | Description |
 |------|-------------|
@@ -382,10 +382,36 @@ The agent has access to 6 MCP tools:
 | `execute_step` | Submit output for the current agent step |
 | `submit_human_response` | Approve or reject a human gate |
 | `get_run_state` | Inspect the current state of a run |
+| `create_workflow` | Register a dynamic workflow at runtime and immediately start a run |
 
 The agent should call `list_workflows` first to discover what is registered, then
 `get_workflow_protocol` for the matched workflow before calling `start_run`. The protocol is
 embedded in each workflow definition and provides exact instructions for what to do at each step.
+
+### Mode 2: self-directed execution with `create_workflow`
+
+When no pre-registered workflow matches the task, an agent can define its own multi-step plan at runtime:
+
+```
+create_workflow
+  steps:
+    - id: research_problem
+      description: "Audit all JSDoc comments in the repository and list files with missing or inaccurate docs."
+    - id: generate_fixes
+      description: "For each file identified in the previous step, generate corrected JSDoc."
+      input_schema:
+        type: object
+        properties:
+          audit_summary: { type: string }
+        required: [audit_summary]
+  metadata:
+    name: jsdoc-audit
+    task_description: "Audit and fix JSDoc across the codebase."
+```
+
+`create_workflow` registers the workflow and starts a run in one call — no YAML file, no `realm register`. The response includes `data.workflow_id` and a `next_action` pointing at the first step. The agent then uses `execute_step` exactly as it would for a YAML workflow.
+
+Runs created by `create_workflow` carry the same evidence chain, `next_action` guidance, and state machine enforcement as YAML-registered runs. See [`.github/instructions/realm-create-workflow.instructions.md`](../.github/instructions/realm-create-workflow.instructions.md) for the full protocol.
 
 ### Using multiple workflows
 
@@ -507,3 +533,21 @@ realm cleanup --older-than 30d    # abandon runs idle for 30+ days
 
 - Browse the [`examples/code-review/`](../examples/code-review/workflow.yaml) workflow for a realistic 3-step pattern with a service adapter, OWASP security review, and a human gate.
 - Read the [`@sensigo/realm` source](../packages/core/src/index.ts) for the full public API.
+
+---
+
+## Delivering Workflows to Clients
+
+Realm's open source engine runs entirely on your machine with no cloud dependency. When you build a workflow for a client, you have two delivery options:
+
+**Option 1 — Self-hosted:** The client runs `realm-mcp` locally and connects it to their own AI agent. Suitable for developer clients comfortable with the CLI.
+
+**Option 2 — Realm Cloud (Workflow Player):** Deploy the workflow to Realm Cloud with `realm deploy`. The client receives a URL to their Workflow Player — a simple web interface where they can trigger runs, fill in run-time input parameters, respond to human gate prompts, and view the full audit trail. No MCP, no AI agent, no CLI required on the client's end.
+
+```bash
+realm deploy ./my-workflow    # push workflow to Realm Cloud, returns dashboard URL
+```
+
+The Workflow Player lets clients modify the *inputs* of a run (e.g., which document to process, which data to extract) without touching the workflow definition. You own the YAML; they operate it.
+
+[Realm Cloud plans →](https://realm.dev/#cloud) · [Startup program →](https://realm.dev/startups)
