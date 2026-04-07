@@ -25,6 +25,15 @@ class FailingHandler implements StepHandler {
   }
 }
 
+/** A handler that returns { confidence: value } for on_success routing tests. */
+class ConfidenceHandler implements StepHandler {
+  constructor(private readonly value: string) {}
+  readonly id = 'confidence_handler';
+  async execute(_inputs: StepHandlerInputs, _ctx: StepContext): Promise<StepHandlerResult> {
+    return { data: { confidence: this.value } };
+  }
+}
+
 /** Workflow: auto failing step → on_error → agent recovery step */
 function makeOnErrorToAgentWorkflow(): WorkflowDefinition {
   return {
@@ -260,6 +269,197 @@ describe('on_error branching', () => {
     expect(result.chained_auto_steps![0]!.step).toBe('validate');
     expect(result.chained_auto_steps![0]!.produced_state).toBe('recovery_needed');
     expect(result.chained_auto_steps![0]!.branched_via).toBe('on_error');
+  });
+
+  it('cleanup', async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe('on_success branching', () => {
+  let dir: string;
+  let store: JsonFileStore;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'realm-on-success-test-'));
+    store = new JsonFileStore(dir);
+  });
+
+  function makeOnSuccessWorkflow(): WorkflowDefinition {
+    return {
+      id: 'on-success-wf',
+      name: 'On Success Workflow',
+      version: 1,
+      initial_state: 'started',
+      steps: {
+        check_identity: {
+          description: 'Check identity confidence',
+          execution: 'auto',
+          handler: 'confidence_handler',
+          allowed_from_states: ['started'],
+          produces_state: 'identity_checked',
+          transitions: {
+            on_success: {
+              field: 'confidence',
+              routes: {
+                high: { step: 'extract', produces_state: 'identity_confirmed' },
+                low: { step: 'manual_confirm', produces_state: 'identity_uncertain' },
+              },
+              default: { step: 'manual_confirm', produces_state: 'identity_uncertain' },
+            },
+          },
+        },
+        extract: {
+          description: 'Extract description (auto)',
+          execution: 'auto',
+          allowed_from_states: ['identity_confirmed'],
+          produces_state: 'extracted',
+        },
+        manual_confirm: {
+          description: 'Manual confirmation step',
+          execution: 'agent',
+          allowed_from_states: ['identity_uncertain'],
+          produces_state: 'confirmed',
+        },
+      },
+    };
+  }
+
+  it('on_success high confidence routes to extract step', async () => {
+    const definition = makeOnSuccessWorkflow();
+    const guard = new StateGuard(definition);
+    const registry = new ExtensionRegistry();
+    registry.register('handler', 'confidence_handler', new ConfidenceHandler('high'));
+
+    const run = await store.create({
+      workflowId: definition.id,
+      workflowVersion: 1,
+      initialState: 'started',
+      params: {},
+    });
+
+    const result = await executeChain(store, guard, definition, {
+      runId: run.id,
+      command: 'check_identity',
+      input: {},
+      snapshotId: run.version.toString(),
+      dispatcher: passthroughDispatcher,
+      registry,
+    });
+
+    expect(result.status).toBe('ok');
+    // extract is auto — chain runs through it to terminal state
+    const updatedRun = await store.get(run.id);
+    expect(updatedRun.state).toBe('extracted');
+    expect(result.chained_auto_steps).toBeDefined();
+    expect(result.chained_auto_steps![0]!.step).toBe('check_identity');
+    expect(result.chained_auto_steps![0]!.produced_state).toBe('identity_confirmed');
+    expect(result.chained_auto_steps![0]!.branched_via).toBe('on_success');
+  });
+
+  it('on_success low confidence routes to manual_confirm (agent) step', async () => {
+    const definition = makeOnSuccessWorkflow();
+    const guard = new StateGuard(definition);
+    const registry = new ExtensionRegistry();
+    registry.register('handler', 'confidence_handler', new ConfidenceHandler('low'));
+
+    const run = await store.create({
+      workflowId: definition.id,
+      workflowVersion: 1,
+      initialState: 'started',
+      params: {},
+    });
+
+    const result = await executeChain(store, guard, definition, {
+      runId: run.id,
+      command: 'check_identity',
+      input: {},
+      snapshotId: run.version.toString(),
+      dispatcher: passthroughDispatcher,
+      registry,
+    });
+
+    expect(result.status).toBe('ok');
+    const updatedRun = await store.get(run.id);
+    expect(updatedRun.state).toBe('identity_uncertain');
+    expect(result.next_action?.instruction?.tool).toBe('execute_step');
+    expect((result.next_action?.instruction?.params as Record<string, unknown>)?.['command']).toBe('manual_confirm');
+    expect(result.chained_auto_steps).toBeDefined();
+    expect(result.chained_auto_steps![0]!.produced_state).toBe('identity_uncertain');
+    expect(result.chained_auto_steps![0]!.branched_via).toBe('on_success');
+  });
+
+  it('on_success unknown value uses default route', async () => {
+    const definition = makeOnSuccessWorkflow();
+    const guard = new StateGuard(definition);
+    const registry = new ExtensionRegistry();
+    registry.register('handler', 'confidence_handler', new ConfidenceHandler('unknown_value'));
+
+    const run = await store.create({
+      workflowId: definition.id,
+      workflowVersion: 1,
+      initialState: 'started',
+      params: {},
+    });
+
+    const result = await executeChain(store, guard, definition, {
+      runId: run.id,
+      command: 'check_identity',
+      input: {},
+      snapshotId: run.version.toString(),
+      dispatcher: passthroughDispatcher,
+      registry,
+    });
+
+    expect(result.status).toBe('ok');
+    const updatedRun = await store.get(run.id);
+    expect(updatedRun.state).toBe('identity_uncertain');
+    expect(result.chained_auto_steps![0]!.branched_via).toBe('on_success');
+    expect(result.chained_auto_steps![0]!.produced_state).toBe('identity_uncertain');
+  });
+
+  it('step without on_success uses top-level produces_state (backward compat)', async () => {
+    const definition: WorkflowDefinition = {
+      id: 'no-on-success-wf',
+      name: 'No On Success',
+      version: 1,
+      initial_state: 'started',
+      steps: {
+        check_identity: {
+          description: 'Check (no on_success)',
+          execution: 'auto',
+          handler: 'confidence_handler',
+          allowed_from_states: ['started'],
+          produces_state: 'identity_checked',
+        },
+      },
+    };
+    const guard = new StateGuard(definition);
+    const registry = new ExtensionRegistry();
+    registry.register('handler', 'confidence_handler', new ConfidenceHandler('high'));
+
+    const run = await store.create({
+      workflowId: definition.id,
+      workflowVersion: 1,
+      initialState: 'started',
+      params: {},
+    });
+
+    const result = await executeChain(store, guard, definition, {
+      runId: run.id,
+      command: 'check_identity',
+      input: {},
+      snapshotId: run.version.toString(),
+      dispatcher: passthroughDispatcher,
+      registry,
+    });
+
+    expect(result.status).toBe('ok');
+    const updatedRun = await store.get(run.id);
+    expect(updatedRun.state).toBe('identity_checked');
+    if (result.chained_auto_steps !== undefined) {
+      expect(result.chained_auto_steps.every((s) => s.branched_via === undefined)).toBe(true);
+    }
   });
 
   it('cleanup', async () => {

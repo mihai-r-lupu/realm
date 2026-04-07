@@ -145,7 +145,14 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
   const reachableStates = new Set<string>([initialState]);
   for (const [, stepRaw] of Object.entries(stepsRaw)) {
     const step = stepRaw as Record<string, unknown>;
-    if (typeof step['produces_state'] === 'string') {
+    // When a step has on_success, its top-level produces_state is a dead fallback
+    // that is never written to the store. Exclude it from reachable states so that
+    // target steps do not list it in their allowed_from_states.
+    const hasOnSuccess =
+      typeof step['transitions'] === 'object' &&
+      step['transitions'] !== null &&
+      'on_success' in (step['transitions'] as object);
+    if (typeof step['produces_state'] === 'string' && !hasOnSuccess) {
       reachableStates.add(step['produces_state']);
     }
     // Transition produces_state values are intermediate states written directly;
@@ -156,6 +163,20 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
         const t = tRaw as Record<string, unknown>;
         if (typeof t['produces_state'] === 'string') {
           reachableStates.add(t['produces_state']);
+        }
+        // Handle on_success routes: extract produces_state from each route and default.
+        const rawRoutes = t['routes'];
+        if (typeof rawRoutes === 'object' && rawRoutes !== null) {
+          for (const routeRaw of Object.values(rawRoutes as Record<string, unknown>)) {
+            const r = routeRaw as Record<string, unknown>;
+            if (typeof r['produces_state'] === 'string') {
+              reachableStates.add(r['produces_state']);
+            }
+          }
+        }
+        const defaultRoute = t['default'] as Record<string, unknown> | undefined;
+        if (typeof defaultRoute?.['produces_state'] === 'string') {
+          reachableStates.add(defaultRoute['produces_state']);
         }
       }
     }
@@ -209,8 +230,14 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
       );
     }
 
-    // Step 5: produces_state uniqueness
-    if (typeof step['produces_state'] === 'string') {
+    // Step 5: produces_state uniqueness (skip when on_success is present — the fallback
+    // produces_state is never written; route states govern reachability instead).
+    const hasOnSuccess =
+      typeof step['transitions'] === 'object' &&
+      step['transitions'] !== null &&
+      'on_success' in (step['transitions'] as object);
+
+    if (typeof step['produces_state'] === 'string' && !hasOnSuccess) {
       const ps = step['produces_state'];
       const prev = seenProducedStates.get(ps);
       if (prev !== undefined) {
@@ -246,6 +273,44 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
           if (step['execution'] !== 'auto') {
             errors.push(`Step '${stepName}': 'on_error' transition is only valid on execution: auto steps`);
           }
+        } else if (transitionKey === 'on_success') {
+          if (step['execution'] !== 'auto') {
+            errors.push(`Step '${stepName}': 'on_success' transition is only valid on execution: auto steps`);
+          }
+          if (typeof t['field'] !== 'string' || t['field'] === '') {
+            errors.push(`Step '${stepName}': 'on_success' transition is missing a non-empty 'field'`);
+          }
+          const routes = t['routes'];
+          if (typeof routes !== 'object' || routes === null || Object.keys(routes as object).length === 0) {
+            errors.push(`Step '${stepName}': 'on_success.routes' must be an object with at least one key`);
+          }
+          if (typeof t['default'] !== 'object' || t['default'] === null) {
+            errors.push(`Step '${stepName}': 'on_success' transition is missing a 'default'`);
+          }
+          const routeEntries: Array<[string, unknown]> = [
+            ...Object.entries((routes as Record<string, unknown>) ?? {}),
+            ['default', t['default']],
+          ];
+          for (const [routeKey, routeRaw] of routeEntries) {
+            if (typeof routeRaw !== 'object' || routeRaw === null) continue;
+            const route = routeRaw as Record<string, unknown>;
+            const targetStep = route['step'];
+            if (typeof targetStep !== 'string') {
+              errors.push(`Step '${stepName}': on_success route '${routeKey}' is missing 'step'`);
+            } else if (!(targetStep in stepsRaw)) {
+              errors.push(`Step '${stepName}': on_success route '${routeKey}' targets unknown step '${targetStep}'`);
+            } else {
+              const routeProducesState = route['produces_state'];
+              if (typeof routeProducesState === 'string') {
+                const targetStepRaw = stepsRaw[targetStep] as Record<string, unknown> | undefined;
+                const targetAllowedFrom = targetStepRaw?.['allowed_from_states'];
+                if (Array.isArray(targetAllowedFrom) && !(targetAllowedFrom as unknown[]).includes(routeProducesState)) {
+                  errors.push(`Step '${stepName}': on_success route '${routeKey}' produces_state '${routeProducesState}' is not in step '${targetStep}'.allowed_from_states`);
+                }
+              }
+            }
+          }
+          continue; // Skip the flat-map step/produces_state checks below.
         } else {
           // Non-on_error keys must match a gate choice (if gate.choices is declared).
           const gateChoices = (step['gate'] as Record<string, unknown> | undefined)?.['choices'];

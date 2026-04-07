@@ -9,7 +9,7 @@ import type { ServiceAdapter, ServiceResponse } from '../extensions/service-adap
  * Supported operations: 'read' — reads a file at `params.path` and returns content metadata.
  */
 export class FileSystemAdapter implements ServiceAdapter {
-  constructor(public readonly id: string) {}
+  constructor(public readonly id: string) { }
 
   async fetch(
     operation: string,

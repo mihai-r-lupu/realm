@@ -36,6 +36,19 @@ export interface RetryConfig {
   base_delay_ms: number;
 }
 
+/** Target of a simple (flat) transition — on_error and gate on_<choice>. */
+export interface SimpleTransition {
+  step: string;
+  produces_state: string;
+}
+
+/** on_success transition — routes based on a named field in handler output. */
+export interface OnSuccessTransition {
+  field: string;
+  routes: Record<string, SimpleTransition>;
+  default: SimpleTransition;
+}
+
 export interface StepDefinition {
   description: string;
   execution: ExecutionMode;
@@ -69,7 +82,11 @@ export interface StepDefinition {
   /** Gate configuration — choices available to the human reviewer. */
   gate?: { choices?: string[] };
   /** Conditional routing based on step outcome or gate response. */
-  transitions?: Record<string, { step: string; produces_state: string }>;
+  transitions?: {
+    on_error?: SimpleTransition;
+    on_success?: OnSuccessTransition;
+    [key: string]: SimpleTransition | OnSuccessTransition | undefined;
+  };
   /** Name of the agent profile for this step. Only valid on execution: 'agent' steps. */
   agent_profile?: string;
 }

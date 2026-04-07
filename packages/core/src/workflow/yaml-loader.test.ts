@@ -202,6 +202,97 @@ steps:
       expect((err as WorkflowError).message).toContain("transition key 'on_cancel' is not in gate choices");
     }
   });
+
+  const ON_SUCCESS_BASE = `
+id: on-success-wf
+name: On Success Workflow
+version: 1
+initial_state: created
+steps:
+  check_step:
+    description: Check step
+    execution: auto
+    handler: check_handler
+    allowed_from_states: [created]
+    produces_state: checked_fallback
+    transitions:
+      on_success:
+        field: confidence
+        routes:
+          high:
+            step: extract_step
+            produces_state: identity_confirmed
+          low:
+            step: confirm_step
+            produces_state: identity_uncertain
+        default:
+          step: confirm_step
+          produces_state: identity_uncertain
+  extract_step:
+    description: Extract step
+    execution: auto
+    allowed_from_states: [identity_confirmed]
+    produces_state: extracted
+  confirm_step:
+    description: Confirm step
+    execution: agent
+    allowed_from_states: [identity_uncertain]
+    produces_state: confirmed
+`;
+
+  it('valid on_success workflow loads without error', () => {
+    const def = loadWorkflowFromString(ON_SUCCESS_BASE);
+    expect(def.steps['check_step']?.transitions?.['on_success']).toBeDefined();
+  });
+
+  it('on_success on agent step throws WorkflowError', () => {
+    const content = ON_SUCCESS_BASE.replace(
+      'execution: auto\n    handler: check_handler',
+      'execution: agent',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("'on_success' transition is only valid on execution: auto steps");
+    }
+  });
+
+  it('on_success missing field throws WorkflowError', () => {
+    const content = ON_SUCCESS_BASE.replace('        field: confidence\n', '');
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("'on_success' transition is missing a non-empty 'field'");
+    }
+  });
+
+  it('on_success route targeting unknown step throws WorkflowError', () => {
+    const content = ON_SUCCESS_BASE.replace(
+      'step: extract_step\n            produces_state: identity_confirmed',
+      'step: nonexistent_step\n            produces_state: identity_confirmed',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("targets unknown step 'nonexistent_step'");
+    }
+  });
+
+  it('on_success route produces_state not in target allowed_from_states throws WorkflowError', () => {
+    const content = ON_SUCCESS_BASE.replace(
+      'step: extract_step\n            produces_state: identity_confirmed',
+      'step: extract_step\n            produces_state: wrong_state',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("produces_state 'wrong_state' is not in step 'extract_step'.allowed_from_states");
+    }
+  });
 });
 
 describe('loadWorkflowFromFile', () => {

@@ -19,7 +19,7 @@ export class MockServiceRecorder implements ServiceAdapter {
   constructor(
     public readonly id: string,
     private readonly responses: Record<string, ServiceResponse>,
-  ) {}
+  ) { }
 
   async fetch(
     operation: string,
