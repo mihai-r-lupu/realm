@@ -184,9 +184,40 @@ All notable changes to this project are documented here.
   non-`WorkflowError` — it does not) has been removed.
 - Stale `"Acceptable for Phase 1"` comment removed from `execution-loop.ts` alongside the
   `withTimeout` refactor that resolved the underlying issue.
+- `SimpleTransition` and `OnSuccessTransition` types exported from `@sensigo/realm` —
+  `SimpleTransition` is the shared `{ step, produces_state }` shape used by `on_error` and
+  gate-response transitions; `OnSuccessTransition` is `{ field, routes, default }` for output-field
+  routing. `StepDefinition.transitions` is now a named-key + index-signature type rather than a plain
+  `Record<string, ...>`, which makes all three transition forms individually typed.
+- `on_success` routing on `execution: auto` steps — when a step defines
+  `transitions.on_success`, the engine reads the named `field` from the handler's output, looks up
+  the string value in `routes`, and falls back to `default` when no key matches. The winning
+  `produces_state` is written to the store; the run chain continues from the winning `step`.
+  `on_success` is restricted to `execution: auto` steps — using it on an `execution: agent` step
+  is a hard validation error at register time.
+- YAML loader extended for `on_success` — the reachability pre-pass now adds
+  `routes[*].produces_state` and `default.produces_state` to reachable states and skips the
+  top-level `produces_state` fallback when `on_success` is present. The uniqueness check applies
+  the same exclusion. The transitions validator adds a dedicated `on_success` branch that checks:
+  non-empty `field`, at least one `routes` key, a `default` present, all target steps exist in the
+  workflow, and each route's `produces_state` is in the target step's `allowed_from_states`.
+- `branched_via: 'on_success'` on `chained_auto_steps` entries — when a route is taken, the
+  chain accumulator records `branched_via: 'on_success'` alongside the step name and the actual
+  persisted `produced_state` (the accumulator push was also moved to after `store.get` so it always
+  reflects the committed state, not the definition fallback).
+- `ProtocolStep.transitions` type in the MCP protocol generator updated to match the named-key
+  `StepDefinition.transitions` shape, importing `SimpleTransition` and `OnSuccessTransition` from
+  `@sensigo/realm`.
+
+### Fixed
+- Gate response look-up in `submitHumanResponse` — after `StepDefinition.transitions` changed
+  from a flat `Record<string, { step; produces_state }>` to a discriminated-key union, the
+  expression `stepDef.transitions?.[transitionKey]` no longer had `.produces_state` visible to
+  TypeScript. Added a `SimpleTransition` cast that is safe because gate-choice keys (`on_approve`,
+  `on_reject`, etc.) can never be `on_success`.
 
 ### Tests
-316 tests across all packages (205 core, 42 CLI, 29 MCP, 40 testing).
+326 tests across all packages (215 core, 42 CLI, 29 MCP, 40 testing).
 
 ---
 
