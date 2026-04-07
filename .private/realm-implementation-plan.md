@@ -854,3 +854,43 @@ Items identified through agent field testing (April 2026). Not yet assigned to a
 **Placement:** Complete during the pre-publication documentation pass (Phase 4 Week 13), before `npm publish`. Remove the stale `"Acceptable for Phase 1"` comment as part of the change.
 
 **Delivered:** All five required changes implemented and tested. `StepHandler.execute()` signal param and `callHandler` forwarding also added (not in original scope but required for end-to-end propagation). 2 new abort tests in `reliability.test.ts`. 316 tests total, all passing.
+
+---
+
+### 6. `on_success` output-routing transitions (Priority: High) — Phase 16
+
+**Origin:** Design doc Section 4 “Conditional branching”. Required by Example 3 (`check_repo_identity` identity gate bypass). `on_error` and gate `on_<choice>` transitions were shipped in Phase 12; `on_success` was explicitly deferred.
+
+**Problem:** There is no way for an `execution: auto` step to route to different successor steps based on its output. The identity-gate bypass in Example 3 requires that when `check_repo_identity` returns `{ confidence: 'high' }` the run skips the gate and proceeds directly to `extract_description`, but when it returns `{ confidence: 'low' }` the run pauses at `confirm_identity`. Without `on_success`, Example 3 cannot be built as designed.
+
+**Design (finalized, no open questions):** Enum dispatch on a named output field. The step YAML declares which field to inspect and maps string values to `{ step, produces_state }` pairs, with a required `default`.
+
+```yaml
+check_repo_identity:
+  execution: auto
+  handler: check_repo_identity
+  allowed_from_states: [issues_fetched]
+  produces_state: identity_checked        # fallback if on_success absent
+  transitions:
+    on_success:
+      field: confidence
+      routes:
+        high: { step: extract_description, produces_state: identity_confirmed }
+        low:  { step: confirm_identity,   produces_state: identity_uncertain }
+      default: { step: confirm_identity, produces_state: identity_uncertain }
+```
+
+**Required changes (8 points across 4 files):**
+
+1. `workflow-definition.ts` — add `SimpleTransition` and `OnSuccessTransition` interfaces; update `transitions` field on `StepDefinition` to named-fields + index signature.
+2. `execution-loop.ts` L710 — replace `const newState = stepDef!.produces_state` with enum dispatch block reading `on_success.field` from handler output.
+3. `execution-loop.ts` accumulator — move `chainedSteps.push` to after `store.get`; use `run.state`; add `branched_via: 'on_success'` when a route was taken.
+4. `yaml-loader.ts` pre-pass — extract `routes[*].produces_state` + `default.produces_state` into `reachableStates`; guard `step.produces_state` add behind `!hasOnSuccess`.
+5. `yaml-loader.ts` uniqueness check — skip top-level `produces_state` in uniqueness map when step has `on_success`.
+6. `yaml-loader.ts` validation loop — add `else if (transitionKey === 'on_success')` branch: validate `field`, `routes`, `default`, target steps, `produces_state` in `allowed_from_states`; reject on `execution: 'agent'` steps.
+7. `generator.ts` — update `ProtocolStep.transitions` type to accept `OnSuccessTransition` for `on_success` key.
+8. Tests — 9 new tests (5 branching, 4 yaml-loader). All 316 existing tests must pass.
+
+**Constraints:** Zero changes to `on_error`, `on_<choice>`, or any existing branching code path. 100% backward-compatible.
+
+**Timing:** Must land before Example 3 can be built. Prompt file: `prompts/phase-16-on-success-branching.md`.
