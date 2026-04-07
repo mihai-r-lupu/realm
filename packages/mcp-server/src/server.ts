@@ -10,6 +10,7 @@ import { registerStartRun } from './tools/start-run.js';
 import { registerExecuteStep } from './tools/execute-step.js';
 import { registerSubmitHumanResponse } from './tools/submit-human-response.js';
 import { registerGetRunState } from './tools/get-run-state.js';
+import { registerCreateWorkflow } from './tools/create-workflow.js';
 
 export interface RealmMcpServerOptions {
   /** Extension registry for resolving service adapters and step handlers at runtime. */
@@ -24,7 +25,7 @@ export interface RealmMcpServerOptions {
 }
 
 /**
- * Creates and configures the Realm MCP server with all 6 workflow tools.
+ * Creates and configures the Realm MCP server with all 7 workflow tools.
  * Pass `registry` and `secrets` to enable auto steps that use service adapters
  * or custom step handlers.
  */
@@ -40,6 +41,7 @@ export function createRealmMcpServer(options?: RealmMcpServerOptions): McpServer
   registerExecuteStep(server, options);
   registerSubmitHumanResponse(server, options);
   registerGetRunState(server, options);
+  registerCreateWorkflow(server, options);
 
   return server;
 }
