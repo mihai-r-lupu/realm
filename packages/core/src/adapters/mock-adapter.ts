@@ -30,7 +30,16 @@ export class MockAdapter implements ServiceAdapter {
     operation: string,
     _params: Record<string, unknown>,
     _config: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<ServiceResponse> {
+    if (signal?.aborted === true) {
+      throw new WorkflowError('MockAdapter: request aborted', {
+        code: 'STEP_ABORTED',
+        category: 'ENGINE',
+        agentAction: 'report_to_user',
+        retryable: false,
+      });
+    }
     return this.resolve(operation);
   }
 
@@ -38,7 +47,16 @@ export class MockAdapter implements ServiceAdapter {
     operation: string,
     _params: Record<string, unknown>,
     _config: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<ServiceResponse> {
+    if (signal?.aborted === true) {
+      throw new WorkflowError('MockAdapter: request aborted', {
+        code: 'STEP_ABORTED',
+        category: 'ENGINE',
+        agentAction: 'report_to_user',
+        retryable: false,
+      });
+    }
     return this.resolve(operation);
   }
 
@@ -46,7 +64,16 @@ export class MockAdapter implements ServiceAdapter {
     operation: string,
     _params: Record<string, unknown>,
     _config: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<ServiceResponse> {
+    if (signal?.aborted === true) {
+      throw new WorkflowError('MockAdapter: request aborted', {
+        code: 'STEP_ABORTED',
+        category: 'ENGINE',
+        agentAction: 'report_to_user',
+        retryable: false,
+      });
+    }
     return this.resolve(operation);
   }
 }

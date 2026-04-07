@@ -23,6 +23,7 @@ export type StepDispatcher = (
   stepName: string,
   input: Record<string, unknown>,
   run: RunRecord,
+  signal?: AbortSignal,
 ) => Promise<Record<string, unknown>>;
 
 export interface ExecuteStepOptions {
@@ -66,28 +67,36 @@ function delayMs(ms: number): Promise<void> {
 }
 
 /**
- * Wraps a promise with a timeout. If the timeout fires first, rejects with STEP_TIMEOUT.
- * NOTE: if timeout fires, the original promise continues running in the background
- * (Promises cannot be cancelled in JavaScript). Acceptable for Phase 1.
+ * Executes `dispatch` with a cancellation signal. If `dispatch` does not complete within `ms`
+ * milliseconds, the signal is aborted and a STEP_TIMEOUT WorkflowError is thrown. The signal
+ * cancels any in-flight fetch() calls inside the dispatcher.
  */
-function withTimeout<T>(promise: Promise<T>, ms: number, stepName: string): Promise<T> {
+function withTimeout<T>(
+  dispatch: (signal: AbortSignal) => Promise<T>,
+  ms: number,
+  stepName: string,
+): Promise<T> {
+  const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout>;
+
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () =>
-        reject(
-          new WorkflowError(`Step '${stepName}' timed out after ${ms}ms`, {
-            code: 'STEP_TIMEOUT',
-            category: 'ENGINE',
-            agentAction: 'report_to_user',
-            retryable: false,
-            details: { stepName, timeout_ms: ms },
-          }),
-        ),
-      ms,
-    );
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(
+        new WorkflowError(`Step '${stepName}' timed out after ${ms}ms`, {
+          code: 'STEP_TIMEOUT',
+          category: 'ENGINE',
+          agentAction: 'report_to_user',
+          retryable: false,
+          details: { stepName, timeout_ms: ms },
+        }),
+      );
+    }, ms);
   });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+
+  return Promise.race([dispatch(controller.signal), timeout]).finally(() =>
+    clearTimeout(timer),
+  );
 }
 
 /** Computes the delay (ms) before a retry attempt based on the configured backoff strategy. */
@@ -111,6 +120,7 @@ async function callAdapter(
   stepDef: StepDefinition,
   definition: WorkflowDefinition,
   options: ExecuteStepOptions,
+  signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
   const serviceName = stepDef.uses_service!;
   const serviceDef = definition.services?.[serviceName];
@@ -150,7 +160,7 @@ async function callAdapter(
 
   let response: ServiceResponse;
   try {
-    response = await adapter[method](operation, options.input, config);
+    response = await adapter[method](operation, options.input, config, signal);
   } catch (err) {
     if (err instanceof WorkflowError) throw err;
     const message = err instanceof Error ? err.message : String(err);
@@ -488,17 +498,18 @@ export async function executeStep(
     try {
       // For auto steps, resolve the correct callable from the registry.
       // For agent steps (or auto steps without a service/handler), use the caller's dispatcher.
-      let call: Promise<Record<string, unknown>>;
-      if (stepDef?.execution === 'auto' && stepDef.uses_service !== undefined) {
-        call = callAdapter(stepDef, definition, options);
-      } else if (stepDef?.execution === 'auto' && stepDef.handler !== undefined) {
-        call = callHandler(stepDef, options, pendingRun, evidenceByStep);
-      } else {
-        call = options.dispatcher(options.command, options.input, pendingRun);
-      }
+      const makeCall = (signal?: AbortSignal): Promise<Record<string, unknown>> => {
+        if (stepDef?.execution === 'auto' && stepDef.uses_service !== undefined) {
+          return callAdapter(stepDef, definition, options, signal);
+        } else if (stepDef?.execution === 'auto' && stepDef.handler !== undefined) {
+          return callHandler(stepDef, options, pendingRun, evidenceByStep);
+        } else {
+          return options.dispatcher(options.command, options.input, pendingRun, signal);
+        }
+      };
       attemptOutput = timeoutMs !== undefined
-        ? await withTimeout(call, timeoutMs, options.command)
-        : await call;
+        ? await withTimeout((signal) => makeCall(signal), timeoutMs, options.command)
+        : await makeCall();
     } catch (err) {
       if (err instanceof WorkflowError) {
         attemptError = err;

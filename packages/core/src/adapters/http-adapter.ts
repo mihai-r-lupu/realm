@@ -44,6 +44,7 @@ export class GenericHttpAdapter implements ServiceAdapter {
     operation: string,
     params: Record<string, unknown>,
     callConfig: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<ServiceResponse> {
     // Only per-call headers can be merged — base_url and auth are constructor-time
     // security boundaries that callers must not override.
@@ -62,17 +63,28 @@ export class GenericHttpAdapter implements ServiceAdapter {
 
     const fetchOptions: RequestInit =
       method === 'GET'
-        ? { method, headers: baseHeaders }
+        ? { method, headers: baseHeaders, signal: signal ?? null }
         : {
           method,
           headers: { ...baseHeaders, 'Content-Type': 'application/json' },
           body: JSON.stringify(params),
+          signal: signal ?? null,
         };
 
     let response: Response;
     try {
       response = await fetch(url, fetchOptions);
     } catch (err) {
+      // AbortError means the engine cancelled this request (e.g. step timeout).
+      // Do not categorize as a network failure — the engine already recorded the reason.
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new WorkflowError(`Adapter request aborted`, {
+          code: 'STEP_ABORTED',
+          category: 'ENGINE',
+          agentAction: 'report_to_user',
+          retryable: false,
+        });
+      }
       const message = err instanceof Error ? err.message : String(err);
       throw new WorkflowError(message, {
         code: 'NETWORK_UNREACHABLE',
@@ -100,23 +112,26 @@ export class GenericHttpAdapter implements ServiceAdapter {
     operation: string,
     params: Record<string, unknown>,
     config: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<ServiceResponse> {
-    return this.request('GET', operation, params, config);
+    return this.request('GET', operation, params, config, signal);
   }
 
   create(
     operation: string,
     params: Record<string, unknown>,
     config: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<ServiceResponse> {
-    return this.request('POST', operation, params, config);
+    return this.request('POST', operation, params, config, signal);
   }
 
   update(
     operation: string,
     params: Record<string, unknown>,
     config: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<ServiceResponse> {
-    return this.request('PATCH', operation, params, config);
+    return this.request('PATCH', operation, params, config, signal);
   }
 }
