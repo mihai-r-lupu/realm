@@ -23,5 +23,14 @@ export interface StepHandlerResult {
 
 export interface StepHandler {
   readonly id: string;
-  execute(inputs: StepHandlerInputs, context: StepContext): Promise<StepHandlerResult>;
+  /**
+   * Executes the handler's business logic.
+   * Implementors that perform async I/O should check `signal?.aborted` between operations
+   * and throw if true, rather than completing work that has already been cancelled.
+   */
+  execute(
+    inputs: StepHandlerInputs,
+    context: StepContext,
+    signal?: AbortSignal,
+  ): Promise<StepHandlerResult>;
 }
