@@ -1,8 +1,10 @@
 # Realm
 
-**Reliable Agent Lifecycle Management**
+**Certified AI Execution**
 
-Realm is a workflow execution engine for AI agents. You define workflows in YAML. The engine enforces step order, validates every agent output against a JSON schema, captures tamper-evident evidence at each step, and pauses at human gates until a person approves. An AI agent connected via MCP cannot skip steps, produce malformed output, or proceed past a gate without authorization.
+Realm is a workflow execution engine for AI agents that proves what your agent did. You define workflows in YAML. The engine enforces step order, validates every agent output against a JSON schema, captures tamper-evident evidence at each step, and pauses at human gates until a person approves. An AI agent connected via MCP cannot skip steps, produce malformed output, or proceed past a gate without authorization.
+
+The result is not just a log of what ran — it is a cryptographically verifiable record that every step ran correctly. For developers building AI workflows for clients, that record is the deliverable.
 
 ## Packages
 
@@ -10,7 +12,7 @@ Realm is a workflow execution engine for AI agents. You define workflows in YAML
 |---------|-----|-------------|
 | `@sensigo/realm` | [![npm](https://img.shields.io/npm/v/@sensigo/realm)](https://www.npmjs.com/package/@sensigo/realm) | Core engine — state guard, execution loop, evidence capture |
 | `@sensigo/realm-cli` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-cli)](https://www.npmjs.com/package/@sensigo/realm-cli) | `realm` CLI — 11 commands for building and operating workflows |
-| `@sensigo/realm-mcp` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-mcp)](https://www.npmjs.com/package/@sensigo/realm-mcp) | `realm-mcp` MCP server — 6 tools for AI agent connections |
+| `@sensigo/realm-mcp` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-mcp)](https://www.npmjs.com/package/@sensigo/realm-mcp) | `realm-mcp` MCP server — 7 tools for AI agent connections |
 | `@sensigo/realm-testing` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-testing)](https://www.npmjs.com/package/@sensigo/realm-testing) | Testing utilities — fixtures, assertions, in-memory store |
 
 ## Installation
@@ -126,9 +128,11 @@ npx @sensigo/realm-mcp
 }
 ```
 
-Once connected the agent has access to 6 tools: `list_workflows`, `get_workflow_protocol`, `start_run`, `execute_step`, `submit_human_response`, and `get_run_state`.
+Once connected the agent has access to 7 tools: `list_workflows`, `get_workflow_protocol`, `start_run`, `execute_step`, `submit_human_response`, `get_run_state`, and `create_workflow`.
 
 The agent calls `list_workflows` to discover registered workflows, then `get_workflow_protocol` for the matched workflow to receive explicit step-by-step instructions. It cannot execute a step out of order or submit output that fails schema validation.
+
+When no registered workflow matches the task, the agent calls `create_workflow` with a `steps` array to register a dynamic workflow and immediately start a run — no YAML file or `realm register` required. The run proceeds identically to a YAML workflow from that point.
 
 **Multiple workflows:** register as many as you need with `realm register`. The agent discovers them all via `list_workflows` and picks the right one by ID. Add a `skill.md` alongside each workflow for workflow-specific agent behaviour.
 
@@ -208,6 +212,23 @@ import { InMemoryStore, assertFinalState, assertStepOutput } from '@sensigo/real
 ```
 
 Full API: `InMemoryStore`, `MockServiceRecorder`, `createAgentDispatcher`, `createGateResponder`, `assertFinalState`, `assertStepSucceeded`, `assertStepFailed`, `assertStepOutput`, `assertEvidenceHash`, `testStepHandler`, `testProcessor`, `testAdapter`.
+
+## Realm Cloud
+
+The open source CLI and MCP server run entirely locally, with no cloud dependency.
+
+[Realm Cloud](https://app.realm.dev) adds a hosted run history dashboard, cross-run analytics, scheduled workflow triggers, and the **Workflow Player UI** — a simple web interface that lets clients trigger runs, fill human gate prompts, and view their audit trail without needing an AI agent or MCP setup.
+
+| Plan | Price | For |
+|------|-------|-----|
+| Solo | $29/month | Developers running workflows for their own projects |
+| Builder | $79/month | Developers delivering AI workflows to clients — manage up to 5 client workspaces, invite clients to their own dashboard, export certified run reports |
+| Client Workspace | $19/month | End clients operating a delivered workflow day-to-day |
+| Enterprise | Custom | SSO, VPC/self-hosted, SOC2 evidence packages, SLA |
+
+30-day free trial, no credit card required. [Start free →](https://app.realm.dev)
+
+Building with Realm for a funded startup? [Apply to the startup program](https://realm.dev/startups) for 6 months free on Builder.
 
 ## Development
 

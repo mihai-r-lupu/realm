@@ -328,6 +328,9 @@ function makeErrorEnvelope(
   return base;
 }
 
+/**
+ * Validates run state, executes a single workflow step through the dispatcher with retry and timeout support, captures evidence, persists the updated run record, and returns a ResponseEnvelope containing the outcome and the next action.
+ */
 export async function executeStep(
   store: RunStore,
   guard: StateGuard,

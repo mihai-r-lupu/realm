@@ -15,6 +15,7 @@ tools:
   - terminalLastCommand
   - changes
   - realm-code-review
+  - githubRepo
 ---
 
 ## Role

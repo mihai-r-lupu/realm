@@ -7,6 +7,11 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Added
+- `create_workflow` MCP tool — Mode 2 self-directed execution. An agent calls `create_workflow` with a `steps` array and optional `metadata` to register a dynamic workflow and immediately start a run in a single call. Returns a `ResponseEnvelope` with `data.workflow_id` and a populated `next_action` pointing at the first step. The agent then drives the run to completion with `execute_step` exactly as it would for a YAML-registered workflow.
+- Dynamic workflow ID derivation — when `metadata.name` is provided, the ID is `<slug>-<6-char-hex-fragment>` (e.g. `jsDoc-audit-a1b2c3`); when omitted, `dynamic-<8-char-hex>`. IDs are deterministic from a UUID fragment and collision-safe in practice.
+- Validation on `create_workflow` input: step IDs must be unique, non-empty, and contain no spaces; step descriptions must be non-empty; `timeout_seconds` must be a positive integer if set; `depends_on` entries must reference step IDs that appear earlier in the array; `depends_on` supports at most one predecessor (linear engine). All validation errors are returned in a single `agent_action: 'provide_input'` response.
+- Hard error when `agent_profile` is set on any step of a dynamic workflow — the feature requires a registered YAML workflow with a `profiles_dir`. The error message names the step and instructs the agent to use `realm register` with a YAML file instead.
+- `list_workflows` hint updated — the response now includes a note directing agents to call `create_workflow` when no registered workflow matches their task.
 - `agent_profile` field on `StepDefinition` — associates a named agent persona with an
   `execution: agent` step. The profile content is loaded at register time from a Markdown file
   under the workflow's `profiles_dir` (defaults to `<workflow-dir>/agents/`). Using `agent_profile`
@@ -156,7 +161,7 @@ All notable changes to this project are documented here.
   non-`WorkflowError` — it does not) has been removed.
 
 ### Tests
-290 tests across all packages (194 core, 42 CLI, 14 MCP, 40 testing).
+314 tests across all packages (203 core, 42 CLI, 29 MCP, 40 testing).
 
 ---
 

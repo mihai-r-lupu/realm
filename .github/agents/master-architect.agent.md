@@ -12,6 +12,7 @@ tools:
   - changes
   - runCommands
   - realm-code-review
+  - githubRepo
 ---
 
 ## Role

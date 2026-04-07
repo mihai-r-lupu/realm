@@ -17,7 +17,7 @@ export async function handleListWorkflows(
   const workflows = await store.list();
   return {
     workflows: workflows.map((w) => ({ id: w.id, name: w.name, version: w.version })),
-    hint: 'Call get_workflow_protocol with a workflow_id before calling start_run.',
+    hint: 'Call get_workflow_protocol with a workflow_id before calling start_run. If no workflow matches your task, use create_workflow to define and start your own plan.',
   };
 }
 
