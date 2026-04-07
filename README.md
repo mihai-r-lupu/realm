@@ -237,7 +237,7 @@ Building with Realm for a funded startup? [Apply to the startup program](https:/
 ```bash
 npm install          # install all workspace dependencies
 npm run build        # compile all packages
-npm run test         # run all tests (316 total)
+npm run test         # run all tests (326 total)
 npm run lint         # lint all packages
 ```
 
