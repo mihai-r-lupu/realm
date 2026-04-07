@@ -25,6 +25,7 @@ export class MockServiceRecorder implements ServiceAdapter {
     operation: string,
     params: Record<string, unknown>,
     _config: Record<string, unknown>,
+    _signal?: AbortSignal,
   ): Promise<ServiceResponse> {
     this.calls.push({ method: 'fetch', operation, params });
     return this.lookupResponse(operation);
@@ -34,6 +35,7 @@ export class MockServiceRecorder implements ServiceAdapter {
     operation: string,
     params: Record<string, unknown>,
     _config: Record<string, unknown>,
+    _signal?: AbortSignal,
   ): Promise<ServiceResponse> {
     this.calls.push({ method: 'create', operation, params });
     return this.lookupResponse(operation);
@@ -43,6 +45,7 @@ export class MockServiceRecorder implements ServiceAdapter {
     operation: string,
     params: Record<string, unknown>,
     _config: Record<string, unknown>,
+    _signal?: AbortSignal,
   ): Promise<ServiceResponse> {
     this.calls.push({ method: 'update', operation, params });
     return this.lookupResponse(operation);

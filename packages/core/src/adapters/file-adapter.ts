@@ -15,6 +15,7 @@ export class FileSystemAdapter implements ServiceAdapter {
     operation: string,
     params: Record<string, unknown>,
     _config: Record<string, unknown>,
+    _signal?: AbortSignal,
   ): Promise<ServiceResponse> {
     if (operation !== 'read') {
       throw new WorkflowError(`unknown operation: ${operation}`, {
@@ -81,6 +82,7 @@ export class FileSystemAdapter implements ServiceAdapter {
     _operation: string,
     _params: Record<string, unknown>,
     _config: Record<string, unknown>,
+    _signal?: AbortSignal,
   ): Promise<ServiceResponse> {
     throw new WorkflowError('not supported', {
       code: 'ENGINE_ADAPTER_FAILED',
@@ -94,6 +96,7 @@ export class FileSystemAdapter implements ServiceAdapter {
     _operation: string,
     _params: Record<string, unknown>,
     _config: Record<string, unknown>,
+    _signal?: AbortSignal,
   ): Promise<ServiceResponse> {
     throw new WorkflowError('not supported', {
       code: 'ENGINE_ADAPTER_FAILED',

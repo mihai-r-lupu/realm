@@ -42,7 +42,7 @@ const agentGateDef: WorkflowDefinition = {
   },
 };
 
-const echoDispatcher: StepDispatcher = async (_name, input) => ({ ...input });
+const echoDispatcher: StepDispatcher = async (_name, input, _run, _signal) => ({ ...input });
 const agentDispatcher: StepDispatcher = async () => ({ extracted_text: 'hello' });
 
 describe('human gate', () => {

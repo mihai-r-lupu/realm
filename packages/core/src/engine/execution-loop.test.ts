@@ -33,7 +33,7 @@ const definition: WorkflowDefinition = {
   },
 };
 
-const echoDispatcher: StepDispatcher = async (_step, input) => ({ ...input, echoed: true });
+const echoDispatcher: StepDispatcher = async (_step, input, _run, _signal) => ({ ...input, echoed: true });
 const failDispatcher: StepDispatcher = async () => {
   throw new WorkflowError('step failed', {
     code: 'ENGINE_HANDLER_FAILED',
@@ -228,9 +228,9 @@ describe('executeStep', () => {
 
   it('input schema validation blocks dispatch when input is invalid', async () => {
     const dispatchCalled = vi.fn();
-    const spy: StepDispatcher = async (step, input, run) => {
+    const spy: StepDispatcher = async (step, input, run, _signal) => {
       dispatchCalled();
-      return echoDispatcher(step, input, run);
+      return echoDispatcher(step, input, run, _signal);
     };
 
     const schemaDefinition = {
@@ -356,6 +356,7 @@ describe('executeStep', () => {
         'fetch_data',
         { doc_id: 'abc' },
         expect.objectContaining({ adapter: 'mock_adapter' }),
+        undefined,
       );
     });
 
@@ -583,6 +584,7 @@ describe('executeStep', () => {
         'fetch_data',
         expect.anything(),
         expect.anything(),
+        undefined,
       );
     });
 
@@ -622,6 +624,7 @@ describe('executeStep', () => {
         'fetch_document_v2',
         expect.anything(),
         expect.anything(),
+        undefined,
       );
     });
   });

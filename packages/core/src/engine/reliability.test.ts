@@ -9,6 +9,7 @@ import { JsonFileStore } from '../store/json-file-store.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import type { WorkflowDefinition } from '../types/workflow-definition.js';
 import type { StepDispatcher } from './execution-loop.js';
+import { MockAdapter } from '../adapters/mock-adapter.js';
 
 // Workflow with a single step that times out at 0.05s and allows 2 retry attempts.
 const timeoutDef: WorkflowDefinition = {
@@ -322,5 +323,48 @@ describe('reliability', () => {
     const updated = await store.get(run.id);
     expect(updated.terminal_state).toBe(true);
     expect(updated.state).toBe('failed');
+  });
+
+  it('AbortSignal is aborted when timeout fires', async () => {
+    const store = new JsonFileStore(dir);
+    const guard = new StateGuard(timeoutDef);
+    const run = await store.create({
+      workflowId: 'timeout-wf',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
+
+    let capturedSignal: AbortSignal | undefined;
+    const sigCapturingDispatcher: StepDispatcher = (_step, _input, _run, signal) => {
+      capturedSignal = signal;
+      return new Promise<Record<string, unknown>>(() => { /* never resolves */ });
+    };
+
+    const envelope = await executeStep(store, guard, timeoutDef, {
+      runId: run.id,
+      command: 'step-one',
+      input: {},
+      snapshotId: run.version.toString(),
+      dispatcher: sigCapturingDispatcher,
+    });
+
+    expect(envelope.status).toBe('error');
+    expect(envelope.errors[0]).toContain('timed out');
+    expect(capturedSignal).toBeDefined();
+    expect(capturedSignal?.aborted).toBe(true);
+  });
+
+  it('MockAdapter rejects with STEP_ABORTED when signal is already aborted', async () => {
+    const adapter = new MockAdapter('test', { foo: { status: 200, data: { ok: true } } });
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      adapter.fetch('foo', {}, {}, controller.signal),
+    ).rejects.toMatchObject({
+      code: 'STEP_ABORTED',
+      retryable: false,
+    });
   });
 });
