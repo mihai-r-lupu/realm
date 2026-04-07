@@ -82,3 +82,11 @@ The agent will:
 # from repo root:
 npm test
 ```
+
+---
+
+## What to look at next
+
+- [README — Conditional Routing](../../README.md#conditional-routing) — all three `transitions`
+  forms: `on_error`, gate-response choices, and `on_success` output-field routing
+- [Example 1 — Code Review](../code-review/) — agent profiles, human gate, `FileSystemAdapter`
