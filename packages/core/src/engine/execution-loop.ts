@@ -191,6 +191,7 @@ async function callHandler(
   options: ExecuteStepOptions,
   pendingRun: RunRecord,
   evidenceByStep: Record<string, Record<string, unknown>>,
+  signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
   const handlerName = stepDef.handler!;
   const handler = options.registry?.getHandler(handlerName);
@@ -216,6 +217,7 @@ async function callHandler(
         // document text, extracted candidates, etc. without reading the store.
         resources: evidenceByStep,
       },
+      signal,
     );
   } catch (err) {
     if (err instanceof WorkflowError) throw err;
@@ -502,7 +504,7 @@ export async function executeStep(
         if (stepDef?.execution === 'auto' && stepDef.uses_service !== undefined) {
           return callAdapter(stepDef, definition, options, signal);
         } else if (stepDef?.execution === 'auto' && stepDef.handler !== undefined) {
-          return callHandler(stepDef, options, pendingRun, evidenceByStep);
+          return callHandler(stepDef, options, pendingRun, evidenceByStep, signal);
         } else {
           return options.dispatcher(options.command, options.input, pendingRun, signal);
         }

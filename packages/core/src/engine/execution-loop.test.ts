@@ -688,6 +688,7 @@ describe('executeStep', () => {
           run_id: run.id,
           run_params: { source: 'doc-1' },
         }),
+        undefined,
       );
     });
 

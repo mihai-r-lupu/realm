@@ -105,7 +105,7 @@ const failsDef: WorkflowDefinition = {
   },
 };
 
-const echoDispatcher: StepDispatcher = async () => ({});
+const echoDispatcher: StepDispatcher = async (_step, _input, _run, _signal) => ({});
 
 describe('executeChain', () => {
   let dir: string;
@@ -202,7 +202,7 @@ describe('executeChain', () => {
       params: {},
     });
 
-    const failDispatcher: StepDispatcher = async () => {
+    const failDispatcher: StepDispatcher = async (_step, _input, _run, _signal) => {
       throw new WorkflowError('step-a failed', {
         code: 'ENGINE_HANDLER_FAILED',
         category: 'ENGINE',
