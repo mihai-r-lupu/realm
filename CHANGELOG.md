@@ -54,6 +54,29 @@ All notable changes to this project are documented here.
   prefer upfront schema discovery can call it before `start_run`.
 - Optional `location` field added to `assess_quality.findings` items in the code-review example
   workflow (symmetric with the existing `location` field in `review_security`).
+- `STEP_ABORTED` error code added to the `ErrorCode` union (after `STEP_TIMEOUT`). Adapters throw
+  `STEP_ABORTED` when they observe a cancelled signal; the engine throws `STEP_TIMEOUT` when the
+  timeout fires. This separation lets callers distinguish "the transport was cancelled" from "the
+  step ran too long".
+- `signal?: AbortSignal` as 4th parameter on `StepDispatcher` — the execution engine now passes the
+  timeout controller's signal to every dispatcher call. Handler code and inline test lambdas that
+  care about cancellation can check `signal?.aborted` at yield points.
+- `signal?: AbortSignal` as 4th parameter on `ServiceAdapter.fetch`, `ServiceAdapter.create`, and
+  `ServiceAdapter.update` — the signal is forwarded through the adapter chain to the underlying
+  transport. JSDoc on the interface documents that implementations are responsible for checking the
+  signal at yield points.
+- `signal?: AbortSignal` as optional 3rd parameter on `StepHandler.execute()` — allows handler
+  implementations to propagate the cancellation signal to nested async operations.
+- `withTimeout` refactored — creates an `AbortController` before dispatching, aborts it when the
+  timeout fires, and passes `controller.signal` to the dispatcher callback. Previously used
+  `Promise.race` without signalling the losing branch; the abandoned branch could hold open
+  connection slots and produce duplicate side effects on retried steps.
+- `GenericHttpAdapter` now forwards `signal` to `fetch()` and converts native `AbortError` to a
+  structured `STEP_ABORTED` `WorkflowError` before the generic error catch, preventing
+  mis-classification as `NETWORK_UNREACHABLE`.
+- `MockAdapter` abort check — all three methods inspect `signal?.aborted` at entry and throw
+  `STEP_ABORTED` immediately if the signal is already aborted, enabling deterministic abort
+  testing without real HTTP calls.
 - `context_hint` promoted to a required top-level field on `ResponseEnvelope` — every response now
   carries orientation about the current run state and what just happened, including error and blocked
   responses where `next_action` is `null`. Previously only appeared inside `next_action`.
@@ -159,9 +182,11 @@ All notable changes to this project are documented here.
 - Dead code removed from `execution-loop.ts`: the unreachable `throw err` branch in the
   `validateInputSchema` catch block (which could only be reached if `validateInputSchema` threw a
   non-`WorkflowError` — it does not) has been removed.
+- Stale `"Acceptable for Phase 1"` comment removed from `execution-loop.ts` alongside the
+  `withTimeout` refactor that resolved the underlying issue.
 
 ### Tests
-314 tests across all packages (203 core, 42 CLI, 29 MCP, 40 testing).
+316 tests across all packages (205 core, 42 CLI, 29 MCP, 40 testing).
 
 ---
 

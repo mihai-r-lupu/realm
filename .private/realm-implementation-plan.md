@@ -803,7 +803,7 @@ Items identified through agent field testing (April 2026). Not yet assigned to a
 
 ---
 
-### 5. AbortSignal propagation through `withTimeout` (Priority: Pre-Phase-4 prerequisite)
+### 5. AbortSignal propagation through `withTimeout` ✅ SHIPPED — commit `8f7758d`
 
 **Origin:** GitHub issue. Introduced in Phase 1b Week 4 (step timeouts). Deferred with the comment `"Acceptable for Phase 1"` in `execution-loop.ts`. Phase 1, 2, and 3 are now complete — the comment is stale.
 
@@ -820,3 +820,5 @@ Items identified through agent field testing (April 2026). Not yet assigned to a
 **Timing constraint:** All Phase 1-3 tests use `MockAdapter` or inline lambda dispatchers — no real HTTP calls flow through `GenericHttpAdapter` today. The practical impact is still theoretical. However, `StepDispatcher` and `ServiceAdapter` are public interfaces. Adding optional parameters is backward-compatible in TypeScript, but the zero-cost window for any interface change closes at the first `npm publish` (Phase 4 Week 14). This must be done **before Week 14**, not after.
 
 **Placement:** Complete during the pre-publication documentation pass (Phase 4 Week 13), before `npm publish`. Remove the stale `"Acceptable for Phase 1"` comment as part of the change.
+
+**Delivered:** All five required changes implemented and tested. `StepHandler.execute()` signal param and `callHandler` forwarding also added (not in original scope but required for end-to-end propagation). 2 new abort tests in `reliability.test.ts`. 316 tests total, all passing.
