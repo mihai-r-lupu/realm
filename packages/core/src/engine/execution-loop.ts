@@ -362,11 +362,7 @@ function makeErrorEnvelope(
     hint,
   );
   if (run !== null && definition !== undefined && err.agentAction !== 'stop') {
-    const evidenceByStep: Record<string, Record<string, unknown>> = {};
-    for (const snap of run.evidence) {
-      if (snap.kind === 'gate_response') continue;
-      evidenceByStep[snap.step_id] = snap.output_summary;
-    }
+    const evidenceByStep = buildEvidenceByStep(run);
     const next_action = findNextAction(run.state, definition, {
       evidenceByStep,
       runParams: run.params,
@@ -418,11 +414,7 @@ export async function executeStep(
   // Step 3: Check state guard
   if (!guard.isAllowed(options.command, run.state)) {
     const blockedReason = guard.getBlockedReason(options.command, run.state);
-    const blockedEvidence: Record<string, Record<string, unknown>> = {};
-    for (const snap of run.evidence) {
-      if (snap.kind === 'gate_response') continue;
-      blockedEvidence[snap.step_id] = snap.output_summary;
-    }
+    const blockedEvidence = buildEvidenceByStep(run);
     const nextAction = findNextAction(run.state, definition, {
       evidenceByStep: blockedEvidence,
       runParams: run.params,
@@ -449,11 +441,7 @@ export async function executeStep(
   const stepDef = definition.steps[options.command];
 
   // Build evidence map once — used for precondition check and diagnostics.
-  const evidenceByStep: Record<string, Record<string, unknown>> = {};
-  for (const snap of run.evidence) {
-    if (snap.kind === 'gate_response') continue;
-    evidenceByStep[snap.step_id] = snap.output_summary;
-  }
+  const evidenceByStep = buildEvidenceByStep(run);
 
   // Step 3a: Evaluate preconditions — block the step if any expression fails.
   if (stepDef?.preconditions !== undefined && stepDef.preconditions.length > 0) {
@@ -944,11 +932,7 @@ export async function submitHumanResponse(
   // 7. Build response — merge step output with human choice for a complete data record.
   const data = { ...run.pending_gate.preview, choice: options.choice };
   // Build evidenceByStep from the saved run for next step's prompt template resolution.
-  const evidenceByStep: Record<string, Record<string, unknown>> = {};
-  for (const snap of savedRun.evidence) {
-    if (snap.kind === 'gate_response') continue;
-    evidenceByStep[snap.step_id] = snap.output_summary;
-  }
+  const evidenceByStep = buildEvidenceByStep(savedRun);
   const nextAction = isTerminal
     ? null
     : findNextAction(newState, definition, {
@@ -1051,11 +1035,7 @@ async function executeChainInternal(
           };
         } else {
           // Agent (or undefined) recovery step — stop chain and return next_action pointing at it.
-          const evidenceByStep: Record<string, Record<string, unknown>> = {};
-          for (const snap of savedBranchRun.evidence) {
-            if (snap.kind === 'gate_response') continue;
-            evidenceByStep[snap.step_id] = snap.output_summary;
-          }
+          const evidenceByStep = buildEvidenceByStep(savedBranchRun);
           const nextAction = findNextAction(onError.produces_state, definition, {
             evidenceByStep,
             runParams: savedBranchRun.params,
