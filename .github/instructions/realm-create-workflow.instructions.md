@@ -116,7 +116,8 @@ already started — check `next_action` immediately and proceed to `execute_step
 
 ```json
 {
-  "status": "running",
+  "status": "ok",
+  "run_id": "<assigned-run-id>",
   "data": { "workflow_id": "acme-proposal-a1b2c3" },
   "next_action": {
     "prompt": "Your task for the first step...",
@@ -126,9 +127,10 @@ already started — check `next_action` immediately and proceed to `execute_step
 ```
 
 The step loop from this point is identical to Mode 1: read `next_action.prompt`, do the work,
-call `execute_step` with your output in `params`, repeat until `status` is `completed` or
-`confirm_required`. Error responses carry `agent_action` — handle them as described in
-`realm.instructions.md`.
+call `execute_step` with your output in `params`, and repeat. Stop when `status` is
+`confirm_required` (human gate — see `realm.instructions.md` step 6) or when `status` is `ok`
+and `next_action` is `null` (workflow finished). Error responses carry `agent_action` — handle
+them as described in `realm.instructions.md`.
 
 ## Constraints
 

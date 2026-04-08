@@ -6,7 +6,7 @@
  * Resolves a dot-path like "context.resources.review_security.findings"
  * against the given root object. Returns undefined if any segment is missing.
  */
-function resolvePath(path: string, root: Record<string, unknown>): unknown {
+export function resolvePath(path: string, root: Record<string, unknown>): unknown {
   const parts = path.trim().split('.');
   let current: unknown = root;
   for (const part of parts) {

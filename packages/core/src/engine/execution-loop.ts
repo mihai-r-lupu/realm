@@ -16,7 +16,7 @@ import { checkPreconditions, evaluateAllPreconditions } from './precondition.js'
 import { ExtensionRegistry } from '../extensions/registry.js';
 import type { ServiceResponse } from '../extensions/service-adapter.js';
 import { resolveSecret } from '../config/secrets.js';
-import { resolvePromptTemplate } from './prompt-template.js';
+import { resolvePromptTemplate, resolvePath } from './prompt-template.js';
 import { generateSchemaSkeleton } from '../utils/schema-skeleton.js';
 
 export type StepDispatcher = (
@@ -99,6 +99,41 @@ function withTimeout<T>(
   );
 }
 
+/**
+ * Builds the evidenceByStep map from a run record's evidence array.
+ * Excludes gate_response snapshots — those carry choice data, not step outputs.
+ */
+function buildEvidenceByStep(run: RunRecord): Record<string, Record<string, unknown>> {
+  const evidenceByStep: Record<string, Record<string, unknown>> = {};
+  for (const snap of run.evidence) {
+    if (snap.kind === 'gate_response') continue;
+    evidenceByStep[snap.step_id] = snap.output_summary;
+  }
+  return evidenceByStep;
+}
+
+/**
+ * Resolves an input_map declaration into a concrete params object.
+ * Each value is a dot-path evaluated against run state and evidence.
+ * Falls back to options.input when input_map is absent.
+ */
+function resolveInputMap(
+  inputMap: Record<string, string> | undefined,
+  options: ExecuteStepOptions,
+  pendingRun: RunRecord,
+): Record<string, unknown> {
+  if (inputMap === undefined) return options.input;
+  const root: Record<string, unknown> = {
+    run: { params: pendingRun.params },
+    context: { resources: buildEvidenceByStep(pendingRun) },
+  };
+  const result: Record<string, unknown> = {};
+  for (const [key, path] of Object.entries(inputMap)) {
+    result[key] = resolvePath(path, root);
+  }
+  return result;
+}
+
 /** Computes the delay (ms) before a retry attempt based on the configured backoff strategy. */
 function computeBackoff(config: RetryConfig, attemptNum: number): number {
   switch (config.backoff) {
@@ -120,6 +155,7 @@ async function callAdapter(
   stepDef: StepDefinition,
   definition: WorkflowDefinition,
   options: ExecuteStepOptions,
+  pendingRun: RunRecord,
   signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
   const serviceName = stepDef.uses_service!;
@@ -160,7 +196,8 @@ async function callAdapter(
 
   let response: ServiceResponse;
   try {
-    response = await adapter[method](operation, options.input, config, signal);
+    const adapterParams = resolveInputMap(stepDef.input_map, options, pendingRun);
+    response = await adapter[method](operation, adapterParams, config, signal);
   } catch (err) {
     if (err instanceof WorkflowError) throw err;
     const message = err instanceof Error ? err.message : String(err);
@@ -502,7 +539,7 @@ export async function executeStep(
       // For agent steps (or auto steps without a service/handler), use the caller's dispatcher.
       const makeCall = (signal?: AbortSignal): Promise<Record<string, unknown>> => {
         if (stepDef?.execution === 'auto' && stepDef.uses_service !== undefined) {
-          return callAdapter(stepDef, definition, options, signal);
+          return callAdapter(stepDef, definition, options, pendingRun, signal);
         } else if (stepDef?.execution === 'auto' && stepDef.handler !== undefined) {
           return callHandler(stepDef, options, pendingRun, evidenceByStep, signal);
         } else {
@@ -1094,6 +1131,8 @@ async function executeChainInternal(
       input: {},
       snapshotId: run.version.toString(),
       dispatcher: options.dispatcher,
+      ...(options.registry !== undefined ? { registry: options.registry } : {}),
+      ...(options.secrets !== undefined ? { secrets: options.secrets } : {}),
     },
     depth + 1,
     chainedSteps,

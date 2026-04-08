@@ -154,129 +154,14 @@ When no registered workflow matches the task, the agent calls `create_workflow` 
 
 Run `realm <command> --help` for full options on any command.
 
-## Writing a Custom Step Handler
 
-A step handler contains business logic for an `auto` step. Register it before running the workflow.
+## Documentation
 
-```typescript
-import type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from '@sensigo/realm';
-import { ExtensionRegistry } from '@sensigo/realm';
-
-const validateQuotes: StepHandler = {
-  id: 'validate_verbatim_quotes',
-  async execute(inputs: StepHandlerInputs, context: StepContext): Promise<StepHandlerResult> {
-    const candidates = inputs.params['candidates'] as Array<{ verbatim_quote: string }>;
-    const valid = candidates.filter(c => c.verbatim_quote.length > 0);
-    return { data: { valid_count: valid.length, candidates: valid } };
-  },
-};
-
-const registry = new ExtensionRegistry();
-registry.register('handler', 'validate_verbatim_quotes', validateQuotes);
-```
-
-In `workflow.yaml`, reference it with `handler: validate_verbatim_quotes` on an `execution: auto` step.
-
-## Built-in Service Adapters
-
-`@sensigo/realm` ships `FileSystemAdapter` out of the box. Register it and reference it from any
-`execution: auto` step to read a local file:
-
-```typescript
-import { ExtensionRegistry, FileSystemAdapter } from '@sensigo/realm';
-
-const registry = new ExtensionRegistry();
-registry.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
-```
-
-The step receives `{ content, path, line_count, size_bytes }` with `trust: engine_delivered` —
-the agent cannot see or alter the file content. See `examples/code-review/` for a working example.
-
-See [docs/getting-started.md](docs/getting-started.md) for a complete end-to-end walkthrough including service adapters and MCP integration.
-
-## Conditional Routing
-
-Any `execution: auto` step can declare a `transitions` block to route the run to different
-successor steps instead of always advancing linearly.
-
-### `on_error` — error recovery branch
-
-When the step's handler throws, the engine demotes the error to a `warnings` entry, transitions
-the run to the branch state, and continues the chain from the branch step. The caller receives
-`status: ok` — the agent is not required to take a recovery action.
-
-```yaml
-validate_fields:
-  execution: auto
-  handler: validate_fields
-  allowed_from_states: [fields_extracted]
-  produces_state: validated
-  transitions:
-    on_error:
-      step: extract_fields
-      produces_state: revision_requested
-```
-
-### Gate-response transitions (`on_<choice>`)
-
-On a `trust: human_confirmed` step, each gate choice can route to a different branch:
-
-```yaml
-confirm_submission:
-  execution: auto
-  trust: human_confirmed
-  allowed_from_states: [validated]
-  produces_state: submitted
-  transitions:
-    on_reject:
-      step: extract_fields
-      produces_state: revision_requested
-```
-
-### `on_success` — output-field routing
-
-After a successful handler run, inspect a named field in the output and route to different
-branches based on its string value. Requires `execution: auto`.
-
-```yaml
-check_identity:
-  execution: auto
-  handler: check_identity
-  allowed_from_states: [data_fetched]
-  produces_state: identity_checked        # fallback if on_success absent
-  transitions:
-    on_success:
-      field: confidence                   # field to read from handler output
-      routes:
-        high: { step: next_step,    produces_state: identity_confirmed }
-        low:  { step: gate_step,    produces_state: identity_uncertain }
-      default: { step: gate_step,   produces_state: identity_uncertain }
-```
-
-The `routes` keys are exact string matches against the field value. `default` is required and
-fires when the field value does not match any key. All target steps and `produces_state` values
-are validated at register time.
-
-See `examples/document-intake/` for a working `on_error` + gate-response branching demo.
-
-## Testing Workflows
-
-Write fixture files describing a run's steps and expected outcomes, then run:
-
-```bash
-realm test ./my-workflow --fixtures ./my-workflow/fixtures/
-```
-
-In code, use `@sensigo/realm-testing` for unit-level assertions:
-
-```typescript
-import { InMemoryStore, assertFinalState, assertStepOutput } from '@sensigo/realm-testing';
-
-// assertFinalState(runRecord, 'completed')
-// assertStepOutput(runRecord, 'gather_input', { summary: 'approved' })
-```
-
-Full API: `InMemoryStore`, `MockServiceRecorder`, `createAgentDispatcher`, `createGateResponder`, `assertFinalState`, `assertStepSucceeded`, `assertStepFailed`, `assertStepOutput`, `assertEvidenceHash`, `testStepHandler`, `testProcessor`, `testAdapter`.
+- [Getting Started](docs/getting-started.md) — end-to-end walkthrough including service adapters, human gates, and step handlers
+- [YAML Schema Reference](docs/reference/yaml-schema.md) — all step fields, execution modes, transitions, trust levels, agent profiles
+- [MCP Protocol Reference](docs/reference/mcp-protocol.md) — tools, response envelope, next_action, agent_action
+- [CLI Reference](docs/reference/cli-commands.md) — all commands with options
+- [Examples](examples/) — working workflow examples
 
 ## Realm Cloud
 

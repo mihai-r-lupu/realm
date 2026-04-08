@@ -65,6 +65,14 @@ export interface StepDefinition {
    * Defaults to the step name if omitted.
    */
   operation?: string;
+  /**
+   * Static path-mapping that assembles this step's adapter params from run state.
+   * Each key is the param name passed to the adapter; each value is a dot-path:
+   *   run.params.FIELD            — from the run's initial params
+   *   context.resources.STEP.FIELD — from a prior step's evidence output
+   * Only valid on execution: 'auto' steps with uses_service.
+   */
+  input_map?: Record<string, string>;
   handler?: string;
   input_schema?: JsonSchema;
   preconditions?: string[];

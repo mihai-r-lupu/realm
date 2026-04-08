@@ -27,7 +27,7 @@ class FailingHandler implements StepHandler {
 
 /** A handler that returns { confidence: value } for on_success routing tests. */
 class ConfidenceHandler implements StepHandler {
-  constructor(private readonly value: string) {}
+  constructor(private readonly value: string) { }
   readonly id = 'confidence_handler';
   async execute(_inputs: StepHandlerInputs, _ctx: StepContext): Promise<StepHandlerResult> {
     return { data: { confidence: this.value } };

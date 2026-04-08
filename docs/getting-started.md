@@ -73,62 +73,7 @@ steps:
 `execution: auto` — the engine runs this step immediately, optionally calling a registered `handler`.  
 `trust: human_confirmed` — the engine pauses and waits for `submit_human_response` before advancing.
 
-Steps can also declare **conditional routing** via the `transitions` field:
-
-```yaml
-steps:
-  validate_fields:
-    execution: auto
-    handler: validate_intake_fields
-    allowed_from_states: [fields_extracted]
-    produces_state: validated
-    transitions:
-      on_error:                          # auto steps only
-        step: extract_fields             # route here if handler throws
-        produces_state: revision_requested
-
-  confirm_submission:
-    execution: auto
-    trust: human_confirmed
-    allowed_from_states: [validated]
-    produces_state: submitted
-    gate:
-      choices: [approve, reject]
-    transitions:
-      on_reject:                         # gate-response keys match gate choices
-        step: extract_fields
-        produces_state: revision_requested
-```
-
-`on_error` — when an `auto` step's handler throws, the engine routes to the named step rather than
-failing the run. The original error is demoted to a `warnings` entry; the response returns `status: ok`
-with `next_action` pointing at the recovery step.  
-Gate-response keys (e.g. `on_reject`) — when a human submits a gate choice, the engine routes to
-the branch target instead of the step's normal `produces_state`.
-
-### Agent profiles
-
-An `execution: agent` step can declare a reusable persona via `agent_profile`:
-
-```yaml
-profiles_dir: agents          # relative to this YAML file; default when omitted
-
-steps:
-  review_security:
-    execution: agent
-    agent_profile: security-reviewer   # loads agents/security-reviewer.md
-    prompt: |
-      Review the following code for security vulnerabilities.
-      ...
-```
-
-Create `agents/security-reviewer.md` (or whatever `profiles_dir` resolves to) with the persona
-definition. The content is loaded at `realm register` time — if the file is missing, registration
-fails immediately with the searched path in the error message.
-
-The profile content is delivered to the consuming agent as `agent_profile_instructions` on the
-protocol step, alongside the per-step `prompt`. The profile SHA-256 hash is recorded in the
-evidence snapshot for auditability. `realm inspect` annotates steps that ran with a profile.
+For a complete reference of all step fields, execution modes, transitions, and agent profiles, see [YAML Schema Reference](reference/yaml-schema.md).
 
 ---
 
@@ -434,44 +379,7 @@ schemas), add a `skill.md` file alongside the workflow. The generic instructions
 skill files compose cleanly: an agent trained on both knows both the Realm protocol and the
 workflow-specific details.
 
-Every response includes a top-level `context_hint` string describing the current run state and what
-just happened — useful for orientation on every response, including errors where `next_action` is `null`.
-
-Every `start_run`, `execute_step`, and `submit_human_response` response includes a `next_action` object:
-
-- `next_action.orientation` — a forward-looking state description: what state the run is in and what step comes next. Distinct from the top-level `context_hint`, which describes what just happened.
-- `next_action.prompt` — the resolved task prompt for the current agent step. Read this and act on it.
-- `next_action.instruction.call_with` — a ready-to-use argument object. For agent steps, `call_with.params` is a minimal schema skeleton derived from `input_schema` — a navigable object with placeholder strings for enums (e.g. `<critical|high|medium|low>`) and zero values for scalars. Copy it, fill in your values, and call the tool. For human gate responses, the agent-supplied field is a string placeholder (e.g. `<approve|reject>`).
-
-For agent steps, the field to replace is `params` — shaped to `next_action.input_schema`.
-
-When `start_run` or `execute_step` chains through one or more `execution: auto` steps before returning,
-the response also includes `chained_auto_steps: Array<{ step: string; produced_state: string }>` — an
-ordered record of every auto step the engine ran silently in this call. Useful for orientation when the
-engine advances several states without agent involvement. The field is omitted when no auto steps were
-chained.
-
-For human gates (`status: confirm_required`), the agent:
-1. Reads `gate.agent_hint` for instructions on how to present the gate (if set).
-2. Presents `gate.display` to the user verbatim.
-3. Collects the user's choice from `gate.response_spec.choices`.
-4. Calls `submit_human_response` using `next_action.instruction.call_with` with the choice filled in.
-
-### Error and blocked responses
-
-Every `status: 'error'` and `status: 'blocked'` response includes an `agent_action` field that
-tells the agent how to recover — without requiring it to parse the error message text.
-
-| `agent_action` | Meaning | What to do |
-|---|---|---|
-| `stop` | Terminal failure. | Do not retry. Report to user. |
-| `report_to_user` | Engine state inconsistent (e.g. snapshot mismatch). | Surface to user. Do not retry autonomously. |
-| `provide_input` | Submitted params were invalid. | Fix params and retry `execute_step` with the same command. Use `next_action` for the correct call. |
-| `resolve_precondition` | Wrong step for current state. | Follow `next_action` to the correct step, or check `blocked_reason` for allowed states. |
-| `wait_for_human` | Gate is open. | Call `submit_human_response` with the user's choice. |
-
-When `agent_action` is `provide_input` or `resolve_precondition` and `next_action` is non-null,
-follow it exactly as after a successful step.
+For the full protocol — `next_action` fields, `chained_auto_steps`, `context_hint`, and error recovery — see [MCP Protocol Reference](reference/mcp-protocol.md).
 
 ---
 
@@ -517,37 +425,11 @@ assertStepOutput(run, 'step_one', { result: 'the document text' });
 
 ---
 
-## 12. Other Useful Commands
-
-```bash
-realm resume <run-id>             # resume a paused run
-realm respond <run-id>            # submit a human gate response
-realm replay <run-id>             # re-evaluate preconditions with overrides
-realm diff <run-a> <run-b>        # compare evidence chains of two runs
-realm cleanup --older-than 30d    # abandon runs idle for 30+ days
-```
-
 ---
 
 ## Next Steps
 
 - Browse the [`examples/code-review/`](../examples/code-review/workflow.yaml) workflow for a realistic 3-step pattern with a service adapter, OWASP security review, and a human gate.
+- Read the [YAML Schema Reference](reference/yaml-schema.md) for all step fields, execution modes, and transitions.
+- Read the [MCP Protocol Reference](reference/mcp-protocol.md) for full tool and response envelope documentation.
 - Read the [`@sensigo/realm` source](../packages/core/src/index.ts) for the full public API.
-
----
-
-## Delivering Workflows to Clients
-
-Realm's open source engine runs entirely on your machine with no cloud dependency. When you build a workflow for a client, you have two delivery options:
-
-**Option 1 — Self-hosted:** The client runs `realm-mcp` locally and connects it to their own AI agent. Suitable for developer clients comfortable with the CLI.
-
-**Option 2 — Realm Cloud (Workflow Player):** Deploy the workflow to Realm Cloud with `realm deploy`. The client receives a URL to their Workflow Player — a simple web interface where they can trigger runs, fill in run-time input parameters, respond to human gate prompts, and view the full audit trail. No MCP, no AI agent, no CLI required on the client's end.
-
-```bash
-realm deploy ./my-workflow    # push workflow to Realm Cloud, returns dashboard URL
-```
-
-The Workflow Player lets clients modify the *inputs* of a run (e.g., which document to process, which data to extract) without touching the workflow definition. You own the YAML; they operate it.
-
-[Realm Cloud plans →](https://realm.dev/#cloud) · [Startup program →](https://realm.dev/startups)
