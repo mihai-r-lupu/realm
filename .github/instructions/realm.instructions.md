@@ -35,15 +35,23 @@ immediately.
 
 ### 4. Execute agent steps
 
-Read `next_action.prompt` — that is your complete task for this step. `context_hint` at the top
-level names the current run state and what just happened — use it for orientation on every
-response, including errors where `next_action` is null.
+Read `next_action.prompt` first — that is your complete task for this step. It is resolved from
+the workflow's step definition at runtime and supersedes any static instructions you may have
+about this workflow. `context_hint` describes what just happened and the current run state — read
+it on every response, including errors.
 
 Call `next_action.instruction.tool` using `instruction.call_with` as the ready-to-use argument
-template — replace the placeholder(s) with your actual values, then call the tool.
+template. The `call_with` object contains placeholder values for agent-supplied fields:
+- Enum fields appear as `<value1|value2|value3>` — replace with one of the listed values.
+- Scalar fields appear as `0` or `""` — replace with your actual value.
+- Arrays appear as `[]` — populate with your items.
 
-- For agent steps: supply your work output in `params`, shaped to `next_action.input_schema`.
-- `next_action.orientation` describes the current state and what step comes next.
+Supply your work output in `params`, shaped to `next_action.input_schema`. `next_action.orientation`
+describes the current state and what step comes next (distinct from `context_hint`, which describes
+what just happened).
+
+If `next_action.expected_timeout` is set, the step has a declared timeout — complete within
+the indicated time (e.g. `"30s"`).
 
 ### 5. Repeat until done
 
@@ -51,12 +59,36 @@ Repeat from step 4 until:
 - `status` is `confirm_required` — a human gate is open; handle it in step 6, then continue.
 - `status` is `ok` and `next_action` is `null` — the workflow has finished. No further steps exist.
 
+### 5a. Reading `chained_auto_steps`
+
+When `start_run` or `execute_step` triggers auto steps before returning, `chained_auto_steps`
+records each one in order:
+
+```json
+"chained_auto_steps": [
+  { "step": "validate_fields", "produced_state": "validated" },
+  { "step": "route_result", "produced_state": "revision_requested", "branched_via": "on_reject" }
+]
+```
+
+`branched_via` is present when a transition fired — `on_error`, an `on_success` route key, or a
+gate-response key. Use this to understand which path the engine took before returning to you.
+
+### 5b. `status: ok` with warnings — recovery branch taken
+
+**`status: ok` does not guarantee the original step succeeded.** When an `on_error` transition
+fires, the engine demotes the error to a `warnings[]` entry, routes to the recovery branch step,
+and returns `status: ok`. Always check `warnings` on `ok` responses — a non-empty array means a
+recovery path was taken, and `context_hint` will describe what happened.
+
 ### 6. Human gate (`status: confirm_required`)
 
 1. Read `gate.agent_hint` for instructions on how to present the gate (if set).
 2. Present `gate.display` to the user verbatim.
 3. Collect the user's choice from `gate.response_spec.choices`.
-4. Call `submit_human_response` using `next_action.instruction.call_with` with the choice filled in.
+4. Call `submit_human_response` using `next_action.instruction.call_with` with:
+   - `gate_id` from `gate.gate_id` (required — distinct from `run_id`)
+   - `choice` set to the user's selected value from `gate.response_spec.choices`
 
 ## Error and Blocked Responses
 
@@ -68,9 +100,16 @@ what to do next. Do not parse the `errors` text to decide recovery strategy — 
 | `stop` | The run is terminal or has failed unrecoverably. | Do not retry. Report to user. |
 | `report_to_user` | Engine state is inconsistent (e.g. snapshot mismatch). | Surface to user. Do not retry autonomously. |
 | `provide_input` | The params you submitted were invalid. | Fix the params and retry `execute_step` with the same command. `next_action` shows the correct tool call. |
-| `resolve_precondition` | A prior step must complete before this one. | Follow `next_action` if non-null, or check `blocked_reason` for allowed states. |
+| `resolve_precondition` | Wrong step for current state. | Follow `next_action` if non-null to call the correct step instead. |
 | `wait_for_human` | A human gate is open and waiting for a choice. | Call `submit_human_response` with the user's choice. |
 
 When `agent_action` is `provide_input` or `resolve_precondition` and `next_action` is non-null,
 follow it exactly as you would after a successful step. When `next_action` is null, surface
-`blocked_reason` to the user.
+`blocked_reason.suggestion` to the user — it names the failed precondition or explains why no
+valid next step exists.
+
+### Precondition failures
+
+When a step's preconditions are not met, the response is `status: blocked`, `agent_action: stop`,
+`next_action: null`. The `blocked_reason.suggestion` field names which precondition expression
+failed and its resolved value. You cannot recover autonomously — report to the user.

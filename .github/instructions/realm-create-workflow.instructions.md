@@ -103,11 +103,15 @@ Define fields only for data that later steps or the user will consume. Do not sc
 intermediate thought. One or two fields is normal. More than five suggests the step is doing
 too much.
 
-### 5. `depends_on` is advisory
+### 5. `depends_on` is advisory — but validated
 
 The engine always runs steps in array order. Setting `depends_on` expresses logical
 dependencies for clarity but does not change execution order. Omit it when array order makes
 the sequence obvious.
+
+All IDs listed in `depends_on` must refer to steps that appear **earlier** in the `steps` array
+(no forward references). Violating this causes `create_workflow` to return
+`agent_action: 'provide_input'` — fix the array order or remove the invalid reference.
 
 ## After Calling create_workflow
 
@@ -121,10 +125,21 @@ already started — check `next_action` immediately and proceed to `execute_step
   "data": { "workflow_id": "acme-proposal-a1b2c3" },
   "next_action": {
     "prompt": "Your task for the first step...",
-    "instruction": { "tool": "execute_step", "call_with": { "...": "..." } }
+    "instruction": {
+      "tool": "execute_step",
+      "call_with": {
+        "run_id": "<assigned-run-id>",
+        "command": "research_company",
+        "params": {}
+      }
+    }
   }
 }
 ```
+
+Call `execute_step` using `instruction.call_with` as the template — fill in your step output
+in `params` (shaped to `next_action.input_schema` if present). The engine does not require a
+`snapshot_id` argument — it reads the current version from the store automatically.
 
 The step loop from this point is identical to Mode 1: read `next_action.prompt`, do the work,
 call `execute_step` with your output in `params`, and repeat. Stop when `status` is
@@ -139,3 +154,8 @@ them as described in `realm.instructions.md`.
 - Step IDs must be unique, non-empty, and contain no spaces.
 - Step descriptions must be non-empty.
 - `timeout_seconds` must be a positive integer if set.
+- All steps in a dynamic workflow are `execution: agent` — the engine always returns them to
+  you for execution. `handler:` and `uses_service:` are not available on dynamic steps; use
+  a YAML-registered workflow if you need auto steps, service adapters, or handlers.
+- `depends_on` references must point to steps earlier in the array. Forward references cause
+  a `provide_input` error at `create_workflow` call time.
