@@ -43,6 +43,8 @@ export { MockAdapter } from './adapters/mock-adapter.js';
 export { GenericHttpAdapter } from './adapters/http-adapter.js';
 export type { HttpAdapterConfig } from './adapters/http-adapter.js';
 export { FileSystemAdapter } from './adapters/file-adapter.js';
+export { GitHubAdapter } from './adapters/github-adapter.js';
+export type { GitHubAdapterConfig } from './adapters/github-adapter.js';
 
 // Processors (built-ins)
 export { normalizeText } from './processors/normalize-text.js';

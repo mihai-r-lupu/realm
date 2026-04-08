@@ -6,6 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
+    "prebuild": "node -e \"const{rmSync}=require('fs');try{rmSync('./dist',{recursive:true,force:true})}catch{}\"",
     "build": "tsc",
     "test": "vitest run",
     "lint": "eslint src"

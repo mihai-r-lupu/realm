@@ -1,0 +1,28 @@
+{
+  "GET /repos/:owner/:repo/pulls/:pr/files": {
+    "status": 200,
+    "body": {
+      "diff_text": "diff --git a/src/main.ts b/src/main.ts\n--- a/src/main.ts\n+++ b/src/main.ts\n@@ -1,4 +1,5 @@\n+// added feature\n export function main() {}",
+      "pr_title": "Add new feature",
+      "base_branch": "main",
+      "files_changed": ["src/main.ts", "src/utils.ts"]
+    }
+  },
+  "GET /repos/:owner/:repo/issues": {
+    "status": 200,
+    "body": {
+      "issues": [
+        {
+          "number": 42,
+          "title": "Implement new feature",
+          "body": "We need to implement the new feature described in the spec.",
+          "state": "open"
+        }
+      ]
+    }
+  },
+  "PATCH /repos/:owner/:repo/pulls/:pr": {
+    "status": 200,
+    "echo": ["body"]
+  }
+}

@@ -31,4 +31,8 @@ export { testAdapter } from './helpers/test-adapter.js';
 export { runFixtureTests } from './runner/test-runner.js';
 export type { TestResult, RunFixtureTestsOptions } from './runner/test-runner.js';
 
+// Servers
+export { startGitHubMockServer } from './servers/github-mock-server.js';
+export type { GitHubMockServerHandle } from './servers/github-mock-server.js';
+
 export const VERSION = '0.1.0';

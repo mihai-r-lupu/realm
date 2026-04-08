@@ -382,9 +382,17 @@ function openFile(path) {
   // Check for WSL
   try {
     const v = _rf('/proc/version', 'utf-8').toLowerCase();
-    if ((v.includes('microsoft') || v.includes('wsl')) && existsSync('/mnt/c/Windows/System32/cmd.exe')) {
-      const winPath = execSync(`wslpath -w "${path}"`).toString().trim();
-      exec(`/mnt/c/Windows/System32/cmd.exe /c start "" "${winPath}"`, handleErr);
+    const ps = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe';
+    if ((v.includes('microsoft') || v.includes('wsl')) && existsSync(ps)) {
+      // Write to Windows TEMP (regular C:\ path, no UNC needed)
+      const winTemp = execSync(`"${ps}" -NoProfile -Command "[System.IO.Path]::GetTempPath()"`)
+        .toString().trim();
+      const winOutPath = winTemp.replace(/\\$/, '') + '\\realm-dashboard.html';
+      const wslOutPath = execSync(`wslpath '${winOutPath.replace(/'/g, "'\\''")}'`).toString().trim();
+      writeFileSync(wslOutPath, readFileSync(path, 'utf-8'), 'utf-8');
+      // Escape backslashes for sh → PowerShell string embedding
+      const winPathEscaped = winOutPath.replace(/\\/g, '\\\\');
+      exec(`"${ps}" -NoProfile -Command "Start-Process '${winPathEscaped}'"`, handleErr);
       return;
     }
   } catch { /* not WSL */ }

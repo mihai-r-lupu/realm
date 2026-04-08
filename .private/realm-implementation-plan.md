@@ -439,7 +439,7 @@ expected:
    - `on_success` — enum dispatch on a named output field: `{ field, routes, default }` (Phase 16)
    Required for the identity gate bypass path in Example 3.
 
-3. **`input_map` with expression language** — steps declare how prior step outputs map to their inputs. Expression evaluator extended from preconditions to handle dot-path access, simple comparisons, ternary. Required for passing `fetch_document` text into `check_identity`.
+3. **`input_map` with static path-mapping** ✅ SHIPPED — commit `f71f5de` (see Backlog §7) — steps declare how prior step outputs map to their inputs via dot-path references (`run.params.FIELD`, `context.resources.STEP.FIELD`). No expression evaluator needed. Required for passing `fetch_document` text into `check_identity`.
 
 4. **`on_error: fallback`** — error recovery routes to an alternative step.
 
@@ -900,3 +900,28 @@ check_repo_identity:
 **Timing:** Must land before Example 3 can be built. Prompt file: `prompts/phase-16-on-success-branching.md`.
 
 **Delivered:** All 8 required changes implemented across 6 source files. One unplanned fix: `submitHumanResponse` gate look-up cast after `transitions` type changed to a union (safe — gate keys can never collide with `on_success`). 10 new tests (4 branching engine + 5 yaml-loader + 1 cleanup overlap). 326 tests total, all passing.
+
+---
+
+### 7. `input_map` — static path-mapping for adapter inputs ✅ SHIPPED — commit `f71f5de`
+
+**Origin:** Phase 3 Week 9 engine deliverable. Required for chained `auto` adapter steps to receive data from `run.params` or prior step outputs. The adapter params field (`options.input`) was hardcoded as `{}` for every auto-chained step.
+
+**Problem:** `callAdapter` passed `options.input` as adapter params. For all auto-chained steps after the first, `options.input` was `{}`. Data was available in memory (`run.params`, `evidenceByStep`) but no routing mechanism existed to deliver it to the adapter.
+
+**Design:** New optional `input_map?: Record<string, string>` field on `StepDefinition`. Each value is a dot-path:
+- `run.params.FIELD` — resolves from the run's initial params
+- `context.resources.STEP_ID.FIELD` — resolves from a named prior step's evidence output
+
+Evaluated at execution time via the existing exported `resolvePath` from `prompt-template.ts`. When `input_map` is present it **replaces** `options.input` entirely (does not merge). Only valid on `execution: auto` + `uses_service` steps; yaml-loader rejects it elsewhere.
+
+**Required changes (5 files):**
+1. `workflow-definition.ts` — `input_map?: Record<string, string>` on `StepDefinition` with JSDoc documenting the two valid path prefixes
+2. `prompt-template.ts` — export `resolvePath`
+3. `execution-loop.ts` — `buildEvidenceByStep(run)` extracted as private helper; new `resolveInputMap(inputMap, options, pendingRun)` function; `callAdapter` accepts `pendingRun: RunRecord`; adapter call uses `resolveInputMap` instead of `options.input`
+4. `yaml-loader.ts` — guard in per-step validation loop: reject `input_map` on non-`auto` or non-adapter steps
+5. Tests — 4 in new `input-map.test.ts`, 1 added to `yaml-loader.test.ts`
+
+**Note:** 3 other inlined copies of `buildEvidenceByStep` logic remain in `execution-loop.ts`. Safe to consolidate in a future cleanup pass — not blocking.
+
+**Delivered:** All changes implemented exactly as specified. 331 tests total (5 new), all passing. Prompt file: `prompts/phase-17-input-map.md`.
