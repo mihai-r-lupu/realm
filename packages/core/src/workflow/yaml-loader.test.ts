@@ -293,6 +293,19 @@ steps:
       expect((err as WorkflowError).message).toContain("produces_state 'wrong_state' is not in step 'extract_step'.allowed_from_states");
     }
   });
+
+  it('input_map on an agent step is rejected with WorkflowError containing input_map', () => {
+    const content = VALID_YAML.replace(
+      'execution: agent',
+      'execution: agent\n    input_map:\n      foo: run.params.foo',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain('input_map');
+    }
+  });
 });
 
 describe('loadWorkflowFromFile', () => {

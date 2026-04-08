@@ -53,7 +53,7 @@ Tasks:
 
 ---
 
-## Phase 1a: Minimum Viable Engine (Weeks 1-3)
+## Phase 1a: Minimum Viable Engine (Weeks 1-3) ✅ SHIPPED
 
 ### Goal
 Define a workflow in YAML, register it, start a run via CLI, execute steps, see evidence.
@@ -258,7 +258,7 @@ steps:
 
 ---
 
-## Phase 1b: Reliability and Human Gates (Weeks 4-5)
+## Phase 1b: Reliability and Human Gates (Weeks 4-5) ✅ SHIPPED
 
 ### Week 4 — Reliability (10-15 hrs)
 
@@ -309,7 +309,7 @@ steps:
 
 ---
 
-## Phase 2: MCP Server, CLI Polish, Testing (Weeks 6-8)
+## Phase 2: MCP Server, CLI Polish, Testing (Weeks 6-8) ✅ SHIPPED
 
 ### Week 6 — MCP Server (10-15 hrs)
 
@@ -433,7 +433,11 @@ expected:
 
 **Engine deliverables (required by Example 3):**
 
-2. **Conditional branching** — `transitions` field on `StepDefinition` with `on_success`, `on_error`, `on_confirm`, `on_cancel`. Condition expressions evaluated by the precondition evaluator. Required for the identity gate bypass path in Example 3.
+2. **Conditional branching** — `transitions` field on auto steps, shipped across Phases 12 and 16:
+   - `on_error` — error recovery to an alternative step (Phase 12)
+   - `on_<choice>` keys (e.g. `on_approve`, `on_reject`) on `trust: human_confirmed` gate steps (Phase 12)
+   - `on_success` — enum dispatch on a named output field: `{ field, routes, default }` (Phase 16)
+   Required for the identity gate bypass path in Example 3.
 
 3. **`input_map` with expression language** — steps declare how prior step outputs map to their inputs. Expression evaluator extended from preconditions to handle dot-path access, simple comparisons, ternary. Required for passing `fetch_document` text into `check_identity`.
 
@@ -755,7 +759,7 @@ Every commit should leave the project in a working state. Every week should prod
 | 6 | Agent can drive a workflow | Agent connects via MCP and completes a full workflow end-to-end |
 | 8 | Testing works | `realm test` runs fixtures and reports pass/fail |
 | 9 | Examples 1 + 2 ship | `node examples/code-review/driver.js` and `node examples/changelog-extract/driver.js` both exit 0 |
-| 9 | Branching works | Conditional `transitions.on_condition` evaluated correctly in 3 new tests |
+| 9 | Branching works | `on_error` and gate-choice `transitions` validated in branching tests (Phases 12 + 16; `on_success` shipped in Phase 16) |
 | 11 | Example 3 ships | `node examples/pr-description/driver.js` exits 0; full evidence chain printed |
 | 11 | Platform is general | Three different-complexity examples run on the same engine |
 | 11 | Multi-agent demo works | Example 3 uses 2 agent profiles, evidence records which profile ran each step |
@@ -857,7 +861,7 @@ Items identified through agent field testing (April 2026). Not yet assigned to a
 
 ---
 
-### 6. `on_success` output-routing transitions (Priority: High) — Phase 16
+### 6. `on_success` output-routing transitions ✅ SHIPPED — commit `5ad7591`
 
 **Origin:** Design doc Section 4 “Conditional branching”. Required by Example 3 (`check_repo_identity` identity gate bypass). `on_error` and gate `on_<choice>` transitions were shipped in Phase 12; `on_success` was explicitly deferred.
 
@@ -894,3 +898,5 @@ check_repo_identity:
 **Constraints:** Zero changes to `on_error`, `on_<choice>`, or any existing branching code path. 100% backward-compatible.
 
 **Timing:** Must land before Example 3 can be built. Prompt file: `prompts/phase-16-on-success-branching.md`.
+
+**Delivered:** All 8 required changes implemented across 6 source files. One unplanned fix: `submitHumanResponse` gate look-up cast after `transitions` type changed to a union (safe — gate keys can never collide with `on_success`). 10 new tests (4 branching engine + 5 yaml-loader + 1 cleanup overlap). 326 tests total, all passing.

@@ -47,7 +47,9 @@ template — replace the placeholder(s) with your actual values, then call the t
 
 ### 5. Repeat until done
 
-Repeat from step 4 until `status` is `confirm_required` or `completed`.
+Repeat from step 4 until:
+- `status` is `confirm_required` — a human gate is open; handle it in step 6, then continue.
+- `status` is `ok` and `next_action` is `null` — the workflow has finished. No further steps exist.
 
 ### 6. Human gate (`status: confirm_required`)
 

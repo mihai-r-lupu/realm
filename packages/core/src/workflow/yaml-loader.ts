@@ -258,6 +258,15 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
       }
     }
 
+    // Validate input_map: only valid on execution: auto steps with uses_service.
+    if (step['input_map'] !== undefined) {
+      if (step['execution'] !== 'auto' || step['uses_service'] === undefined) {
+        errors.push(
+          `Step '${stepName}': 'input_map' is only valid on execution: auto steps with uses_service`,
+        );
+      }
+    }
+
     // Validate transitions.
     const transitions = step['transitions'];
     if (typeof transitions === 'object' && transitions !== null) {

@@ -10,7 +10,8 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "dashboard": "node scripts/dashboard.mjs"
   },
   "devDependencies": {
     "turbo": "latest",
