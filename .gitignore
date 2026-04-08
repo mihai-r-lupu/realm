@@ -5,6 +5,13 @@
 prompts/
 reports/
 
+# Local agent customisation files
+.github/agents/
+.github/instructions/pre-publication.instructions.md
+
+# Local scripts
+scripts/
+
 # Dependencies
 node_modules/
 .pnp
