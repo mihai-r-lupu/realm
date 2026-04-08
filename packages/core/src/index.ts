@@ -60,3 +60,10 @@ export { loadSecrets, resolveSecret } from './config/secrets.js';
 export { loadWorkflowFromFile, loadWorkflowFromString } from './workflow/yaml-loader.js';
 export { JsonWorkflowStore } from './workflow/registrar.js';
 export type { WorkflowRegistrar } from './workflow/registrar.js';
+
+// Handler primitives
+export { resolveResource } from './handlers/primitives/resolve-resource.js';
+export { walkField } from './handlers/primitives/walk-field.js';
+export { partitionBySubstring } from './handlers/primitives/partition-by-substring.js';
+export { countResults } from './handlers/primitives/count-results.js';
+export { compareStrings } from './handlers/primitives/compare-strings.js';
