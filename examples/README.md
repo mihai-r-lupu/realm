@@ -4,10 +4,10 @@ Examples are ordered by the developer pain they address, starting with the most 
 felt problems. Each example has a **before** (the naive approach) and an **after** (the Realm
 workflow), so you can see exactly what changes and why.
 
-| Example | Pain points demonstrated | Realm primitive |
-|---|---|---|
+| Example                                        | Pain points demonstrated                                                           | Realm primitive                                                                  |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | [03-incident-response/](03-incident-response/) | No human gate before irreversible action, no audit trail, duplicate posts on retry | Human gate, idempotency via evidence chain, sequential agent steps with personas |
-| [02-document-intake/](02-document-intake/) | No output validation, steps proceed on bad data, no retry boundary | Handler schemas, `on_error` branching, validation step |
+| [02-document-intake/](02-document-intake/)     | No output validation, steps proceed on bad data, no retry boundary                 | Handler schemas, `on_error` branching, validation step                           |
 
 More examples covering verification gaps, checkpoint/resume, and idempotency are planned.
 See `.private/realm-ai-automation-pain-points-final.md` for the full priority ladder.

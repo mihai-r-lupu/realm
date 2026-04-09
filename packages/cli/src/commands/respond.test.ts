@@ -94,12 +94,7 @@ describe('respondToGate', () => {
     });
 
     await expect(
-      respondToGate(
-        run.id,
-        { gate: 'wrong-gate-id', choice: 'approve' },
-        runStore,
-        workflowStore,
-      ),
+      respondToGate(run.id, { gate: 'wrong-gate-id', choice: 'approve' }, runStore, workflowStore),
     ).rejects.toThrow(WorkflowError);
   });
 });

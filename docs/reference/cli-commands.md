@@ -72,12 +72,12 @@ Fixture format (`fixtures/happy-path.yaml`):
 
 ```yaml
 workflow: my-workflow
-description: "Complete happy-path run"
+description: 'Complete happy-path run'
 params: {}
 steps:
   gather_input:
     output:
-      summary: "the collected information"
+      summary: 'the collected information'
 expected_final_state: completed
 ```
 
@@ -152,20 +152,20 @@ indicates truncation — use `realm run replay` to re-evaluate with modified val
 
 #### Field reference
 
-| Field | What it tells you |
-|---|---|
-| **State** | Current state name. Terminal runs show `✓` (completed) or no suffix (failed/abandoned). |
-| **Evidence (N steps)** | Number of distinct steps that produced evidence. Steps with multiple attempts are counted once. |
-| **Step number** | Execution order, 1-based. |
-| **Step name** | The `id` of the step in your workflow YAML. |
-| **`[profile: ...]`** | Which agent profile handled this step. Present on agent steps only; absent on auto steps and human gates. |
-| **Status** | `success` (green), `error` (red), or other engine-assigned state (yellow). |
-| **Duration** | Wall-clock time the step took to complete. High values on agent steps are normal. |
-| **`hash: XXXXXXXX`** | First 8 characters of the SHA-256 chain hash. The hash covers all evidence up to and including this step — it changes if any prior step's output changes. Use it to detect replay divergence. |
-| **Input** | What the step received. For the first step: the run params. For subsequent steps: the output of the prior step (or merged outputs if `input_map` is configured). |
-| **Output** | What the step produced. For agent steps: the JSON the AI returned. For auto steps: the handler return value. For adapter steps: the raw adapter response injected by the engine. |
-| **Diagnostics: `~N tokens`** | Estimated token count of the context window passed to the agent for this step. Useful for spotting steps that approach model context limits. |
-| **Diagnostics: preconditions** | Each precondition expression, whether it passed (`→ true`) or failed (`→ false`), and the resolved value in parentheses. If a step ran unexpectedly or was blocked, this is where you look. |
+| Field                          | What it tells you                                                                                                                                                                             |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **State**                      | Current state name. Terminal runs show `✓` (completed) or no suffix (failed/abandoned).                                                                                                       |
+| **Evidence (N steps)**         | Number of distinct steps that produced evidence. Steps with multiple attempts are counted once.                                                                                               |
+| **Step number**                | Execution order, 1-based.                                                                                                                                                                     |
+| **Step name**                  | The `id` of the step in your workflow YAML.                                                                                                                                                   |
+| **`[profile: ...]`**           | Which agent profile handled this step. Present on agent steps only; absent on auto steps and human gates.                                                                                     |
+| **Status**                     | `success` (green), `error` (red), or other engine-assigned state (yellow).                                                                                                                    |
+| **Duration**                   | Wall-clock time the step took to complete. High values on agent steps are normal.                                                                                                             |
+| **`hash: XXXXXXXX`**           | First 8 characters of the SHA-256 chain hash. The hash covers all evidence up to and including this step — it changes if any prior step's output changes. Use it to detect replay divergence. |
+| **Input**                      | What the step received. For the first step: the run params. For subsequent steps: the output of the prior step (or merged outputs if `input_map` is configured).                              |
+| **Output**                     | What the step produced. For agent steps: the JSON the AI returned. For auto steps: the handler return value. For adapter steps: the raw adapter response injected by the engine.              |
+| **Diagnostics: `~N tokens`**   | Estimated token count of the context window passed to the agent for this step. Useful for spotting steps that approach model context limits.                                                  |
+| **Diagnostics: preconditions** | Each precondition expression, whether it passed (`→ true`) or failed (`→ false`), and the resolved value in parentheses. If a step ran unexpectedly or was blocked, this is where you look.   |
 
 #### What to look for
 
@@ -224,6 +224,7 @@ realm run replay abc123 --with "step_id.field=value"
 
 **`--with` syntax:** `step_id.field_path=literal_value` where `step_id` is the step name,
 `field_path` is a dot-separated path into the step's output, and `literal_value` is one of:
+
 - `true` or `false` — boolean
 - A number (e.g. `0.85`, `3`) — numeric
 - A quoted string (e.g. `"high"`) — string

@@ -3,13 +3,13 @@ params:
   path: alerts/high-latency.json
 agent_responses:
   analyze_cause:
-    root_cause: "Database connection pool exhausted on payments-api following a throughput spike after the v2.14.1 deployment."
+    root_cause: 'Database connection pool exhausted on payments-api following a throughput spike after the v2.14.1 deployment.'
     severity: P2
     impacted_services: [payments-api, order-service, inventory-api]
     confidence: high
-    runbook: "https://runbooks.internal/payments-api/high-latency"
+    runbook: 'https://runbooks.internal/payments-api/high-latency'
   draft_response:
-    headline: "P2 — payments-api degraded — DB connection pool exhausted"
+    headline: 'P2 — payments-api degraded — DB connection pool exhausted'
     message: |
       P2 — payments-api degraded
 

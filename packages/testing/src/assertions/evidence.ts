@@ -19,9 +19,7 @@ export function assertStepSucceeded(evidence: EvidenceSnapshot[], stepId: string
     (e) => e.step_id === stepId && e.kind !== 'gate_response' && e.status === 'success',
   );
   if (!found) {
-    throw new Error(
-      `assertStepSucceeded: no 'success' snapshot found for step '${stepId}'`,
-    );
+    throw new Error(`assertStepSucceeded: no 'success' snapshot found for step '${stepId}'`);
   }
 }
 
@@ -34,9 +32,7 @@ export function assertStepFailed(evidence: EvidenceSnapshot[], stepId: string): 
     (e) => e.step_id === stepId && e.kind !== 'gate_response' && e.status === 'error',
   );
   if (!found) {
-    throw new Error(
-      `assertStepFailed: no 'error' snapshot found for step '${stepId}'`,
-    );
+    throw new Error(`assertStepFailed: no 'error' snapshot found for step '${stepId}'`);
   }
 }
 
@@ -49,14 +45,10 @@ export function assertStepOutput(
   stepId: string,
   expected: Record<string, unknown>,
 ): void {
-  const snaps = evidence.filter(
-    (e) => e.step_id === stepId && e.kind !== 'gate_response',
-  );
+  const snaps = evidence.filter((e) => e.step_id === stepId && e.kind !== 'gate_response');
   const snap = snaps[snaps.length - 1];
   if (snap === undefined) {
-    throw new Error(
-      `assertStepOutput: no snapshot found for step '${stepId}'`,
-    );
+    throw new Error(`assertStepOutput: no snapshot found for step '${stepId}'`);
   }
   for (const [key, value] of Object.entries(expected)) {
     if (snap.output_summary[key] !== value) {
@@ -76,14 +68,10 @@ export function assertEvidenceHash(
   stepId: string,
   expectedHash: string,
 ): void {
-  const snaps = evidence.filter(
-    (e) => e.step_id === stepId && e.kind !== 'gate_response',
-  );
+  const snaps = evidence.filter((e) => e.step_id === stepId && e.kind !== 'gate_response');
   const snap = snaps[snaps.length - 1];
   if (snap === undefined) {
-    throw new Error(
-      `assertEvidenceHash: no snapshot found for step '${stepId}'`,
-    );
+    throw new Error(`assertEvidenceHash: no snapshot found for step '${stepId}'`);
   }
   if (snap.evidence_hash !== expectedHash) {
     throw new Error(

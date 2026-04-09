@@ -14,7 +14,7 @@ params_schema:
   properties:
     path:
       type: string
-      description: "Path to the alert JSON file (relative paths resolved from example root)"
+      description: 'Path to the alert JSON file (relative paths resolved from example root)'
 
 services:
   alerts:
@@ -56,7 +56,7 @@ steps:
       properties:
         root_cause:
           type: string
-          description: "One-sentence root cause statement"
+          description: 'One-sentence root cause statement'
         severity:
           type: string
           enum: [P1, P2, P3]
@@ -69,7 +69,7 @@ steps:
           enum: [high, medium, low]
         runbook:
           type: string
-          description: "Runbook name or URL if identifiable from the alert data"
+          description: 'Runbook name or URL if identifiable from the alert data'
 
   draft_response:
     description: Draft the oncall channel message based on the triage analysis
@@ -101,10 +101,10 @@ steps:
       properties:
         headline:
           type: string
-          description: "One-line headline for the incident"
+          description: 'One-line headline for the incident'
         message:
           type: string
-          description: "Full channel message text"
+          description: 'Full channel message text'
 
   confirm_and_send:
     description: Present the analysis and draft to the oncall engineer for approval

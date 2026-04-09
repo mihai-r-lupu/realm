@@ -12,8 +12,5 @@ export interface ProcessorOutput {
 
 export interface Processor {
   readonly id: string;
-  process(
-    content: ProcessorInput,
-    config: Record<string, unknown>,
-  ): Promise<ProcessorOutput>;
+  process(content: ProcessorInput, config: Record<string, unknown>): Promise<ProcessorOutput>;
 }

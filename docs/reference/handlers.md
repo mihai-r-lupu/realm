@@ -48,12 +48,12 @@ unique across all registered handlers.
 
 ## Context fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `run_id` | string | The current run's identifier. |
-| `run_params` | object | The params passed to `start_run` for this run. |
-| `config` | object | The `config:` block from the YAML step definition. Always present; empty object if no `config:` was declared. |
-| `resources` | object \| undefined | Outputs from earlier steps, keyed by step name. Use `resources['step_name']['field']` or the `resolveResource` primitive. |
+| Field        | Type                | Description                                                                                                               |
+| ------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `run_id`     | string              | The current run's identifier.                                                                                             |
+| `run_params` | object              | The params passed to `start_run` for this run.                                                                            |
+| `config`     | object              | The `config:` block from the YAML step definition. Always present; empty object if no `config:` was declared.             |
+| `resources`  | object \| undefined | Outputs from earlier steps, keyed by step name. Use `resources['step_name']['field']` or the `resolveResource` primitive. |
 
 ### Accessing prior step outputs
 
@@ -150,7 +150,7 @@ Use only imports from `@sensigo/realm`.
 # workflow.yaml
 steps:
   validate_output:
-    description: "Validate that required fields are present."
+    description: 'Validate that required fields are present.'
     execution: auto
     handler: check_required_fields
     allowed_from_states: [fields_extracted]
@@ -164,15 +164,20 @@ steps:
 ```
 
 ```typescript
-import type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from '@sensigo/realm';
+import type {
+  StepHandler,
+  StepHandlerInputs,
+  StepContext,
+  StepHandlerResult,
+} from '@sensigo/realm';
 
 const checkRequiredFields: StepHandler = {
   id: 'check_required_fields',
 
   async execute(inputs: StepHandlerInputs, context: StepContext): Promise<StepHandlerResult> {
-    const keys = context.config['required_keys'] as string[] | undefined ?? [];
+    const keys = (context.config['required_keys'] as string[] | undefined) ?? [];
     const fields = inputs.params as Record<string, unknown>;
-    const missing = keys.filter(k => !(k in fields) || fields[k] === null || fields[k] === '');
+    const missing = keys.filter((k) => !(k in fields) || fields[k] === null || fields[k] === '');
     if (missing.length > 0) {
       throw new Error(`Missing required fields: ${missing.join(', ')}`);
     }
@@ -321,18 +326,18 @@ compareStrings(
 Compares two strings using one of three modes. Returns `false` (does not throw) when `mode`
 is `'regex'` and `b` is not a valid regular expression.
 
-| Mode | Behaviour |
-|------|-----------|
-| `exact` | `a === b` |
-| `prefix` | `a.startsWith(b)` |
-| `regex` | `new RegExp(b).test(a)` |
+| Mode     | Behaviour               |
+| -------- | ----------------------- |
+| `exact`  | `a === b`               |
+| `prefix` | `a.startsWith(b)`       |
+| `regex`  | `new RegExp(b).test(a)` |
 
 ```typescript
 import { compareStrings } from '@sensigo/realm';
 
 compareStrings('myorg/my-repo', 'myorg/.*', 'regex'); // true
-compareStrings('v1.2.3', 'v1', 'prefix');             // true
-compareStrings('active', 'active', 'exact');           // true
+compareStrings('v1.2.3', 'v1', 'prefix'); // true
+compareStrings('active', 'active', 'exact'); // true
 ```
 
 ---
@@ -343,12 +348,7 @@ Combine primitives in sequence to build a handler:
 
 ```typescript
 import type { StepHandler } from '@sensigo/realm';
-import {
-  resolveResource,
-  walkField,
-  partitionBySubstring,
-  countResults,
-} from '@sensigo/realm';
+import { resolveResource, walkField, partitionBySubstring, countResults } from '@sensigo/realm';
 
 const validateExtractions: StepHandler = {
   id: 'validate_extractions',
@@ -372,7 +372,7 @@ const validateExtractions: StepHandler = {
     }
 
     // 4. Walk for items that contain the quote field
-    const allItems = rawCandidates.flatMap(item =>
+    const allItems = rawCandidates.flatMap((item) =>
       walkField(item as Record<string, unknown>, quoteField),
     );
 
@@ -401,33 +401,33 @@ where an agent extracts literal passages that must be grounded in the source tex
 
 #### Config
 
-| Key | Type | Required | Default | Description |
-|-----|------|----------|---------|-------------|
-| `source_step` | string | Yes | — | Name of the prior step that produced the source text. |
-| `source_field` | string | No | `"text"` | Field name in the source step's output that holds the source text. |
-| `quote_field` | string | No | `"verbatim_quote"` | Field name in each candidate object that holds the quote to verify. |
+| Key            | Type   | Required | Default            | Description                                                         |
+| -------------- | ------ | -------- | ------------------ | ------------------------------------------------------------------- |
+| `source_step`  | string | Yes      | —                  | Name of the prior step that produced the source text.               |
+| `source_field` | string | No       | `"text"`           | Field name in the source step's output that holds the source text.  |
+| `quote_field`  | string | No       | `"verbatim_quote"` | Field name in each candidate object that holds the quote to verify. |
 
 #### Inputs
 
-| Key | Type | Description |
-|-----|------|-------------|
+| Key          | Type  | Description                                                                              |
+| ------------ | ----- | ---------------------------------------------------------------------------------------- |
 | `candidates` | array | Array of objects (or nested structures) each containing a `quote_field` value to verify. |
 
 #### Output
 
-| Key | Type | Description |
-|-----|------|-------------|
-| `accepted` | array | Candidates whose quote appears verbatim in the source text. |
-| `rejected` | array | Candidates whose quote does not appear (potential hallucinations). |
-| `accepted_count` | number | Length of `accepted`. |
-| `rejected_count` | number | Length of `rejected`. |
+| Key                | Type   | Description                                                                                                       |
+| ------------------ | ------ | ----------------------------------------------------------------------------------------------------------------- |
+| `accepted`         | array  | Candidates whose quote appears verbatim in the source text.                                                       |
+| `rejected`         | array  | Candidates whose quote does not appear (potential hallucinations).                                                |
+| `accepted_count`   | number | Length of `accepted`.                                                                                             |
+| `rejected_count`   | number | Length of `rejected`.                                                                                             |
 | `candidates_found` | number | `accepted_count + rejected_count`. Useful for diagnosing "nothing was extracted" vs "all extracted were invalid". |
 
 #### Example
 
 ```yaml
 validate_quotes:
-  description: "Verify that extracted quotes appear verbatim in the source document."
+  description: 'Verify that extracted quotes appear verbatim in the source document.'
   execution: auto
   handler: validate_verbatim_quotes
   allowed_from_states: [quotes_extracted]
@@ -451,21 +451,21 @@ guard to verify that a fetched resource belongs to the expected entity before pr
 
 #### Config
 
-| Key | Type | Required | Default | Description |
-|-----|------|----------|---------|-------------|
-| `source_step` | string | Yes | — | Name of the prior step that produced the value to match. |
-| `source_field` | string | Yes | — | Field path in that step's output. |
-| `pattern` | string | Yes | — | The value or pattern to compare against. |
-| `mode` | `"exact"` \| `"prefix"` \| `"regex"` | No | `"exact"` | Comparison mode. |
+| Key            | Type                                 | Required | Default   | Description                                              |
+| -------------- | ------------------------------------ | -------- | --------- | -------------------------------------------------------- |
+| `source_step`  | string                               | Yes      | —         | Name of the prior step that produced the value to match. |
+| `source_field` | string                               | Yes      | —         | Field path in that step's output.                        |
+| `pattern`      | string                               | Yes      | —         | The value or pattern to compare against.                 |
+| `mode`         | `"exact"` \| `"prefix"` \| `"regex"` | No       | `"exact"` | Comparison mode.                                         |
 
 #### Output
 
-| Key | Type | Description |
-|-----|------|-------------|
-| `matched` | boolean | Whether the field value satisfied the pattern. |
-| `value` | string \| null | The actual field value read. `null` if missing. |
-| `pattern` | string | The pattern from config, echoed back for auditability. |
-| `mode` | string | The mode used, echoed back for auditability. |
+| Key       | Type           | Description                                            |
+| --------- | -------------- | ------------------------------------------------------ |
+| `matched` | boolean        | Whether the field value satisfied the pattern.         |
+| `value`   | string \| null | The actual field value read. `null` if missing.        |
+| `pattern` | string         | The pattern from config, echoed back for auditability. |
+| `mode`    | string         | The mode used, echoed back for auditability.           |
 
 This handler **never throws on mismatch** — `matched: false` is a valid outcome that the
 workflow handles via preconditions or transitions, not via `on_error`.
@@ -474,7 +474,7 @@ workflow handles via preconditions or transitions, not via `on_error`.
 
 ```yaml
 verify_repo:
-  description: "Verify the fetched diff belongs to the expected repository."
+  description: 'Verify the fetched diff belongs to the expected repository.'
   execution: auto
   handler: validate_field_match
   allowed_from_states: [diff_fetched]
@@ -482,10 +482,10 @@ verify_repo:
   config:
     source_step: fetch_diff
     source_field: repo_full_name
-    pattern: "myorg/.*"
+    pattern: 'myorg/.*'
     mode: regex
   preconditions:
-    - "verify_repo.result.matched == true"
+    - 'verify_repo.result.matched == true'
 ```
 
 ---

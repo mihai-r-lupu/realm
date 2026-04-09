@@ -73,9 +73,7 @@ function validateArgs(args: CreateWorkflowArgs): string[] {
   // Rule 3: step IDs must be non-empty with no spaces.
   for (const step of args.steps) {
     if (step.id.trim() === '' || step.id.includes(' ')) {
-      errors.push(
-        `Step id '${step.id}' is invalid: must be a non-empty string with no spaces`,
-      );
+      errors.push(`Step id '${step.id}' is invalid: must be a non-empty string with no spaces`);
     }
   }
 
@@ -141,10 +139,7 @@ function deriveWorkflowId(name?: string): string {
 }
 
 /** Builds a linear WorkflowDefinition from the submitted steps. */
-function buildWorkflowDefinition(
-  workflowId: string,
-  args: CreateWorkflowArgs,
-): WorkflowDefinition {
+function buildWorkflowDefinition(workflowId: string, args: CreateWorkflowArgs): WorkflowDefinition {
   const { steps, metadata } = args;
   const stepsRecord: WorkflowDefinition['steps'] = {};
 

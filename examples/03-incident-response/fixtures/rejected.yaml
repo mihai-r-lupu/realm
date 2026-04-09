@@ -3,13 +3,13 @@ params:
   path: alerts/error-spike.json
 agent_responses:
   analyze_cause:
-    root_cause: "Session store dependency failure is causing all 5xx errors in auth-service — 1921 of 1938 errors trace to session-store."
+    root_cause: 'Session store dependency failure is causing all 5xx errors in auth-service — 1921 of 1938 errors trace to session-store.'
     severity: P1
     impacted_services: [auth-service, api-gateway, user-service]
     confidence: medium
-    runbook: "https://runbooks.internal/auth-service/error-spike"
+    runbook: 'https://runbooks.internal/auth-service/error-spike'
   draft_response:
-    headline: "P1 — auth-service down — session-store dependency failure"
+    headline: 'P1 — auth-service down — session-store dependency failure'
     message: |
       P1 — auth-service outage
 

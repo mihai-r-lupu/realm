@@ -4,7 +4,11 @@
 export { InMemoryStore } from './store/in-memory-store.js';
 
 // Fixtures
-export { loadFixtureFromFile, loadFixtureFromString, loadFixturesFromDir } from './fixtures/fixture-loader.js';
+export {
+  loadFixtureFromFile,
+  loadFixtureFromString,
+  loadFixturesFromDir,
+} from './fixtures/fixture-loader.js';
 export type { TestFixture, MockOperations } from './fixtures/fixture-loader.js';
 
 // Mocks

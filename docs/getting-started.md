@@ -45,18 +45,18 @@ extraction-demo/
 Open `workflow.yaml`. The key fields are:
 
 ```yaml
-id: extraction-demo          # unique identifier used in all CLI commands
-name: "Extraction Demo"
+id: extraction-demo # unique identifier used in all CLI commands
+name: 'Extraction Demo'
 version: 1
-initial_state: created       # every run starts here
+initial_state: created # every run starts here
 
 steps:
   step_one:
-    description: "..."
-    execution: agent          # the AI agent executes this step
+    description: '...'
+    execution: agent # the AI agent executes this step
     allowed_from_states: [created]
     produces_state: step_one_done
-    input_schema:             # the engine validates agent output against this schema
+    input_schema: # the engine validates agent output against this schema
       type: object
       required: [result]
       properties:
@@ -64,7 +64,7 @@ steps:
           type: string
 
   finalize:
-    execution: auto           # engine executes this automatically
+    execution: auto # engine executes this automatically
     allowed_from_states: [step_one_done]
     produces_state: completed
 ```
@@ -142,6 +142,7 @@ Evidence (2 steps):
 ```
 
 Each evidence entry records:
+
 - **Input / Output** — what the step received and what it returned, truncated to 120 characters.
 - **Hash** — first 8 characters of the SHA-256 chain hash. The hash changes if any prior step's
   output changes, making the chain tamper-evident.
@@ -236,8 +237,12 @@ const googleDocsAdapter: ServiceAdapter = {
     // call the Google Docs API …
     return { status: 200, data: { text: '…' } };
   },
-  async create(_op, _p, _c) { return { status: 501, data: {} }; },
-  async update(_op, _p, _c) { return { status: 501, data: {} }; },
+  async create(_op, _p, _c) {
+    return { status: 501, data: {} };
+  },
+  async update(_op, _p, _c) {
+    return { status: 501, data: {} };
+  },
 };
 
 const registry = new ExtensionRegistry();
@@ -253,7 +258,7 @@ A human gate pauses a run and requires explicit approval before the engine advan
 ```yaml
 steps:
   review_findings:
-    description: "Security team reviews the identified findings."
+    description: 'Security team reviews the identified findings.'
     execution: auto
     trust: human_confirmed
     allowed_from_states: [findings_ready]
@@ -300,7 +305,7 @@ transformation, enrichment, or any computation the engine should run automatical
 ```yaml
 steps:
   validate_output:
-    description: "Validate that required fields are present."
+    description: 'Validate that required fields are present.'
     execution: auto
     handler: check_required_fields
     allowed_from_states: [fields_extracted]
@@ -322,7 +327,12 @@ here.
 Import and implement the `StepHandler` interface from `@sensigo/realm`:
 
 ```typescript
-import type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from '@sensigo/realm';
+import type {
+  StepHandler,
+  StepHandlerInputs,
+  StepContext,
+  StepHandlerResult,
+} from '@sensigo/realm';
 
 const checkRequiredFields: StepHandler = {
   id: 'check_required_fields',
@@ -330,7 +340,7 @@ const checkRequiredFields: StepHandler = {
   async execute(inputs: StepHandlerInputs, context: StepContext): Promise<StepHandlerResult> {
     const keys = (context.config['required_keys'] as string[] | undefined) ?? [];
     const fields = inputs.params as Record<string, unknown>;
-    const missing = keys.filter(k => !(k in fields) || fields[k] === null || fields[k] === '');
+    const missing = keys.filter((k) => !(k in fields) || fields[k] === null || fields[k] === '');
     if (missing.length > 0) {
       throw new Error(`Missing required fields: ${missing.join(', ')}`);
     }
@@ -340,6 +350,7 @@ const checkRequiredFields: StepHandler = {
 ```
 
 **Key rules:**
+
 - Throw a plain `Error` — the engine wraps it as `ENGINE_HANDLER_FAILED`. Do not import engine internals.
 - Return `{ data: { ... } }` for business-logic outcomes (e.g. "no matches found"). Only throw for genuine errors the workflow cannot proceed from.
 - Read `context.config` for step-level configuration, `context.resources['step_name']['field']` for prior step outputs, and `inputs.params` for the agent's submitted input from the previous step.
@@ -373,13 +384,13 @@ const server = createRealmMcpServer({ registry });
 
 `@sensigo/realm` exports five utility functions you can compose inside handlers:
 
-| Function | Purpose |
-|----------|---------|
-| `resolveResource(resources, stepId, field)` | Read a field from a prior step's output. Returns `undefined` on missing. |
-| `walkField(data, fieldName)` | Recursively collect all objects containing `fieldName` from a nested structure. |
-| `partitionBySubstring(candidates, quoteField, sourceText)` | Split candidates into `accepted`/`rejected` by verbatim substring presence. |
-| `countResults(accepted, rejected)` | Compute `{ accepted_count, rejected_count, candidates_found }`. |
-| `compareStrings(a, b, mode)` | Compare strings with `"exact"`, `"prefix"`, or `"regex"` mode. |
+| Function                                                   | Purpose                                                                         |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `resolveResource(resources, stepId, field)`                | Read a field from a prior step's output. Returns `undefined` on missing.        |
+| `walkField(data, fieldName)`                               | Recursively collect all objects containing `fieldName` from a nested structure. |
+| `partitionBySubstring(candidates, quoteField, sourceText)` | Split candidates into `accepted`/`rejected` by verbatim substring presence.     |
+| `countResults(accepted, rejected)`                         | Compute `{ accepted_count, rejected_count, candidates_found }`.                 |
+| `compareStrings(a, b, mode)`                               | Compare strings with `"exact"`, `"prefix"`, or `"regex"` mode.                  |
 
 ### Built-in handlers
 
@@ -389,7 +400,8 @@ Two handlers are available without registration:
 - **`validate_field_match`** — reads a field from a prior step and compares it to a pattern. Guards that a fetched resource belongs to the expected entity.
 
 For full interface documentation, context field reference, handler composition patterns, built-in handler config/output tables, and testing utilities, see the [Handler Authoring Reference](reference/handlers.md).
-```
+
+````
 
 ---
 
@@ -399,7 +411,7 @@ Install the MCP server:
 
 ```bash
 npm install -g @sensigo/realm-mcp
-```
+````
 
 Start it:
 
@@ -433,15 +445,15 @@ Configure your AI client. **Claude Desktop** (`~/Library/Application Support/Cla
 
 The agent has access to 7 MCP tools:
 
-| Tool | Description |
-|------|-------------|
-| `list_workflows` | List all registered workflows |
-| `get_workflow_protocol` | Get step-by-step instructions for a workflow |
-| `start_run` | Start a new run |
-| `execute_step` | Submit output for the current agent step |
-| `submit_human_response` | Approve or reject a human gate |
-| `get_run_state` | Inspect the current state of a run |
-| `create_workflow` | Register a dynamic workflow at runtime and immediately start a run |
+| Tool                    | Description                                                        |
+| ----------------------- | ------------------------------------------------------------------ |
+| `list_workflows`        | List all registered workflows                                      |
+| `get_workflow_protocol` | Get step-by-step instructions for a workflow                       |
+| `start_run`             | Start a new run                                                    |
+| `execute_step`          | Submit output for the current agent step                           |
+| `submit_human_response` | Approve or reject a human gate                                     |
+| `get_run_state`         | Inspect the current state of a run                                 |
+| `create_workflow`       | Register a dynamic workflow at runtime and immediately start a run |
 
 The agent should call `list_workflows` first to discover what is registered, then
 `get_workflow_protocol` for the matched workflow before calling `start_run`. The protocol is
@@ -503,12 +515,12 @@ Write a fixture file in `extraction-demo/fixtures/happy-path.yaml`:
 
 ```yaml
 workflow: extraction-demo
-description: "Complete happy-path run"
+description: 'Complete happy-path run'
 params: {}
 steps:
   step_one:
     output:
-      result: "the document text"
+      result: 'the document text'
   finalize:
     gate_response:
       approved: true
@@ -524,7 +536,12 @@ realm workflow test ./ --fixtures ./fixtures/
 In unit tests, use `@sensigo/realm-testing`:
 
 ```typescript
-import { InMemoryStore, createAgentDispatcher, assertFinalState, assertStepOutput } from '@sensigo/realm-testing';
+import {
+  InMemoryStore,
+  createAgentDispatcher,
+  assertFinalState,
+  assertStepOutput,
+} from '@sensigo/realm-testing';
 import { executeChain } from '@sensigo/realm';
 
 const store = new InMemoryStore();

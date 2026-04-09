@@ -76,7 +76,7 @@ describe('input_map', () => {
       initial_state: 'created',
       services: { svc: { adapter: 'mock', trust: 'engine_delivered' } },
       steps: {
-        'setup': {
+        setup: {
           description: 'Agent step that produces state',
           execution: 'agent',
           allowed_from_states: ['created'],
@@ -142,14 +142,14 @@ describe('input_map', () => {
       initial_state: 'created',
       services: { svc: { adapter: 'mock', trust: 'engine_delivered' } },
       steps: {
-        'step1': {
+        step1: {
           description: 'Handler step that outputs pr_number',
           execution: 'auto',
           handler: 'make-pr',
           allowed_from_states: ['created'],
           produces_state: 'step1_done',
         },
-        'step2': {
+        step2: {
           description: 'Adapter step using context.resources',
           execution: 'auto',
           allowed_from_states: ['step1_done'],
@@ -202,12 +202,7 @@ describe('input_map', () => {
       registry,
     });
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      'step2',
-      { number: 42 },
-      expect.any(Object),
-      undefined,
-    );
+    expect(fetchSpy).toHaveBeenCalledWith('step2', { number: 42 }, expect.any(Object), undefined);
   });
 
   it('unresolvable path produces undefined key in adapter params', async () => {
@@ -250,11 +245,6 @@ describe('input_map', () => {
       registry,
     });
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      'fetch',
-      { x: undefined },
-      expect.any(Object),
-      undefined,
-    );
+    expect(fetchSpy).toHaveBeenCalledWith('fetch', { x: undefined }, expect.any(Object), undefined);
   });
 });

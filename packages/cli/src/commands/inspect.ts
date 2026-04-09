@@ -1,7 +1,13 @@
 // inspect command — displays the full evidence chain and diagnostics for a run.
 import chalk from 'chalk';
 import { Command } from 'commander';
-import type { RunStore, RunRecord, WorkflowRegistrar, EvidenceSnapshot, StepDiagnostics } from '@sensigo/realm';
+import type {
+  RunStore,
+  RunRecord,
+  WorkflowRegistrar,
+  EvidenceSnapshot,
+  StepDiagnostics,
+} from '@sensigo/realm';
 
 /** Truncates a JSON-serialised summary to a readable single line. */
 function formatSummary(value: unknown, maxLength = 120): string {
@@ -17,7 +23,9 @@ function formatDiagnostics(diag: StepDiagnostics): string {
     return `${tokens} | no preconditions`;
   }
   const traceStr = diag.precondition_trace
-    .map((t) => `${t.expression} \u2192 ${t.passed ? 'true' : 'false'} (${String(t.resolved_value)})`)
+    .map(
+      (t) => `${t.expression} \u2192 ${t.passed ? 'true' : 'false'} (${String(t.resolved_value)})`,
+    )
     .join(', ');
   return `${tokens} | preconditions: ${traceStr}`;
 }
@@ -102,7 +110,9 @@ export async function inspectRun(
       snaps.forEach((snap, ai) => {
         const statusColored = colorStatus(snap.status);
         const hashShort = chalk.dim(`hash: ${snap.evidence_hash.slice(0, 8)}`);
-        lines.push(`     (attempt ${ai + 1}/${totalAttempts})  ${statusColored}   ${snap.duration_ms}ms   ${hashShort}`);
+        lines.push(
+          `     (attempt ${ai + 1}/${totalAttempts})  ${statusColored}   ${snap.duration_ms}ms   ${hashShort}`,
+        );
       });
       // Show Input/Output/Diagnostics for the last attempt.
       const lastSnap = snaps[snaps.length - 1]!;
@@ -117,7 +127,9 @@ export async function inspectRun(
       const hashShort = chalk.dim(`hash: ${snap.evidence_hash.slice(0, 8)}`);
       const profileLabel =
         snap.agent_profile !== undefined ? chalk.cyan(` [profile: ${snap.agent_profile}]`) : '';
-      lines.push(`  ${idx + 1}. ${stepId.padEnd(22)}${profileLabel} ${statusColored}   ${snap.duration_ms}ms   ${hashShort}`);
+      lines.push(
+        `  ${idx + 1}. ${stepId.padEnd(22)}${profileLabel} ${statusColored}   ${snap.duration_ms}ms   ${hashShort}`,
+      );
       lines.push(`     Input:  ${formatSummary(snap.input_summary)}`);
       lines.push(`     Output: ${formatSummary(snap.output_summary)}`);
       if (snap.diagnostics !== undefined) {

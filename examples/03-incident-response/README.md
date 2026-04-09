@@ -28,15 +28,15 @@ who approved, what the analysis was, and exactly what text was sent.
 
 ## What it demonstrates
 
-| Feature | How it appears |
-|---|---|
-| Human gate with real stakes | `confirm_and_send` blocks until engineer chooses `send` or `reject` |
+| Feature                          | How it appears                                                                           |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| Human gate with real stakes      | `confirm_and_send` blocks until engineer chooses `send` or `reject`                      |
 | Gate choice recorded in evidence | Both `send` and `reject` produce `completed` — the choice is in the evidence audit trail |
-| Idempotency | A completed step cannot re-execute — duplicate retries cannot re-post |
-| Sequential agent steps | `draft_response` cannot run until `analyze_cause` output is validated |
-| Evidence chain | Analysis, draft, and gate choice all captured with timing and hash |
-| `FileSystemAdapter` | Reads alert JSON from disk — zero auth, zero network |
-| Swap-readiness | Replace the filesystem service with a Slack or PagerDuty adapter — zero YAML changes |
+| Idempotency                      | A completed step cannot re-execute — duplicate retries cannot re-post                    |
+| Sequential agent steps           | `draft_response` cannot run until `analyze_cause` output is validated                    |
+| Evidence chain                   | Analysis, draft, and gate choice all captured with timing and hash                       |
+| `FileSystemAdapter`              | Reads alert JSON from disk — zero auth, zero network                                     |
+| Swap-readiness                   | Replace the filesystem service with a Slack or PagerDuty adapter — zero YAML changes     |
 
 ## Install
 
@@ -53,6 +53,7 @@ node dist/driver.js fixtures/approved.yaml
 ```
 
 Expected output:
+
 ```
 Run: <uuid>
 Workflow: Incident First-Response v1
@@ -73,6 +74,7 @@ node dist/driver.js fixtures/rejected.yaml
 ```
 
 Expected output:
+
 ```
 Run: <uuid>
 Workflow: Incident First-Response v1
@@ -90,6 +92,7 @@ Both fixtures produce 4 evidence entries. The choice (`send` vs `reject`) is rec
 gate evidence — `realm run inspect` shows who chose what and when.
 
 To inspect the full evidence chain of any run:
+
 ```bash
 node ../../packages/cli/dist/index.js run inspect <uuid>
 # or, if realm-cli is installed globally:
@@ -99,6 +102,7 @@ realm run inspect <uuid>
 ## Run it with an AI agent (any VS Code agent with MCP support)
 
 **Step 1** — Build:
+
 ```bash
 npm run build
 ```
@@ -107,6 +111,7 @@ npm run build
 MCP server starts on first use — no `settings.json` editing required.
 
 **Step 3** — In Copilot chat, ask:
+
 > "Triage this alert with Realm: examples/03-incident-response/alerts/high-latency.json"
 
 The workspace instruction file (`.github/instructions/realm.instructions.md`) gives your agent
@@ -147,4 +152,3 @@ is present via `context.resources.read_alert.content`.
   validation, revision loop
 - [YAML Schema Reference](../../docs/reference/yaml-schema.md) — all step fields, execution
   modes, gate configuration, and transitions
-

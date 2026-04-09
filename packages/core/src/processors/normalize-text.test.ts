@@ -12,10 +12,7 @@ describe('normalizeText', () => {
   });
 
   it('replaces em dash and en dash when dashes: true (default)', async () => {
-    const result = await normalizeText.process(
-      { text: 'a\u2014b\u2013c', metadata: {} },
-      {},
-    );
+    const result = await normalizeText.process({ text: 'a\u2014b\u2013c', metadata: {} }, {});
     expect(result.text).toBe('a--b-c');
     expect(result.metadata.normalized_dashes).toBe(2);
   });

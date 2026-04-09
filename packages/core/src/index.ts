@@ -8,17 +8,18 @@ export { JsonFileStore } from './store/json-file-store.js';
 export { StateGuard } from './engine/state-guard.js';
 export { executeStep } from './engine/execution-loop.js';
 export type { StepDispatcher, ExecuteStepOptions } from './engine/execution-loop.js';
-export {
-    findNextAction,
-    submitHumanResponse,
-    executeChain,
-} from './engine/execution-loop.js';
+export { findNextAction, submitHumanResponse, executeChain } from './engine/execution-loop.js';
 export type { SubmitGateOptions, ExecuteChainOptions } from './engine/execution-loop.js';
-export { TERMINAL_STATES, RESUMABLE_STATES, WAITING_STATES, isTerminalState } from './engine/lifecycle.js';
 export {
-    evaluatePrecondition,
-    checkPreconditions,
-    evaluateAllPreconditions,
+  TERMINAL_STATES,
+  RESUMABLE_STATES,
+  WAITING_STATES,
+  isTerminalState,
+} from './engine/lifecycle.js';
+export {
+  evaluatePrecondition,
+  checkPreconditions,
+  evaluateAllPreconditions,
 } from './engine/precondition.js';
 export type { PreconditionResult } from './engine/precondition.js';
 export type { StepDiagnostics } from './types/run-record.js';
@@ -27,7 +28,12 @@ export const VERSION = '0.1.0';
 // Extensions
 export type { ServiceAdapter, ServiceResponse } from './extensions/service-adapter.js';
 export type { Processor, ProcessorInput, ProcessorOutput } from './extensions/processor.js';
-export type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from './extensions/step-handler.js';
+export type {
+  StepHandler,
+  StepHandlerInputs,
+  StepContext,
+  StepHandlerResult,
+} from './extensions/step-handler.js';
 export { ExtensionRegistry } from './extensions/registry.js';
 
 // Evidence

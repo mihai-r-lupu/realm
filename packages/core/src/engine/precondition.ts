@@ -38,13 +38,20 @@ function parseLiteral(raw: string): unknown {
 /** Compares lhs to rhs using the given operator. Returns false if types are incompatible. */
 function compare(lhs: unknown, op: string, rhs: unknown): boolean {
   switch (op) {
-    case '==': return lhs === rhs;
-    case '!=': return lhs !== rhs;
-    case '>': return typeof lhs === 'number' && typeof rhs === 'number' && lhs > rhs;
-    case '<': return typeof lhs === 'number' && typeof rhs === 'number' && lhs < rhs;
-    case '>=': return typeof lhs === 'number' && typeof rhs === 'number' && lhs >= rhs;
-    case '<=': return typeof lhs === 'number' && typeof rhs === 'number' && lhs <= rhs;
-    default: return false;
+    case '==':
+      return lhs === rhs;
+    case '!=':
+      return lhs !== rhs;
+    case '>':
+      return typeof lhs === 'number' && typeof rhs === 'number' && lhs > rhs;
+    case '<':
+      return typeof lhs === 'number' && typeof rhs === 'number' && lhs < rhs;
+    case '>=':
+      return typeof lhs === 'number' && typeof rhs === 'number' && lhs >= rhs;
+    case '<=':
+      return typeof lhs === 'number' && typeof rhs === 'number' && lhs <= rhs;
+    default:
+      return false;
   }
 }
 

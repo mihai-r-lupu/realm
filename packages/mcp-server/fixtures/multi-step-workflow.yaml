@@ -12,14 +12,14 @@ params_schema:
   properties:
     candidates:
       type: array
-      description: "Extracted field candidates to validate"
+      description: 'Extracted field candidates to validate'
 
 protocol:
   quick_start: "Call start_run with workflow_id 'multi-step-demo'. The engine runs fetch_document automatically. You execute extract_fields by calling execute_step with command 'extract_fields' and your extracted candidates. The engine validates them, then pauses at finalize for human approval."
   rules:
     - "At extract_fields, extract candidates from the document text in the previous step's data. Submit them using execute_step."
-    - "At finalize, show the validation summary to the user before calling submit_human_response."
-    - "Include a verbatim_quote for every candidate you extract."
+    - 'At finalize, show the validation summary to the user before calling submit_human_response.'
+    - 'Include a verbatim_quote for every candidate you extract.'
 
 services:
   source:
@@ -35,7 +35,7 @@ steps:
     uses_service: source
     allowed_from_states: [created]
     produces_state: document_ready
-    instructions: "Engine handles this automatically. No action needed."
+    instructions: 'Engine handles this automatically. No action needed.'
 
   extract_fields:
     description: Extract field candidates from the document text
@@ -56,7 +56,7 @@ steps:
     handler: validate_verbatim_quotes
     allowed_from_states: [fields_extracted]
     produces_state: validated
-    instructions: "Engine validates your citations automatically. No action needed."
+    instructions: 'Engine validates your citations automatically. No action needed.'
 
   finalize:
     description: Human reviews and approves validated fields
@@ -64,4 +64,4 @@ steps:
     trust: human_confirmed
     allowed_from_states: [validated]
     produces_state: completed
-    instructions: "Show the validation results to the user and ask for their approval or rejection."
+    instructions: 'Show the validation results to the user and ask for their approval or rejection.'

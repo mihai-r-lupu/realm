@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { ExtensionRegistry } from './registry.js';
 import type { ServiceAdapter } from './service-adapter.js';
 import type { Processor, ProcessorInput, ProcessorOutput } from './processor.js';
-import type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from './step-handler.js';
+import type {
+  StepHandler,
+  StepHandlerInputs,
+  StepContext,
+  StepHandlerResult,
+} from './step-handler.js';
 
 const stubAdapter: ServiceAdapter = {
   id: 'test-adapter',

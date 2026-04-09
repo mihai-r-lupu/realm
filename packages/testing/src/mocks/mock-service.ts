@@ -19,7 +19,7 @@ export class MockServiceRecorder implements ServiceAdapter {
   constructor(
     public readonly id: string,
     private readonly responses: Record<string, ServiceResponse>,
-  ) { }
+  ) {}
 
   async fetch(
     operation: string,
@@ -54,12 +54,15 @@ export class MockServiceRecorder implements ServiceAdapter {
   private lookupResponse(operation: string): ServiceResponse {
     const response = this.responses[operation];
     if (response === undefined) {
-      throw new WorkflowError(`MockServiceRecorder: no response configured for operation '${operation}'`, {
-        code: 'ENGINE_ADAPTER_FAILED',
-        category: 'ENGINE',
-        agentAction: 'report_to_user',
-        retryable: false,
-      });
+      throw new WorkflowError(
+        `MockServiceRecorder: no response configured for operation '${operation}'`,
+        {
+          code: 'ENGINE_ADAPTER_FAILED',
+          category: 'ENGINE',
+          agentAction: 'report_to_user',
+          retryable: false,
+        },
+      );
     }
     return response;
   }

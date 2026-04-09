@@ -54,6 +54,8 @@ describe('runPipeline', () => {
     await expect(runPipeline(input, ['nonexistent'], registry)).rejects.toMatchObject({
       code: 'ENGINE_PROCESSOR_FAILED',
     });
-    await expect(runPipeline(input, ['nonexistent'], registry)).rejects.toBeInstanceOf(WorkflowError);
+    await expect(runPipeline(input, ['nonexistent'], registry)).rejects.toBeInstanceOf(
+      WorkflowError,
+    );
   });
 });

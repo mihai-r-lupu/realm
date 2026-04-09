@@ -112,7 +112,11 @@ export function replayRun(
 }
 
 /** Formats a precondition comparison column for the replay output table. */
-function formatPrecondColumn(originalPass: boolean, replayPass: boolean, hasPreconditions: boolean): string {
+function formatPrecondColumn(
+  originalPass: boolean,
+  replayPass: boolean,
+  hasPreconditions: boolean,
+): string {
   if (!hasPreconditions) return 'none';
   const orig = originalPass ? 'PASS' : 'BLOCKED';
   const replay = replayPass ? 'PASS' : 'BLOCKED';
@@ -177,7 +181,11 @@ export const replayCommand = new Command('replay')
     for (const row of results) {
       const step = definition.steps[row.step_id];
       const hasPreconditions = (step?.preconditions ?? []).length > 0;
-      const precondCol = formatPrecondColumn(row.preconditions_original, row.preconditions_replay, hasPreconditions);
+      const precondCol = formatPrecondColumn(
+        row.preconditions_original,
+        row.preconditions_replay,
+        hasPreconditions,
+      );
       const changedCol = row.changed ? 'YES \u26A0' : 'no';
       console.log(`${row.step_id.padEnd(col1)} ${precondCol.padEnd(col2)} ${changedCol}`);
     }

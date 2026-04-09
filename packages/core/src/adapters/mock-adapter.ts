@@ -11,7 +11,7 @@ export class MockAdapter implements ServiceAdapter {
   constructor(
     public readonly id: string,
     private readonly responses: Record<string, ServiceResponse>,
-  ) { }
+  ) {}
 
   private resolve(operation: string): ServiceResponse {
     const response = this.responses[operation];

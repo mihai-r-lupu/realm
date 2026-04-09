@@ -55,9 +55,7 @@ export function diffRuns(runA: RunRecord, runB: RunRecord): DiffStepRow[] {
       duration_a_ms: snapA?.duration_ms ?? 0,
       duration_b_ms: snapB?.duration_ms ?? 0,
       same_output:
-        snapA !== undefined &&
-        snapB !== undefined &&
-        snapA.evidence_hash === snapB.evidence_hash,
+        snapA !== undefined && snapB !== undefined && snapA.evidence_hash === snapB.evidence_hash,
       same_status: statusA === statusB,
     };
   });
@@ -108,7 +106,9 @@ export const diffCommand = new Command('diff')
     }
 
     if (runA.workflow_id !== runB.workflow_id) {
-      console.warn(`Warning: runs are from different workflows (${runA.workflow_id} vs ${runB.workflow_id})`);
+      console.warn(
+        `Warning: runs are from different workflows (${runA.workflow_id} vs ${runB.workflow_id})`,
+      );
     }
 
     const rows = diffRuns(runA, runB);
@@ -136,6 +136,8 @@ export const diffCommand = new Command('diff')
       const hashA = row.hash_a.slice(0, 8).padEnd(col2);
       const hashB = row.hash_b.slice(0, 8).padEnd(col2);
       const delta = formatDelta(row);
-      console.log(`${row.step_id.padEnd(col1)} ${statusA} ${sym} ${statusB} ${hashA} ${hashB} ${delta}`);
+      console.log(
+        `${row.step_id.padEnd(col1)} ${statusA} ${sym} ${statusB} ${hashA} ${hashB} ${delta}`,
+      );
     }
   });

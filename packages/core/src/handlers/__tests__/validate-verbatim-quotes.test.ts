@@ -6,7 +6,13 @@ const handler = new ValidateVerbatimQuotesHandler();
 
 const SOURCE_TEXT = 'The quick brown fox jumps over the lazy dog and the cat sat on the mat.';
 
-function makeContext(overrides: Partial<StepContext> & { source_step?: string; source_field?: string; quote_field?: string } = {}): StepContext {
+function makeContext(
+  overrides: Partial<StepContext> & {
+    source_step?: string;
+    source_field?: string;
+    quote_field?: string;
+  } = {},
+): StepContext {
   const { source_step = 'fetch_document', source_field, quote_field, ...rest } = overrides;
   const config: Record<string, unknown> = { source_step };
   if (source_field !== undefined) config.source_field = source_field;
@@ -51,9 +57,9 @@ describe('ValidateVerbatimQuotesHandler', () => {
         config: { source_step: 'missing_step' },
         resources: { fetch_document: { text: SOURCE_TEXT } },
       };
-      await expect(
-        handler.execute({ params: { candidates: [] } }, ctx),
-      ).rejects.toThrow('source text is missing or not a string');
+      await expect(handler.execute({ params: { candidates: [] } }, ctx)).rejects.toThrow(
+        'source text is missing or not a string',
+      );
     });
 
     it('throws when source text is not a string', async () => {
@@ -63,9 +69,9 @@ describe('ValidateVerbatimQuotesHandler', () => {
         config: { source_step: 'fetch_document' },
         resources: { fetch_document: { text: 12345 } },
       };
-      await expect(
-        handler.execute({ params: { candidates: [] } }, ctx),
-      ).rejects.toThrow('source text is missing or not a string');
+      await expect(handler.execute({ params: { candidates: [] } }, ctx)).rejects.toThrow(
+        'source text is missing or not a string',
+      );
     });
   });
 

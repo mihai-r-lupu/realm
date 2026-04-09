@@ -1,5 +1,5 @@
 ---
-applyTo: "**"
+applyTo: '**'
 ---
 
 # Realm: Using create_workflow
@@ -63,21 +63,21 @@ Minimal call:
 
 **Parameters:**
 
-| Field | Required | Description |
-|---|---|---|
-| `steps` | Yes | Array of step objects. At least one step required. |
-| `metadata.name` | No | Short slug used to derive the workflow ID. Use kebab-case. |
-| `metadata.task_description` | No | Human-readable description of the overall task. |
+| Field                       | Required | Description                                                |
+| --------------------------- | -------- | ---------------------------------------------------------- |
+| `steps`                     | Yes      | Array of step objects. At least one step required.         |
+| `metadata.name`             | No       | Short slug used to derive the workflow ID. Use kebab-case. |
+| `metadata.task_description` | No       | Human-readable description of the overall task.            |
 
 Each step:
 
-| Field | Required | Description |
-|---|---|---|
-| `id` | Yes | Unique identifier. Snake_case verb-noun. No spaces. |
-| `description` | Yes | What a correct output looks like (acceptance criterion). |
-| `input_schema` | No | JSON Schema for the fields this step's output must include. |
-| `depends_on` | No | Advisory list of step IDs this step logically follows. |
-| `timeout_seconds` | No | Positive integer. If omitted, no timeout is enforced. |
+| Field             | Required | Description                                                 |
+| ----------------- | -------- | ----------------------------------------------------------- |
+| `id`              | Yes      | Unique identifier. Snake_case verb-noun. No spaces.         |
+| `description`     | Yes      | What a correct output looks like (acceptance criterion).    |
+| `input_schema`    | No       | JSON Schema for the fields this step's output must include. |
+| `depends_on`      | No       | Advisory list of step IDs this step logically follows.      |
+| `timeout_seconds` | No       | Positive integer. If omitted, no timeout is enforced.       |
 
 ## Step Design Guidelines
 

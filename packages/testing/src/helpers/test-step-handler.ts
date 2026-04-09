@@ -1,5 +1,10 @@
 // testStepHandler — isolated step handler test helper.
-import type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from '@sensigo/realm';
+import type {
+  StepHandler,
+  StepHandlerInputs,
+  StepContext,
+  StepHandlerResult,
+} from '@sensigo/realm';
 
 /**
  * Calls handler.execute(inputs, context) and returns the result.

@@ -27,9 +27,7 @@ export const runCommand = new Command('run')
     try {
       definition = loadWorkflowFromFile(filePath);
     } catch (err) {
-      console.error(
-        `Error loading workflow: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      console.error(`Error loading workflow: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
     }
 

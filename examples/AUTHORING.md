@@ -19,12 +19,14 @@ The examples are the primary vehicle for demonstrating Realm to prospective user
 These principles apply to every example. Never violate them.
 
 **Realm does:**
+
 - Enforce step order via a YAML state machine
 - Validate step input schemas before execution
 - Enforce human gates mechanically — not by agent goodwill
 - Produce an immutable evidence chain for every run
 
 **Realm does NOT do:**
+
 - Parse or classify unstructured text — that is the LLM's job
 - Make the agent smarter — it makes the agent's behaviour predictable
 - Run domain logic in handlers — handlers are for deterministic operations only (schema validation, hash computation, verbatim-quote checking, field existence). If the logic requires language understanding, it belongs in an agent step.

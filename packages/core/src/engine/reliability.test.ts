@@ -271,12 +271,16 @@ describe('reliability', () => {
     });
 
     let dispatcherCalled!: () => void;
-    const calledPromise = new Promise<void>((r) => { dispatcherCalled = r; });
+    const calledPromise = new Promise<void>((r) => {
+      dispatcherCalled = r;
+    });
     let resolveDispatcher!: (v: Record<string, unknown>) => void;
 
     const deferredDispatcher: StepDispatcher = async () => {
       dispatcherCalled();
-      return await new Promise<Record<string, unknown>>((r) => { resolveDispatcher = r; });
+      return await new Promise<Record<string, unknown>>((r) => {
+        resolveDispatcher = r;
+      });
     };
 
     const stepPromise = executeStep(store, guard, noTimeoutDef, {
@@ -338,7 +342,9 @@ describe('reliability', () => {
     let capturedSignal: AbortSignal | undefined;
     const sigCapturingDispatcher: StepDispatcher = (_step, _input, _run, signal) => {
       capturedSignal = signal;
-      return new Promise<Record<string, unknown>>(() => { /* never resolves */ });
+      return new Promise<Record<string, unknown>>(() => {
+        /* never resolves */
+      });
     };
 
     const envelope = await executeStep(store, guard, timeoutDef, {
@@ -360,9 +366,7 @@ describe('reliability', () => {
     const controller = new AbortController();
     controller.abort();
 
-    await expect(
-      adapter.fetch('foo', {}, {}, controller.signal),
-    ).rejects.toMatchObject({
+    await expect(adapter.fetch('foo', {}, {}, controller.signal)).rejects.toMatchObject({
       code: 'STEP_ABORTED',
       retryable: false,
     });

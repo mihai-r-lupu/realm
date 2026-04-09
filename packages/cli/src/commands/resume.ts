@@ -23,15 +23,12 @@ export async function resumeRun(
   const run = await runStore.get(runId);
 
   if (!RESUMABLE_STATES.has(run.state)) {
-    throw new WorkflowError(
-      `Run ${runId} is in state '${run.state}', which is not resumable.`,
-      {
-        code: 'STATE_TRANSITION_DENIED',
-        category: 'STATE',
-        agentAction: 'report_to_user',
-        retryable: false,
-      },
-    );
+    throw new WorkflowError(`Run ${runId} is in state '${run.state}', which is not resumable.`, {
+      code: 'STATE_TRANSITION_DENIED',
+      category: 'STATE',
+      agentAction: 'report_to_user',
+      retryable: false,
+    });
   }
 
   const workflow = await workflowStore.get(run.workflow_id);
@@ -87,7 +84,10 @@ export const resumeCommand = new Command('resume')
   .description('Reset a failed or abandoned run so the specified step can execute again')
   .argument('<run-id>', 'ID of the run to resume')
   .requiredOption('--from <step>', 'Name of the step to re-enable')
-  .option('--state <state>', 'Override the target state (required when step allows multiple from-states)')
+  .option(
+    '--state <state>',
+    'Override the target state (required when step allows multiple from-states)',
+  )
   .action(async (runId: string, opts: { from: string; state?: string }) => {
     const { JsonFileStore, JsonWorkflowStore } = await import('@sensigo/realm');
     const runStore = new JsonFileStore();

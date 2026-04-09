@@ -50,8 +50,7 @@ export function createAgentDispatcher(
 
     if (stepDef.handler !== undefined) {
       const handler =
-        registry.getHandler(stepDef.handler) ??
-        fallbackRegistry?.getHandler(stepDef.handler);
+        registry.getHandler(stepDef.handler) ?? fallbackRegistry?.getHandler(stepDef.handler);
       if (handler === undefined) {
         throw new WorkflowError(
           `createAgentDispatcher: no handler registered for '${stepDef.handler}'`,

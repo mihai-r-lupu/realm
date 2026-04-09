@@ -69,7 +69,11 @@ describe('handleCreateWorkflow', () => {
   });
 
   it('happy path — input_schema is forwarded to the step and next_action', async () => {
-    const schema = { type: 'object', required: ['answer'], properties: { answer: { type: 'string' } } };
+    const schema = {
+      type: 'object',
+      required: ['answer'],
+      properties: { answer: { type: 'string' } },
+    };
     const result = await handleCreateWorkflow(
       {
         steps: [{ id: 'step-schema', description: 'Schemed step', input_schema: schema }],
@@ -134,9 +138,7 @@ describe('handleCreateWorkflow', () => {
   it('validation — depends_on unknown reference returns error', async () => {
     const result = await handleCreateWorkflow(
       {
-        steps: [
-          { id: 'step-a', description: 'Step A', depends_on: ['unknown-step'] },
-        ],
+        steps: [{ id: 'step-a', description: 'Step A', depends_on: ['unknown-step'] }],
       },
       stores,
     );
@@ -148,22 +150,28 @@ describe('handleCreateWorkflow', () => {
     const result = await handleCreateWorkflow(
       {
         steps: [
-          { id: 'step-a', description: 'A step', agent_profile: 'some-profile' } as unknown as import('./create-workflow.js').CreateWorkflowStep,
+          {
+            id: 'step-a',
+            description: 'A step',
+            agent_profile: 'some-profile',
+          } as unknown as import('./create-workflow.js').CreateWorkflowStep,
         ],
       },
       stores,
     );
     expect(result.status).toBe('error');
     expect(result.agent_action).toBe('provide_input');
-    expect(result.errors.some((e) => e.includes('agent_profile is not supported on dynamically-created workflows'))).toBe(true);
+    expect(
+      result.errors.some((e) =>
+        e.includes('agent_profile is not supported on dynamically-created workflows'),
+      ),
+    ).toBe(true);
   });
 
   it('validation — multiple errors collected together', async () => {
     const result = await handleCreateWorkflow(
       {
-        steps: [
-          { id: 'bad id', description: '' },
-        ],
+        steps: [{ id: 'bad id', description: '' }],
       },
       stores,
     );

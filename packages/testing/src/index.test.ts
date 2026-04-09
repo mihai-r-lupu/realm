@@ -135,8 +135,18 @@ describe('InMemoryStore', () => {
 
   it('list() filters by workflow_id', async () => {
     const store = new InMemoryStore();
-    await store.create({ workflowId: 'wf-a', workflowVersion: 1, initialState: 'created', params: {} });
-    await store.create({ workflowId: 'wf-b', workflowVersion: 1, initialState: 'created', params: {} });
+    await store.create({
+      workflowId: 'wf-a',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
+    await store.create({
+      workflowId: 'wf-b',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
     const result = await store.list('wf-a');
     expect(result).toHaveLength(1);
     expect(result[0]!.workflow_id).toBe('wf-a');
@@ -144,8 +154,18 @@ describe('InMemoryStore', () => {
 
   it('list() without filter returns all records', async () => {
     const store = new InMemoryStore();
-    await store.create({ workflowId: 'wf-a', workflowVersion: 1, initialState: 'created', params: {} });
-    await store.create({ workflowId: 'wf-b', workflowVersion: 1, initialState: 'created', params: {} });
+    await store.create({
+      workflowId: 'wf-a',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
+    await store.create({
+      workflowId: 'wf-b',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
     const all = await store.list();
     expect(all).toHaveLength(2);
   });
@@ -397,7 +417,10 @@ describe('testProcessor', () => {
   it('calls the processor and returns its output', async () => {
     const processor: Processor = {
       id: 'my-processor',
-      async process(content: ProcessorInput, config: Record<string, unknown>): Promise<ProcessorOutput> {
+      async process(
+        content: ProcessorInput,
+        config: Record<string, unknown>,
+      ): Promise<ProcessorOutput> {
         return {
           text: content.text.toUpperCase(),
           metadata: { ...content.metadata, processed: true, lang: config['lang'] ?? 'en' },
@@ -414,11 +437,19 @@ describe('testAdapter', () => {
   it('calls adapter.fetch() and returns the response', async () => {
     const adapter: ServiceAdapter = {
       id: 'test-adapter',
-      async fetch(_op: string, params: Record<string, unknown>, _cfg: Record<string, unknown>): Promise<ServiceResponse> {
+      async fetch(
+        _op: string,
+        params: Record<string, unknown>,
+        _cfg: Record<string, unknown>,
+      ): Promise<ServiceResponse> {
         return { status: 200, data: { received: params['x'] } };
       },
-      async create(): Promise<ServiceResponse> { return { status: 201, data: {} }; },
-      async update(): Promise<ServiceResponse> { return { status: 200, data: {} }; },
+      async create(): Promise<ServiceResponse> {
+        return { status: 201, data: {} };
+      },
+      async update(): Promise<ServiceResponse> {
+        return { status: 200, data: {} };
+      },
     };
     const resp = await testAdapter(adapter, 'do_thing', { x: 42 });
     expect(resp.status).toBe(200);
@@ -465,11 +496,9 @@ function makeMinimalRun(): RunRecord {
 describe('createAgentDispatcher', () => {
   it('returns pre-built agent response for execution: agent step', async () => {
     const registry = new ExtensionRegistry();
-    const dispatcher = createAgentDispatcher(
-      DISPATCHER_DEFINITION,
-      registry,
-      { 'agent-step': { score: 99 } },
-    );
+    const dispatcher = createAgentDispatcher(DISPATCHER_DEFINITION, registry, {
+      'agent-step': { score: 99 },
+    });
     const result = await dispatcher('agent-step', {}, makeMinimalRun());
     expect(result['score']).toBe(99);
   });

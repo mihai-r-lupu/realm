@@ -9,9 +9,7 @@ function makeContext(config: Record<string, unknown>, fieldValue?: unknown): Ste
     run_id: 'test-run',
     run_params: {},
     config,
-    resources: fieldValue !== undefined
-      ? { some_step: { some_field: fieldValue } }
-      : undefined,
+    resources: fieldValue !== undefined ? { some_step: { some_field: fieldValue } } : undefined,
   };
 }
 
@@ -139,7 +137,12 @@ describe('ValidateFieldMatchHandler', () => {
       const ctx: StepContext = {
         run_id: 'r',
         run_params: {},
-        config: { source_step: 'some_step', source_field: 'some_field', pattern: 'hello', mode: 'prefix' },
+        config: {
+          source_step: 'some_step',
+          source_field: 'some_field',
+          pattern: 'hello',
+          mode: 'prefix',
+        },
         resources: { some_step: { some_field: 'hello world' } },
       };
       const result = await handler.execute({ params: {} }, ctx);
@@ -150,7 +153,12 @@ describe('ValidateFieldMatchHandler', () => {
       const ctx: StepContext = {
         run_id: 'r',
         run_params: {},
-        config: { source_step: 'some_step', source_field: 'some_field', pattern: 'world', mode: 'prefix' },
+        config: {
+          source_step: 'some_step',
+          source_field: 'some_field',
+          pattern: 'world',
+          mode: 'prefix',
+        },
         resources: { some_step: { some_field: 'hello world' } },
       };
       const result = await handler.execute({ params: {} }, ctx);
@@ -163,7 +171,12 @@ describe('ValidateFieldMatchHandler', () => {
       const ctx: StepContext = {
         run_id: 'r',
         run_params: {},
-        config: { source_step: 'some_step', source_field: 'some_field', pattern: '^\\d+$', mode: 'regex' },
+        config: {
+          source_step: 'some_step',
+          source_field: 'some_field',
+          pattern: '^\\d+$',
+          mode: 'regex',
+        },
         resources: { some_step: { some_field: '12345' } },
       };
       const result = await handler.execute({ params: {} }, ctx);
@@ -174,7 +187,12 @@ describe('ValidateFieldMatchHandler', () => {
       const ctx: StepContext = {
         run_id: 'r',
         run_params: {},
-        config: { source_step: 'some_step', source_field: 'some_field', pattern: '^\\d+$', mode: 'regex' },
+        config: {
+          source_step: 'some_step',
+          source_field: 'some_field',
+          pattern: '^\\d+$',
+          mode: 'regex',
+        },
         resources: { some_step: { some_field: 'hello' } },
       };
       const result = await handler.execute({ params: {} }, ctx);
@@ -185,7 +203,12 @@ describe('ValidateFieldMatchHandler', () => {
       const ctx: StepContext = {
         run_id: 'r',
         run_params: {},
-        config: { source_step: 'some_step', source_field: 'some_field', pattern: '[invalid', mode: 'regex' },
+        config: {
+          source_step: 'some_step',
+          source_field: 'some_field',
+          pattern: '[invalid',
+          mode: 'regex',
+        },
         resources: { some_step: { some_field: 'hello' } },
       };
       const result = await handler.execute({ params: {} }, ctx);
@@ -198,7 +221,12 @@ describe('ValidateFieldMatchHandler', () => {
       const ctx: StepContext = {
         run_id: 'r',
         run_params: {},
-        config: { source_step: 'some_step', source_field: 'some_field', pattern: 'hello', mode: 'prefix' },
+        config: {
+          source_step: 'some_step',
+          source_field: 'some_field',
+          pattern: 'hello',
+          mode: 'prefix',
+        },
         resources: { some_step: { some_field: 'hello world' } },
       };
       const result = await handler.execute({ params: {} }, ctx);

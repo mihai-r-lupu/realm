@@ -55,9 +55,11 @@ npm run build
 `realm-document-intake` MCP server starts on first use.
 
 **Step 3** — In Copilot chat, ask:
+
 > "Run the document intake workflow on this file: /path/to/document.txt"
 
 The agent will:
+
 1. Start the run — `read_document` and any auto steps execute immediately.
 2. Receive a `next_action.prompt` asking it to extract fields.
 3. Submit extracted fields via `execute_step`.
@@ -72,9 +74,9 @@ The agent will:
 
 `params_schema` requires:
 
-| Field | Type   | Description                                 |
-|-------|--------|---------------------------------------------|
-| path  | string | Absolute path to the intake document file.  |
+| Field | Type   | Description                                |
+| ----- | ------ | ------------------------------------------ |
+| path  | string | Absolute path to the intake document file. |
 
 ## Run tests
 

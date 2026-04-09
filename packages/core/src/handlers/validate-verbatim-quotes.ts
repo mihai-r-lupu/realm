@@ -3,7 +3,12 @@
  *
  * Composes the handler primitives: resolveResource, walkField, partitionBySubstring, countResults.
  */
-import type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from '../extensions/step-handler.js';
+import type {
+  StepHandler,
+  StepHandlerInputs,
+  StepContext,
+  StepHandlerResult,
+} from '../extensions/step-handler.js';
 import { resolveResource } from './primitives/resolve-resource.js';
 import { walkField } from './primitives/walk-field.js';
 import { partitionBySubstring } from './primitives/partition-by-substring.js';

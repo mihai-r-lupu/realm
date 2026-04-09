@@ -9,7 +9,10 @@ export interface NormalizeTextConfig {
 /** Replaces Unicode smart quotes and dashes with plain ASCII equivalents. */
 export const normalizeText: Processor = {
   id: 'normalize_text',
-  async process(content: ProcessorInput, config: Record<string, unknown>): Promise<ProcessorOutput> {
+  async process(
+    content: ProcessorInput,
+    config: Record<string, unknown>,
+  ): Promise<ProcessorOutput> {
     const cfg = config as NormalizeTextConfig;
     const smartQuotes = cfg.smart_quotes !== false;
     const dashes = cfg.dashes !== false;

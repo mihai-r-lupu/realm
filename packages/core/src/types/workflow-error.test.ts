@@ -82,16 +82,13 @@ describe('WorkflowError', () => {
     expect(new Date(err.timestamp).toISOString()).toBe(err.timestamp);
   });
 
-  it.each(ALL_CATEGORIES)(
-    'can be constructed with category %s',
-    (category) => {
-      const err = new WorkflowError('cat test', {
-        code: 'ENGINE_INTERNAL',
-        category,
-        agentAction: 'stop',
-        retryable: false,
-      });
-      expect(err.category).toBe(category);
-    },
-  );
+  it.each(ALL_CATEGORIES)('can be constructed with category %s', (category) => {
+    const err = new WorkflowError('cat test', {
+      code: 'ENGINE_INTERNAL',
+      category,
+      agentAction: 'stop',
+      retryable: false,
+    });
+    expect(err.category).toBe(category);
+  });
 });
