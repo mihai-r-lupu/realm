@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// driver.ts — headless runner for the code-review example.
-// Usage: node dist/driver.js fixtures/clean-file.yaml
+// driver.ts — headless runner for the incident-response example.
+// Usage: node dist/driver.js fixtures/approved.yaml
 import { fileURLToPath } from 'node:url';
-import { join, dirname } from 'node:path';
+import { join, dirname, isAbsolute } from 'node:path';
 import {
   loadWorkflowFromFile,
   StateGuard,
@@ -27,6 +27,11 @@ if (fixturePath === undefined) {
 
 const definition = loadWorkflowFromFile(join(__dirname, '..', 'workflow.yaml'));
 const fixture = loadFixtureFromFile(fixturePath);
+
+// Resolve relative params.path values from the example root, so fixtures are portable.
+if (typeof fixture.params?.path === 'string' && !isAbsolute(fixture.params.path as string)) {
+  fixture.params.path = join(__dirname, '..', fixture.params.path as string);
+}
 const store = new InMemoryStore();
 const guard = new StateGuard(definition);
 
@@ -106,7 +111,7 @@ const allOk = evidence.every((s) => s.status === 'success');
 console.log('─'.repeat(57));
 console.log(`Final state: ${currentRun.state}`);
 console.log(`Evidence hash chain: ${allOk ? 'ok' : 'FAILED'} (${evidence.length}/${evidence.length})`);
-console.log(`\nTo inspect: realm inspect ${runId}\n`);
+console.log(`\nTo inspect: realm run inspect ${runId}\n`);
 process.exit(currentRun.state === 'completed' ? 0 : 1);
 
 function printStepRow(

@@ -43,7 +43,7 @@ npm install  # from repo root — installs all workspace packages
 ## Build
 
 ```bash
-cd examples/document-intake
+cd examples/02-document-intake
 npm run build
 ```
 
@@ -89,4 +89,4 @@ npm test
 
 - [README — Conditional Routing](../../README.md#conditional-routing) — all three `transitions`
   forms: `on_error`, gate-response choices, and `on_success` output-field routing
-- [Example 1 — Code Review](../code-review/) — agent profiles, human gate, `FileSystemAdapter`
+- [Example 3 — Incident Response](../03-incident-response/) — human gate with real stakes, idempotency via evidence chain

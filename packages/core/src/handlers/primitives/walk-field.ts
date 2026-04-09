@@ -1,8 +1,4 @@
 /**
- * Recursively walks a value and collects all objects that contain a specific property.
- */
-
-/**
  * Recursively walks any value and collects all objects that contain a
  * property named fieldName.
  *

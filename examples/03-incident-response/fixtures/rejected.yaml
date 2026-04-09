@@ -1,0 +1,38 @@
+name: rejected
+params:
+  path: alerts/error-spike.json
+agent_responses:
+  analyze_cause:
+    root_cause: "Session store dependency failure is causing all 5xx errors in auth-service — 1921 of 1938 errors trace to session-store."
+    severity: P1
+    impacted_services: [auth-service, api-gateway, user-service]
+    confidence: medium
+    runbook: "https://runbooks.internal/auth-service/error-spike"
+  draft_response:
+    headline: "P1 — auth-service down — session-store dependency failure"
+    message: |
+      P1 — auth-service outage
+
+      Root cause: All 5xx errors trace to session-store dependency (1921 of 1938 errors). Likely connection failure or service unavailability.
+
+      Impact: 23% of auth requests failing. api-gateway and user-service affected. Login and session refresh unavailable.
+
+      Runbook: https://runbooks.internal/auth-service/error-spike
+
+      Next steps:
+      - Check session-store health and connectivity immediately
+      - Verify no recent session-store deployments or config changes
+      - Consider enabling auth bypass if session-store remains down for more than 5 minutes
+gate_responses:
+  confirm_and_send: reject
+expected:
+  final_state: completed
+  evidence:
+    - step_id: read_alert
+      status: success
+    - step_id: analyze_cause
+      status: success
+    - step_id: draft_response
+      status: success
+    - step_id: confirm_and_send
+      status: success

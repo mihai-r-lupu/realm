@@ -1,0 +1,26 @@
+{
+    "alert_id": "ALT-20240412-1023",
+    "fired_at": "2024-04-12T10:23:11Z",
+    "alert_name": "error_rate_spike",
+    "service": "auth-service",
+    "environment": "production",
+    "threshold": "5xx error rate > 5% for 2 consecutive minutes",
+    "current_value": "5xx rate = 23%",
+    "metrics": {
+        "total_requests_per_min": 8430,
+        "error_5xx_per_min": 1938,
+        "error_rate_pct": 23.0,
+        "p99_latency_ms": 620,
+        "upstream_dependency_errors": {
+            "user-db": 0,
+            "session-store": 1921,
+            "rate-limiter": 0
+        }
+    },
+    "related_services": [
+        "api-gateway",
+        "user-service"
+    ],
+    "runbook": "https://runbooks.internal/auth-service/error-spike",
+    "recent_deployments": []
+}

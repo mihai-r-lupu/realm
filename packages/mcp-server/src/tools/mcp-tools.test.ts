@@ -1,6 +1,6 @@
 // Integration tests for MCP tool business logic — tests handle* functions directly.
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { JsonFileStore, JsonWorkflowStore } from '@sensigo/realm';
@@ -11,6 +11,7 @@ import { handleStartRun } from './start-run.js';
 import { handleExecuteStep, handleExecuteStepTool } from './execute-step.js';
 import { handleSubmitHumanResponse } from './submit-human-response.js';
 import { handleGetRunState } from './get-run-state.js';
+import { createDefaultRegistry } from '../server.js';
 
 /** Minimal 2-step workflow: auto → completed */
 function makeSimpleDef(): WorkflowDefinition {
@@ -303,5 +304,50 @@ describe('mcp tool handlers', () => {
 
     // Suppress unused-variable warning
     void gateRun;
+  });
+
+  it('handleStartRun resolves a filesystem auto step using the default built-in registry', async () => {
+    // Write a temp file to read.
+    const tempFilePath = join(runDir, 'test-input.txt');
+    await writeFile(tempFilePath, 'hello from filesystem adapter');
+
+    const filesystemDef: WorkflowDefinition = {
+      id: 'filesystem-auto-wf',
+      name: 'Filesystem Auto Workflow',
+      version: 1,
+      initial_state: 'created',
+      services: {
+        source: { adapter: 'filesystem', trust: 'engine_delivered' },
+      },
+      steps: {
+        read_file: {
+          description: 'Read a file from disk.',
+          execution: 'auto',
+          uses_service: 'source',
+          operation: 'read',
+          allowed_from_states: ['created'],
+          produces_state: 'completed',
+        },
+      },
+    };
+
+    const workflowStore = new JsonWorkflowStore(workflowDir);
+    await workflowStore.register(filesystemDef);
+    const runStore = new JsonFileStore(runDir);
+
+    // createDefaultRegistry() is what createRealmMcpServer() uses when no registry is provided.
+    // Passing it here verifies that the default registry has FileSystemAdapter available.
+    const result = await handleStartRun(
+      { workflow_id: 'filesystem-auto-wf', params: { path: tempFilePath } },
+      { runStore, workflowStore, registry: createDefaultRegistry() },
+    );
+
+    expect(result.status).toBe('ok');
+    expect(result.chained_auto_steps).toHaveLength(1);
+    expect(result.chained_auto_steps![0]!.step).toBe('read_file');
+    expect(result.chained_auto_steps![0]!.produced_state).toBe('completed');
+
+    const run = await runStore.get(result.run_id);
+    expect(run.state).toBe('completed');
   });
 });

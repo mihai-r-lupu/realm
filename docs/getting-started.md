@@ -24,7 +24,7 @@ realm --version
 ## 2. Scaffold a Workflow
 
 ```bash
-realm init extraction-demo
+realm workflow init extraction-demo
 cd extraction-demo
 ```
 
@@ -69,7 +69,7 @@ steps:
     produces_state: completed
 ```
 
-`execution: agent` — the step waits for the AI agent (or `realm run` in dev mode) to call `execute_step`.  
+`execution: agent` — the step waits for the AI agent (or `realm workflow run` in dev mode) to call `execute_step`.  
 `execution: auto` — the engine runs this step immediately, optionally calling a registered `handler`.  
 `trust: human_confirmed` — the engine pauses and waits for `submit_human_response` before advancing.
 
@@ -80,21 +80,21 @@ For a complete reference of all step fields, execution modes, transitions, and a
 ## 4. Validate and Register
 
 ```bash
-realm validate ./                # parse and validate the YAML
-realm register ./                # store the workflow definition locally
+realm workflow validate ./                # parse and validate the YAML
+realm workflow register ./                # store the workflow definition locally
 ```
 
-`realm validate` catches schema errors, duplicate step IDs, and invalid state transitions before you run anything.
+`realm workflow validate` catches schema errors, duplicate step IDs, and invalid state transitions before you run anything.
 
 ---
 
 ## 5. Run Interactively
 
 ```bash
-realm run ./
+realm workflow run ./
 ```
 
-`realm run` is a development driver. For each agent step it prompts you to type the JSON output. For human gates it prompts for approval. This lets you exercise the full workflow without an AI agent.
+`realm workflow run` is a development driver. For each agent step it prompts you to type the JSON output. For human gates it prompts for approval. This lets you exercise the full workflow without an AI agent.
 
 Example session:
 
@@ -114,7 +114,7 @@ Run ID: abc123
 ## 6. Inspect the Evidence Chain
 
 ```bash
-realm inspect abc123
+realm run inspect abc123
 ```
 
 Every step produces a tamper-evident evidence record containing the input received, the output produced, the resulting state, and a SHA-256 hash of the full evidence chain up to that point.
@@ -128,14 +128,9 @@ Services let the engine fetch, create, or update data in external systems.
 ### Built-in: FileSystemAdapter
 
 `@sensigo/realm` ships `FileSystemAdapter`, which reads a local file and returns
-`{ content, path, line_count, size_bytes }`. No custom TypeScript required:
-
-```typescript
-import { ExtensionRegistry, FileSystemAdapter } from '@sensigo/realm';
-
-const registry = new ExtensionRegistry();
-registry.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
-```
+`{ content, path, line_count, size_bytes }`. When using `createRealmMcpServer()` with no
+custom registry, it is pre-registered automatically under the name `filesystem` — no
+TypeScript required. Declare it only in your workflow YAML:
 
 ```yaml
 services:
@@ -154,7 +149,20 @@ steps:
 
 The file path is taken from the run's `params` — declare it in `params_schema` and pass it when
 calling `start_run`. The step result is injected directly into the evidence; the agent cannot see
-or alter it. See `examples/code-review/` and `examples/document-intake/` for working examples.
+or alter it. See `examples/03-incident-response/` and `examples/02-document-intake/` for working examples.
+
+**When you provide a custom registry** (e.g. to register a handler), auto-registration does not
+apply — start from `createDefaultRegistry()` from `@sensigo/realm-mcp` and add your extensions
+on top, so built-in adapters remain available:
+
+```typescript
+import { createDefaultRegistry } from '@sensigo/realm-mcp';
+
+const registry = createDefaultRegistry();
+registry.register('handler', 'my_handler', myHandler);
+
+const server = createRealmMcpServer({ workflowStore, registry });
+```
 
 ### Custom adapters
 
@@ -230,7 +238,7 @@ When the engine reaches a step with `trust: human_confirmed`, it pauses the run 
 **To resume a paused run from the CLI:**
 
 ```bash
-realm respond <run-id>
+realm run respond <run-id>
 ```
 
 **To resume via the MCP tool:** call `submit_human_response` with the `run_id`, `gate_id`, and `choice` from the `confirm_required` response.
@@ -250,31 +258,101 @@ When the engine opens a gate, the `confirm_required` response includes a `gate` 
 
 ## 9. Adding a Step Handler
 
-A step handler contains business logic for an `auto` step — validation, transformation, enrichment.
+A step handler contains business logic for an `execution: auto` step — validation,
+transformation, enrichment, or any computation the engine should run automatically.
 
 ```yaml
 steps:
   validate_output:
+    description: "Validate that required fields are present."
     execution: auto
     handler: check_required_fields
     allowed_from_states: [fields_extracted]
     produces_state: validated
+    config:
+      required_keys: [name, date, summary]
+    transitions:
+      on_error:
+        step: extract_fields
+        produces_state: revision_requested
 ```
+
+The `handler:` value is the name string. The `config:` block is a freeform key-value object
+delivered to the handler as `context.config`. Add any static configuration your handler needs
+here.
+
+### Writing a handler
+
+Import and implement the `StepHandler` interface from `@sensigo/realm`:
 
 ```typescript
 import type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from '@sensigo/realm';
 
 const checkRequiredFields: StepHandler = {
   id: 'check_required_fields',
-  async execute(inputs: StepHandlerInputs, _ctx: StepContext): Promise<StepHandlerResult> {
-    const fields = inputs.params['fields'] as Record<string, unknown>;
-    const missing = ['name', 'date'].filter(k => !(k in fields));
+
+  async execute(inputs: StepHandlerInputs, context: StepContext): Promise<StepHandlerResult> {
+    const keys = (context.config['required_keys'] as string[] | undefined) ?? [];
+    const fields = inputs.params as Record<string, unknown>;
+    const missing = keys.filter(k => !(k in fields) || fields[k] === null || fields[k] === '');
     if (missing.length > 0) {
       throw new Error(`Missing required fields: ${missing.join(', ')}`);
     }
-    return { data: { validated: true, fields } };
+    return { data: { validated: true, field_count: keys.length } };
   },
 };
+```
+
+**Key rules:**
+- Throw a plain `Error` — the engine wraps it as `ENGINE_HANDLER_FAILED`. Do not import engine internals.
+- Return `{ data: { ... } }` for business-logic outcomes (e.g. "no matches found"). Only throw for genuine errors the workflow cannot proceed from.
+- Read `context.config` for step-level configuration, `context.resources['step_name']['field']` for prior step outputs, and `inputs.params` for the agent's submitted input from the previous step.
+- If your handler does async I/O, check `signal?.aborted` between operations and throw if true.
+
+### Accessing prior step outputs
+
+```typescript
+import { resolveResource } from '@sensigo/realm';
+
+// Reads context.resources['fetch_document']['text'], returns undefined if missing
+const text = resolveResource(context.resources, 'fetch_document', 'text');
+if (typeof text !== 'string') {
+  throw new Error('source text missing');
+}
+```
+
+### Registering a handler
+
+```typescript
+import { ExtensionRegistry } from '@sensigo/realm';
+import { createRealmMcpServer } from '@sensigo/realm-mcp';
+
+const registry = new ExtensionRegistry();
+registry.register('handler', 'check_required_fields', checkRequiredFields);
+
+const server = createRealmMcpServer({ registry });
+```
+
+### Available primitives
+
+`@sensigo/realm` exports five utility functions you can compose inside handlers:
+
+| Function | Purpose |
+|----------|---------|
+| `resolveResource(resources, stepId, field)` | Read a field from a prior step's output. Returns `undefined` on missing. |
+| `walkField(data, fieldName)` | Recursively collect all objects containing `fieldName` from a nested structure. |
+| `partitionBySubstring(candidates, quoteField, sourceText)` | Split candidates into `accepted`/`rejected` by verbatim substring presence. |
+| `countResults(accepted, rejected)` | Compute `{ accepted_count, rejected_count, candidates_found }`. |
+| `compareStrings(a, b, mode)` | Compare strings with `"exact"`, `"prefix"`, or `"regex"` mode. |
+
+### Built-in handlers
+
+Two handlers are available without registration:
+
+- **`validate_verbatim_quotes`** — verifies AI-extracted quotes appear verbatim in a source document. Detects hallucinations.
+- **`validate_field_match`** — reads a field from a prior step and compares it to a pattern. Guards that a fetched resource belongs to the expected entity.
+
+For full interface documentation, context field reference, handler composition patterns, built-in handler config/output tables, and testing utilities, see the [Handler Authoring Reference](reference/handlers.md).
 ```
 
 ---
@@ -354,7 +432,7 @@ create_workflow
     task_description: "Audit and fix JSDoc across the codebase."
 ```
 
-`create_workflow` registers the workflow and starts a run in one call — no YAML file, no `realm register`. The response includes `data.workflow_id` and a `next_action` pointing at the first step. The agent then uses `execute_step` exactly as it would for a YAML workflow.
+`create_workflow` registers the workflow and starts a run in one call — no YAML file, no `realm workflow register`. The response includes `data.workflow_id` and a `next_action` pointing at the first step. The agent then uses `execute_step` exactly as it would for a YAML workflow.
 
 Runs created by `create_workflow` carry the same evidence chain, `next_action` guidance, and state machine enforcement as YAML-registered runs. See [`.github/instructions/realm-create-workflow.instructions.md`](../.github/instructions/realm-create-workflow.instructions.md) for the full protocol.
 
@@ -363,7 +441,7 @@ Runs created by `create_workflow` carry the same evidence chain, `next_action` g
 Realm supports any number of registered workflows in one store. To add more workflows:
 
 ```bash
-realm register ./my-other-workflow
+realm workflow register ./my-other-workflow
 ```
 
 When the agent calls `list_workflows`, it receives the full list of registered IDs and names. It
@@ -371,7 +449,7 @@ matches the user's request to the right workflow ID, calls `get_workflow_protoco
 that workflow's step-by-step briefing, then proceeds with `start_run`.
 
 For VS Code, place a generic `.github/instructions/realm.instructions.md` in your repository
-(see [examples/code-review/](../examples/code-review/)) — it teaches any connected agent the
+(see [examples/03-incident-response/](../examples/03-incident-response/)) — it teaches any connected agent the
 full discovery-and-execute loop without being tied to a specific workflow.
 
 For workflow-specific agent behaviour (custom trigger phrases, UX instructions, step-level
@@ -404,7 +482,7 @@ expected_final_state: completed
 Run the tests:
 
 ```bash
-realm test ./ --fixtures ./fixtures/
+realm workflow test ./ --fixtures ./fixtures/
 ```
 
 In unit tests, use `@sensigo/realm-testing`:
@@ -429,7 +507,7 @@ assertStepOutput(run, 'step_one', { result: 'the document text' });
 
 ## Next Steps
 
-- Browse the [`examples/code-review/`](../examples/code-review/workflow.yaml) workflow for a realistic 3-step pattern with a service adapter, OWASP security review, and a human gate.
+- Browse the [`examples/03-incident-response/`](../examples/03-incident-response/workflow.yaml) workflow for a realistic 4-step pattern with a filesystem adapter, two agent steps with personas, and a human gate.
 - Read the [YAML Schema Reference](reference/yaml-schema.md) for all step fields, execution modes, and transitions.
 - Read the [MCP Protocol Reference](reference/mcp-protocol.md) for full tool and response envelope documentation.
 - Read the [`@sensigo/realm` source](../packages/core/src/index.ts) for the full public API.

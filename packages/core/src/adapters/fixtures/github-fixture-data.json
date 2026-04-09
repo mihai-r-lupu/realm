@@ -5,7 +5,11 @@
       "diff_text": "diff --git a/src/main.ts b/src/main.ts\n--- a/src/main.ts\n+++ b/src/main.ts\n@@ -1,4 +1,5 @@\n+// added feature\n export function main() {}",
       "pr_title": "Add new feature",
       "base_branch": "main",
-      "files_changed": ["src/main.ts", "src/utils.ts"]
+      "files_changed": [
+        "src/main.ts",
+        "src/utils.ts"
+      ],
+      "repo": "owner/repo"
     }
   },
   "GET /repos/:owner/:repo/issues": {
@@ -23,6 +27,8 @@
   },
   "PATCH /repos/:owner/:repo/pulls/:pr": {
     "status": 200,
-    "echo": ["body"]
+    "echo": [
+      "body"
+    ]
   }
 }

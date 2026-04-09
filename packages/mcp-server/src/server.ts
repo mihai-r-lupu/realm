@@ -2,8 +2,7 @@
 // realm-mcp — MCP server exposing the Realm workflow engine to AI agents.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import type { ExtensionRegistry } from '@sensigo/realm';
-import { JsonWorkflowStore, JsonFileStore } from '@sensigo/realm';
+import { ExtensionRegistry, FileSystemAdapter, JsonWorkflowStore, JsonFileStore } from '@sensigo/realm';
 import { registerListWorkflows } from './tools/list-workflows.js';
 import { registerGetWorkflowProtocol } from './tools/get-workflow-protocol.js';
 import { registerStartRun } from './tools/start-run.js';
@@ -25,9 +24,29 @@ export interface RealmMcpServerOptions {
 }
 
 /**
+ * Returns an ExtensionRegistry pre-populated with Realm's built-in adapters.
+ * `FileSystemAdapter` is registered under the name `'filesystem'`.
+ *
+ * Use this as a starting point when you need built-in adapters alongside your own extensions:
+ * ```ts
+ * const registry = createDefaultRegistry();
+ * registry.register('handler', 'my_handler', myHandler);
+ * const server = createRealmMcpServer({ workflowStore, registry });
+ * ```
+ */
+export function createDefaultRegistry(): ExtensionRegistry {
+  const r = new ExtensionRegistry();
+  r.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
+  return r;
+}
+
+/**
  * Creates and configures the Realm MCP server with all 7 workflow tools.
- * Pass `registry` and `secrets` to enable auto steps that use service adapters
- * or custom step handlers.
+ *
+ * When no `registry` is provided, `FileSystemAdapter` is pre-registered automatically
+ * under the name `filesystem`. Pass a custom `registry` to add your own handlers and
+ * adapters — when you do, include `FileSystemAdapter` explicitly if your workflows use it,
+ * or start from `createDefaultRegistry()` and add your extensions on top.
  */
 export function createRealmMcpServer(options?: RealmMcpServerOptions): McpServer {
   const server = new McpServer({
@@ -35,13 +54,19 @@ export function createRealmMcpServer(options?: RealmMcpServerOptions): McpServer
     version: '0.1.0',
   });
 
-  registerListWorkflows(server, options);
-  registerGetWorkflowProtocol(server, options);
-  registerStartRun(server, options);
-  registerExecuteStep(server, options);
-  registerSubmitHumanResponse(server, options);
-  registerGetRunState(server, options);
-  registerCreateWorkflow(server, options);
+  // When no registry is provided, use the default registry that pre-registers built-in
+  // adapters. When a registry is provided, the caller is responsible for its contents.
+  const effectiveRegistry = options?.registry ?? createDefaultRegistry();
+
+  const effectiveOptions: RealmMcpServerOptions = { ...options, registry: effectiveRegistry };
+
+  registerListWorkflows(server, effectiveOptions);
+  registerGetWorkflowProtocol(server, effectiveOptions);
+  registerStartRun(server, effectiveOptions);
+  registerExecuteStep(server, effectiveOptions);
+  registerSubmitHumanResponse(server, effectiveOptions);
+  registerGetRunState(server, effectiveOptions);
+  registerCreateWorkflow(server, effectiveOptions);
 
   return server;
 }

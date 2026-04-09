@@ -63,11 +63,11 @@ export class GitHubAdapter implements ServiceAdapter {
       method === 'GET'
         ? { method, headers: this.buildHeaders(), signal: signal ?? null }
         : {
-            method,
-            headers: this.buildHeaders(),
-            body: JSON.stringify(body),
-            signal: signal ?? null,
-          };
+          method,
+          headers: this.buildHeaders(),
+          body: JSON.stringify(body),
+          signal: signal ?? null,
+        };
 
     let response: Response;
     try {
@@ -118,7 +118,8 @@ export class GitHubAdapter implements ServiceAdapter {
 
     if (operation === 'get_pr_diff') {
       const url = `${this.baseUrl}/repos/${repo}/pulls/${prNumber}/files`;
-      return this.executeRequest('GET', url, undefined, signal);
+      const result = await this.executeRequest('GET', url, undefined, signal);
+      return { ...result, data: { ...(result.data as Record<string, unknown>), repo } };
     }
 
     if (operation === 'get_linked_issues') {

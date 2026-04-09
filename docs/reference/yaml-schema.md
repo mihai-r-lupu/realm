@@ -1,6 +1,6 @@
 # YAML Schema Reference
 
-Complete reference for `workflow.yaml` fields. Every field documented here is validated at `realm register` time — errors include the field name and expected type.
+Complete reference for `workflow.yaml` fields. Every field documented here is validated at `realm workflow register` time — errors include the field name and expected type.
 
 ---
 
@@ -10,7 +10,7 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 |-------|------|----------|-------------|
 | `id` | string | Yes | Unique workflow identifier. Used in all CLI commands and MCP tool calls. |
 | `name` | string | Yes | Human-readable workflow name. |
-| `version` | integer | Yes | Workflow version number. Incremented on each `realm register`. |
+| `version` | integer | Yes | Workflow version number. Incremented on each `realm workflow register`. |
 | `initial_state` | string | Yes | State every new run starts in. Must appear in at least one step's `allowed_from_states`. |
 | `params_schema` | object | No | JSON Schema for the params accepted by `start_run`. The agent's `call_with.params` skeleton is derived from this at runtime. |
 | `services` | object | No | Named service definitions. Referenced by steps via `uses_service`. |
@@ -32,6 +32,7 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 | `service_method` | `fetch` \| `create` \| `update` | No | Adapter method to call. Defaults to `fetch`. |
 | `operation` | string | No | Operation name passed to the adapter. Defaults to the step name. |
 | `handler` | string | No | Name of a registered `StepHandler` to invoke. Only valid on `execution: auto` steps. |
+| `config` | object | No | Static key-value configuration passed to the handler via `context.config`. Only meaningful on `execution: auto` steps with a `handler`. |
 | `input_schema` | object | No | JSON Schema validated against the agent's submitted `params` before execution. |
 | `preconditions` | string[] | No | Boolean expressions evaluated before the step runs. See [Preconditions](#preconditions). |
 | `trust` | string | No | Human oversight level. See [Trust levels](#trust-levels). |
@@ -187,7 +188,7 @@ steps:
     agent_profile: security-reviewer   # loads agents/security-reviewer.md
 ```
 
-The profile file must exist in `profiles_dir`. If it is missing, `realm register` fails immediately and includes the expected file path in the error message. The profile content is delivered to the agent as `agent_profile_instructions` on the protocol step. Its SHA-256 hash is recorded in the evidence snapshot for auditability.
+The profile file must exist in `profiles_dir`. If it is missing, `realm workflow register` fails immediately and includes the expected file path in the error message. The profile content is delivered to the agent as `agent_profile_instructions` on the protocol step. Its SHA-256 hash is recorded in the evidence snapshot for auditability.
 
 ---
 
@@ -214,3 +215,75 @@ protocol:
 ```
 
 `quick_start` overrides the generated instructions paragraph in `get_workflow_protocol`. `rules` replaces the default rule set entirely — include the defaults if you still want them.
+
+---
+
+## Built-in handlers
+
+Two handlers are available in every Realm instance without registration. Declare them with
+`handler:` on any `execution: auto` step, and configure them with a `config:` block.
+
+### `validate_verbatim_quotes`
+
+Verifies that AI-extracted quotes appear verbatim in a source document.
+
+| Config key | Required | Default | Description |
+|------------|----------|---------|-------------|
+| `source_step` | Yes | — | Name of the prior step that produced the source text. |
+| `source_field` | No | `"text"` | Field in the source step's output holding the source text. |
+| `quote_field` | No | `"verbatim_quote"` | Field in each candidate object holding the quote to verify. |
+
+**Inputs:** `candidates` — array of objects, each containing a `quote_field` value.
+
+**Output:** `{ accepted, rejected, accepted_count, rejected_count, candidates_found }`
+
+`candidates_found` (`accepted_count + rejected_count`) is the key diagnostic: it
+distinguishes "nothing was extracted" from "all extracted were invalid".
+
+```yaml
+validate_quotes:
+  execution: auto
+  handler: validate_verbatim_quotes
+  allowed_from_states: [quotes_extracted]
+  produces_state: quotes_validated
+  config:
+    source_step: fetch_document
+    source_field: text
+  transitions:
+    on_error:
+      step: extract_quotes
+      produces_state: revision_requested
+```
+
+### `validate_field_match`
+
+Reads a field from a prior step's output and compares it against a pattern. Use this as a
+guard to verify that a fetched resource belongs to the expected entity.
+
+| Config key | Required | Default | Description |
+|------------|----------|---------|-------------|
+| `source_step` | Yes | — | Name of the prior step that produced the value. |
+| `source_field` | Yes | — | Field in that step's output to read. |
+| `pattern` | Yes | — | Value or pattern to compare against. |
+| `mode` | No | `"exact"` | `"exact"`, `"prefix"`, or `"regex"`. |
+
+**Output:** `{ matched, value, pattern, mode }`
+
+This handler never throws on mismatch — `matched: false` is a valid outcome that the workflow
+handles via preconditions, not via `on_error`.
+
+```yaml
+verify_repo:
+  execution: auto
+  handler: validate_field_match
+  allowed_from_states: [diff_fetched]
+  produces_state: repo_verified
+  config:
+    source_step: fetch_diff
+    source_field: repo_full_name
+    pattern: "myorg/.*"
+    mode: regex
+```
+
+For handler authoring details, interface signatures, primitives, and registration patterns, see
+[Handler Authoring Reference](handlers.md).
