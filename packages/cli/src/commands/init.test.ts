@@ -27,7 +27,7 @@ describe('initWorkflow', () => {
     expect(schema).toContain('"$schema"');
     expect(envEx).toContain('EXAMPLE_API_KEY');
     expect(readme).toContain('# my-workflow');
-    expect(readme).toContain('realm validate');
+    expect(readme).toContain('realm workflow validate');
   });
 
   it('throws an error when target directory already exists', async () => {

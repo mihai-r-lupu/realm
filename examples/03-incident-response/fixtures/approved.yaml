@@ -1,0 +1,38 @@
+name: approved
+params:
+  path: alerts/high-latency.json
+agent_responses:
+  analyze_cause:
+    root_cause: "Database connection pool exhausted on payments-api following a throughput spike after the v2.14.1 deployment."
+    severity: P2
+    impacted_services: [payments-api, order-service, inventory-api]
+    confidence: high
+    runbook: "https://runbooks.internal/payments-api/high-latency"
+  draft_response:
+    headline: "P2 — payments-api degraded — DB connection pool exhausted"
+    message: |
+      P2 — payments-api degraded
+
+      Root cause: DB connection pool at capacity (98/100 connections). Likely triggered by throughput increase following v2.14.1 deployment at 07:30 UTC.
+
+      Impact: p99 latency at 4820ms (threshold 2000ms). order-service and inventory-api calls degraded.
+
+      Runbook: https://runbooks.internal/payments-api/high-latency
+
+      Next steps:
+      - Scale DB connection pool limit immediately
+      - Review v2.14.1 for unexpected query pattern changes
+      - Monitor p99 latency until back below 500ms
+gate_responses:
+  confirm_and_send: send
+expected:
+  final_state: completed
+  evidence:
+    - step_id: read_alert
+      status: success
+    - step_id: analyze_cause
+      status: success
+    - step_id: draft_response
+      status: success
+    - step_id: confirm_and_send
+      status: success

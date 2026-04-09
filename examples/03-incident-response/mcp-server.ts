@@ -1,23 +1,19 @@
 #!/usr/bin/env node
-// mcp-server.ts — entry point for the document-intake MCP server.
+// mcp-server.ts — starts the Realm MCP server with the incident-response workflow registered.
+// Used for Mode 1: connect a VS Code agent with MCP support to this server.
+// FileSystemAdapter is pre-registered automatically by createRealmMcpServer().
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
-import { loadWorkflowFromFile, JsonWorkflowStore, FileSystemAdapter, ExtensionRegistry } from '@sensigo/realm';
+import { loadWorkflowFromFile, JsonWorkflowStore } from '@sensigo/realm';
 import { createRealmMcpServer } from '@sensigo/realm-mcp';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { ValidateIntakeFieldsHandler } from './handlers.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const registry = new ExtensionRegistry();
-registry.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
-registry.register('handler', 'validate_intake_fields', new ValidateIntakeFieldsHandler());
-
 const definition = loadWorkflowFromFile(join(__dirname, '..', 'workflow.yaml'));
-
 const workflowStore = new JsonWorkflowStore();
 await workflowStore.register(definition);
 
-const server = createRealmMcpServer({ workflowStore, registry });
+const server = createRealmMcpServer({ workflowStore });
 const transport = new StdioServerTransport();
 await server.connect(transport);

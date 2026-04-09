@@ -8,7 +8,7 @@ import path from 'node:path';
 
 const fixturePath = path.resolve(
   fileURLToPath(import.meta.url),
-  '../../../../../examples/pr-description/fixtures/github-fixture-data.json',
+  '../fixtures/github-fixture-data.json',
 );
 
 describe('GitHubAdapter', () => {

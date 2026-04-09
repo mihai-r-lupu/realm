@@ -1,10 +1,10 @@
 {
   "servers": {
-    "realm-code-review": {
+    "realm-incident-response": {
       "type": "stdio",
       "command": "node",
       "args": [
-        "${workspaceFolder}/examples/code-review/dist/mcp-server.js"
+        "${workspaceFolder}/examples/03-incident-response/dist/mcp-server.js"
       ],
       "autoStart": true
     },
@@ -12,7 +12,7 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "${workspaceFolder}/examples/document-intake/dist/mcp-server.js"
+        "${workspaceFolder}/examples/02-document-intake/dist/mcp-server.js"
       ],
       "autoStart": true
     }

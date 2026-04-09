@@ -46,7 +46,7 @@ npm install --save-dev @sensigo/realm-testing
 ### 1. Scaffold a workflow
 
 ```bash
-realm init my-workflow
+realm workflow init my-workflow
 ```
 
 This creates `my-workflow/` with `workflow.yaml`, `schema.json`, `.env.example`, and a `README.md`.
@@ -83,12 +83,12 @@ steps:
 ### 3. Validate, register, and run
 
 ```bash
-realm validate ./my-workflow   # check the YAML
-realm register ./my-workflow   # register with the local store
-realm run ./my-workflow        # run interactively (development mode)
+realm workflow validate ./my-workflow   # check the YAML
+realm workflow register ./my-workflow   # register with the local store
+realm workflow run ./my-workflow        # run interactively (development mode)
 ```
 
-`realm run` drives the workflow step by step, prompting you for simulated agent output and pausing at human gates.
+`realm workflow run` drives the workflow step by step, prompting you for simulated agent output and pausing at human gates.
 
 ## Connect an AI Agent via MCP
 
@@ -132,33 +132,35 @@ Once connected the agent has access to 7 tools: `list_workflows`, `get_workflow_
 
 The agent calls `list_workflows` to discover registered workflows, then `get_workflow_protocol` for the matched workflow to receive explicit step-by-step instructions. It cannot execute a step out of order or submit output that fails schema validation.
 
-When no registered workflow matches the task, the agent calls `create_workflow` with a `steps` array to register a dynamic workflow and immediately start a run — no YAML file or `realm register` required. The run proceeds identically to a YAML workflow from that point.
+When no registered workflow matches the task, the agent calls `create_workflow` with a `steps` array to register a dynamic workflow and immediately start a run — no YAML file or `realm workflow register` required. The run proceeds identically to a YAML workflow from that point.
 
-**Multiple workflows:** register as many as you need with `realm register`. The agent discovers them all via `list_workflows` and picks the right one by ID. Add a `skill.md` alongside each workflow for workflow-specific agent behaviour.
+**Multiple workflows:** register as many as you need with `realm workflow register`. The agent discovers them all via `list_workflows` and picks the right one by ID. Add a `skill.md` alongside each workflow for workflow-specific agent behaviour.
 
 ## CLI Reference
 
 | Command | Description |
 |---------|-------------|
-| `realm init <name>` | Scaffold a new workflow project directory |
-| `realm validate <path>` | Validate a workflow YAML without registering it |
-| `realm register <path>` | Register a workflow in the local store |
-| `realm run <path>` | Run a workflow interactively (development mode) |
-| `realm resume <run-id>` | Resume a paused run |
-| `realm respond <run-id>` | Submit a response to a human gate |
-| `realm inspect <run-id>` | Print the full evidence chain for a run |
-| `realm replay <run-id>` | Re-evaluate preconditions with modified step outputs |
-| `realm diff <run-a> <run-b>` | Compare evidence chains of two runs side by side |
-| `realm cleanup` | Mark idle non-terminal runs as abandoned |
-| `realm test <path>` | Run fixture-based tests against a workflow |
+| `realm workflow init <name>` | Scaffold a new workflow project directory |
+| `realm workflow validate <path>` | Validate a workflow YAML without registering it |
+| `realm workflow register <path>` | Register a workflow in the local store |
+| `realm workflow run <path>` | Run a workflow interactively (development mode) |
+| `realm workflow test <path>` | Run fixture-based tests against a workflow |
+| `realm run list` | List all runs |
+| `realm run resume <run-id>` | Resume a paused run |
+| `realm run respond <run-id>` | Submit a response to a human gate |
+| `realm run inspect <run-id>` | Print the full evidence chain for a run |
+| `realm run replay <run-id>` | Re-evaluate preconditions with modified step outputs |
+| `realm run diff <run-a> <run-b>` | Compare evidence chains of two runs side by side |
+| `realm run cleanup` | Mark idle non-terminal runs as abandoned |
 
-Run `realm <command> --help` for full options on any command.
+Run `realm <group> <command> --help` for full options on any command.
 
 
 ## Documentation
 
 - [Getting Started](docs/getting-started.md) — end-to-end walkthrough including service adapters, human gates, and step handlers
 - [YAML Schema Reference](docs/reference/yaml-schema.md) — all step fields, execution modes, transitions, trust levels, agent profiles
+- [Handler Authoring Reference](docs/reference/handlers.md) — `StepHandler` interface, `StepContext` fields, primitives catalogue, built-in handlers, registration
 - [MCP Protocol Reference](docs/reference/mcp-protocol.md) — tools, response envelope, next_action, agent_action
 - [CLI Reference](docs/reference/cli-commands.md) — all commands with options
 - [Examples](examples/) — working workflow examples

@@ -65,9 +65,9 @@ A Realm workflow.
 ## Run
 
 \`\`\`bash
-realm validate ./
-realm register ./
-realm run ./
+realm workflow validate ./
+realm workflow register ./
+realm workflow run ./
 \`\`\`
 
 ## Test
@@ -75,7 +75,7 @@ realm run ./
 Add fixtures to \`fixtures/\` and run:
 
 \`\`\`bash
-realm test ./ --fixtures ./fixtures/
+realm workflow test ./ --fixtures ./fixtures/
 \`\`\`
 `;
 
@@ -99,7 +99,7 @@ export const initCommand = new Command('init')
       console.log('  .env.example');
       console.log('  README.md');
       console.log('');
-      console.log(`Next: realm validate ./${name}/`);
+      console.log(`Next: realm workflow validate ./${name}/`);
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
       process.exit(1);

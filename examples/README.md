@@ -1,11 +1,16 @@
 # Realm — Examples
 
-Two progressive examples, each runnable in under five minutes.
+Examples are ordered by the developer pain they address, starting with the most immediately
+felt problems. Each example has a **before** (the naive approach) and an **after** (the Realm
+workflow), so you can see exactly what changes and why.
 
-| Example | What it demonstrates |
-|---|---|
-| [code-review/](code-review/) | Four-step workflow: auto file read via `FileSystemAdapter`, two agent steps with persona profiles (`agents/`), human gate |
-| [document-intake/](document-intake/) | Conditional branching — `on_error`, gate-response `transitions`, and `on_success` output-field routing; `FileSystemAdapter` |
+| Example | Pain points demonstrated | Realm primitive |
+|---|---|---|
+| [03-incident-response/](03-incident-response/) | No human gate before irreversible action, no audit trail, duplicate posts on retry | Human gate, idempotency via evidence chain, sequential agent steps with personas |
+| [02-document-intake/](02-document-intake/) | No output validation, steps proceed on bad data, no retry boundary | Handler schemas, `on_error` branching, validation step |
+
+More examples covering verification gaps, checkpoint/resume, and idempotency are planned.
+See `.private/realm-ai-automation-pain-points-final.md` for the full priority ladder.
 
 Each example ships with a headless driver (`node dist/driver.js <fixture>`) and an MCP server
 (`node dist/mcp-server.js`) for use with a VS Code agent.
@@ -25,7 +30,7 @@ npm run build
 Or build a single example:
 
 ```bash
-cd examples/code-review
+cd examples/03-incident-response
 npm run build
 ```
 
@@ -59,7 +64,7 @@ If the server shows as stopped, reload the window first:
 window load. If it doesn't, confirm the example has been built:
 
 ```bash
-cd examples/code-review && npm run build
+cd examples/03-incident-response && npm run build
 ```
 
 ### "Falling back to a direct review" — agent ignores the Realm protocol
@@ -67,7 +72,7 @@ cd examples/code-review && npm run build
 The agent's response appears in the chat, but it never called `start_run`. Two possible causes:
 
 1. **Wrong agent mode** — make sure you are in **Master Architect** or **Implementation Agent**
-   mode. Both have `realm-code-review` in their `tools:` list. The default Copilot agent does not.
+   mode. Both have `realm-incident-response` in their `tools:` list. The default Copilot agent does not.
    Switch using the agent dropdown in the chat panel.
 
 2. **Server not connected** — the tool exists in the agent's list but VS Code has not started the
@@ -90,11 +95,11 @@ VS Code starts the MCP server from the remote host automatically when `autoStart
 Check whether `mcp-server.js` is in the built output:
 
 ```bash
-ls examples/code-review/dist/mcp-server.js
+ls examples/03-incident-response/dist/mcp-server.js
 ```
 
 If missing, rebuild:
 
 ```bash
-cd examples/code-review && npm run build
+cd examples/03-incident-response && npm run build
 ```
