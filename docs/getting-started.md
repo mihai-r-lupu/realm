@@ -113,11 +113,47 @@ Run ID: abc123
 
 ## 6. Inspect the Evidence Chain
 
+After a run completes (or fails), inspect the full evidence chain:
+
 ```bash
 realm run inspect abc123
 ```
 
-Every step produces a tamper-evident evidence record containing the input received, the output produced, the resulting state, and a SHA-256 hash of the full evidence chain up to that point.
+The output shows every step in execution order:
+
+```
+Run: abc123
+Workflow: my-workflow v1
+State: completed  ✓
+Created: 2026-01-15T10:30:00.000Z
+Updated: 2026-01-15T10:30:42.000Z
+
+Evidence (2 steps):
+
+  1. gather_input              [profile: default] success   4231ms   hash: a1b2c3d4
+     Input:  {"topic":"quarterly earnings"}
+     Output: {"summary":"Revenue grew 12% YoY...","sources":3}
+     Diagnostics: ~900 tokens | no preconditions
+
+  2. write_report              [profile: default] success   6104ms   hash: e5f6a7b8
+     Input:  {"summary":"Revenue grew 12% YoY...","sources":3}
+     Output: {"report":"# Q4 Earnings Report\n## Summary\nRevenue grew 12% YoY...","word_count":412}
+     Diagnostics: ~1600 tokens | preconditions: gather_input.result.summary != "" → true (Revenue gr…)
+```
+
+Each evidence entry records:
+- **Input / Output** — what the step received and what it returned, truncated to 120 characters.
+- **Hash** — first 8 characters of the SHA-256 chain hash. The hash changes if any prior step's
+  output changes, making the chain tamper-evident.
+- **Diagnostics** — token estimate (context window size) and the precondition trace (each
+  precondition expression, pass/fail, and the resolved value).
+
+**Debugging with inspect:**
+
+If a step fails, its `Output` field contains the error or the unexpected value. If a
+precondition blocked a step, the `precondition_trace` shows the exact expression and the
+value that caused it to fail. See the [CLI reference](./reference/cli-commands.md#realm-run-inspect-run-id)
+for the full field guide and diagnostic patterns.
 
 ---
 

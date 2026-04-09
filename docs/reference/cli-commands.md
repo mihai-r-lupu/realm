@@ -106,15 +106,86 @@ State colors: green = completed, red = failed/abandoned, cyan = gate_waiting, ye
 
 ### `realm run inspect <run-id>`
 
-Prints the full run record: state, workflow, creation and update timestamps, and the complete
-evidence chain. Color-coded terminal output.
+Prints the full run record and evidence chain for a workflow run. This is the primary
+debugging tool — use it whenever a run fails, gets stuck, or produces unexpected output.
 
 ```bash
-realm run inspect abc123
+realm run inspect abc12345-0000-0000-0000-000000000000
 ```
 
-Each evidence entry shows: step name, agent profile (if set), status, duration, hash, input
-summary, output summary, and diagnostics (token estimate and precondition trace).
+#### Output format
+
+```
+Run: abc12345-0000-0000-0000-000000000000
+Workflow: incident-response v3
+State: completed  ✓
+
+Created: 2026-01-15T10:30:00.000Z
+Updated: 2026-01-15T10:30:42.000Z
+
+Evidence (3 steps):
+
+  1. read_alert                success    12ms   hash: f3a9b2c1
+     Input:  {"path":"/tmp/alert.md"}
+     Output: {"content":"## SEV-2 Alert\nDisk usage on prod-db-1 at 94%","line_count":14}
+     Diagnostics: ~200 tokens | no preconditions
+
+  2. analyze_cause             [profile: senior-sre] success   8432ms   hash: 2d7e4f81
+     Input:  {"content":"## SEV-2 Alert\nDisk usage on prod-db-1 at 94%"}
+     Output: {"root_cause":"log_rotation_disabled","severity":"sev2","affected_system":"prod-db-1"}
+     Diagnostics: ~1840 tokens | preconditions: analyze_cause.result.content != "" → true ("")
+
+  3. draft_response            [profile: senior-sre] success   5211ms   hash: 9c3b1a0f
+     Input:  {"root_cause":"log_rotation_disabled","severity":"sev2","affected_system":"prod-db-1"}
+     Output: {"message":"SEV-2 on prod-db-1: log rotation was disabled causing disk accumulation…"}
+     Diagnostics: ~2100 tokens | preconditions: draft_response.result.root_cause != "" → true (log_rot…)
+```
+
+**State colors:** green = completed, red = failed or abandoned, yellow = in-progress or
+gate_waiting, cyan = gate_waiting.
+
+**Output truncation:** Input and Output fields are truncated at 120 characters. A `…` suffix
+indicates truncation — use `realm run replay` to re-evaluate with modified values.
+
+#### Field reference
+
+| Field | What it tells you |
+|---|---|
+| **State** | Current state name. Terminal runs show `✓` (completed) or no suffix (failed/abandoned). |
+| **Evidence (N steps)** | Number of distinct steps that produced evidence. Steps with multiple attempts are counted once. |
+| **Step number** | Execution order, 1-based. |
+| **Step name** | The `id` of the step in your workflow YAML. |
+| **`[profile: ...]`** | Which agent profile handled this step. Present on agent steps only; absent on auto steps and human gates. |
+| **Status** | `success` (green), `error` (red), or other engine-assigned state (yellow). |
+| **Duration** | Wall-clock time the step took to complete. High values on agent steps are normal. |
+| **`hash: XXXXXXXX`** | First 8 characters of the SHA-256 chain hash. The hash covers all evidence up to and including this step — it changes if any prior step's output changes. Use it to detect replay divergence. |
+| **Input** | What the step received. For the first step: the run params. For subsequent steps: the output of the prior step (or merged outputs if `input_map` is configured). |
+| **Output** | What the step produced. For agent steps: the JSON the AI returned. For auto steps: the handler return value. For adapter steps: the raw adapter response injected by the engine. |
+| **Diagnostics: `~N tokens`** | Estimated token count of the context window passed to the agent for this step. Useful for spotting steps that approach model context limits. |
+| **Diagnostics: preconditions** | Each precondition expression, whether it passed (`→ true`) or failed (`→ false`), and the resolved value in parentheses. If a step ran unexpectedly or was blocked, this is where you look. |
+
+#### What to look for
+
+**Run failed — step shows `error`:**
+Read the failed step's `Output` field. For handler steps, the error message is in the output.
+For agent steps, the output may be missing required fields — compare its shape against the
+`input_schema` of the step that consumes it in your workflow YAML.
+
+**Run stuck at a gate (`gate_waiting` state):**
+The state line will show `gate_waiting` in yellow. Look at the last entry in the evidence
+chain — it will be the step that produced the gate. Submit the gate response with
+`realm run respond <run-id>`.
+
+**Precondition blocked a step unexpectedly:**
+Find the step that was supposed to run and look at its `precondition_trace`. Each expression
+shows the actual resolved value in parentheses. The value will tell you whether the prior step
+produced the right field name, type, or content. Cross-reference with the prior step's
+`Output` field to see what was actually returned.
+
+**Agent returned wrong output shape:**
+Find the agent step in the evidence chain and read its `Output`. Compare the field names and
+types against the `input_schema` of the next step in your YAML. The mismatch will be visible
+— missing keys, wrong types, or extra nesting are common causes of precondition failures.
 
 ---
 
