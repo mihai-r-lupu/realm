@@ -547,11 +547,16 @@ import { executeChain } from '@sensigo/realm';
 const store = new InMemoryStore();
 const dispatch = createAgentDispatcher({ step_one: { result: 'the document text' } });
 
-const run = await store.create({ workflowId: 'extraction-demo', params: {} });
+const run = await store.create({
+  workflowId: 'extraction-demo',
+  workflowVersion: 1,
+  initialState: 'created',
+  params: {},
+});
 await executeChain({ definition, run, store, dispatch });
 
 assertFinalState(run, 'completed');
-assertStepOutput(run, 'step_one', { result: 'the document text' });
+assertStepOutput(run.evidence, 'step_one', { result: 'the document text' });
 ```
 
 ---

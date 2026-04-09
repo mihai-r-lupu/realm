@@ -22,27 +22,28 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 
 ## Step fields
 
-| Field                 | Type                            | Required | Description                                                                                                                                                                                     |
-| --------------------- | ------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `description`         | string                          | Yes      | Human-readable step description. Appears in the agent protocol.                                                                                                                                 |
-| `execution`           | `agent` \| `auto`               | Yes      | Who executes this step.                                                                                                                                                                         |
-| `allowed_from_states` | string[]                        | Yes      | Run states from which this step may execute. The engine blocks any attempt from a state not in this list.                                                                                       |
-| `produces_state`      | string                          | Yes      | State the run transitions to after this step completes. Must be unique across all steps.                                                                                                        |
-| `uses_service`        | string                          | No       | Name of a service declared in `services`. Only valid on `execution: auto` steps.                                                                                                                |
-| `service_method`      | `fetch` \| `create` \| `update` | No       | Adapter method to call. Defaults to `fetch`.                                                                                                                                                    |
-| `operation`           | string                          | No       | Operation name passed to the adapter. Defaults to the step name.                                                                                                                                |
-| `handler`             | string                          | No       | Name of a registered `StepHandler` to invoke. Only valid on `execution: auto` steps.                                                                                                            |
-| `config`              | object                          | No       | Static key-value configuration passed to the handler via `context.config`. Only meaningful on `execution: auto` steps with a `handler`.                                                         |
-| `input_schema`        | object                          | No       | JSON Schema validated against the agent's submitted `params` before execution.                                                                                                                  |
-| `preconditions`       | string[]                        | No       | Boolean expressions evaluated before the step runs. See [Preconditions](#preconditions).                                                                                                        |
-| `trust`               | string                          | No       | Human oversight level. See [Trust levels](#trust-levels).                                                                                                                                       |
-| `timeout_seconds`     | integer                         | No       | Step execution timeout in seconds. On expiry the run fails with `STEP_TIMEOUT`.                                                                                                                 |
-| `retry`               | object                          | No       | Retry configuration. See [Retry](#retry).                                                                                                                                                       |
-| `instructions`        | string                          | No       | Agent-facing instructions. Delivered as `gate.agent_hint` when a gate is open.                                                                                                                  |
-| `prompt`              | string                          | No       | Template-resolved task prompt delivered via `next_action.prompt`. On human gate steps, delivered as `gate.display`. Supports `{{ context.resources.STEP.FIELD }}` and `{{ run.params.FIELD }}`. |
-| `gate`                | object                          | No       | Gate configuration. `gate.choices` lists the valid human response values.                                                                                                                       |
-| `transitions`         | object                          | No       | Conditional routing. See [Transitions](#transitions).                                                                                                                                           |
-| `agent_profile`       | string                          | No       | Agent profile name. Only valid on `execution: agent` steps. Must match a file in `profiles_dir`.                                                                                                |
+| Field                 | Type                            | Required | Description                                                                                                                                                                                                                                                                                                    |
+| --------------------- | ------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `description`         | string                          | Yes      | Human-readable step description. Appears in the agent protocol.                                                                                                                                                                                                                                                |
+| `execution`           | `agent` \| `auto`               | Yes      | Who executes this step.                                                                                                                                                                                                                                                                                        |
+| `allowed_from_states` | string[]                        | Yes      | Run states from which this step may execute. The engine blocks any attempt from a state not in this list.                                                                                                                                                                                                      |
+| `produces_state`      | string                          | Yes      | State the run transitions to after this step completes. Must be unique across all steps.                                                                                                                                                                                                                       |
+| `uses_service`        | string                          | No       | Name of a service declared in `services`. Only valid on `execution: auto` steps.                                                                                                                                                                                                                               |
+| `service_method`      | `fetch` \| `create` \| `update` | No       | Adapter method to call. Defaults to `fetch`.                                                                                                                                                                                                                                                                   |
+| `operation`           | string                          | No       | Operation name passed to the adapter. Defaults to the step name.                                                                                                                                                                                                                                               |
+| `handler`             | string                          | No       | Name of a registered `StepHandler` to invoke. Only valid on `execution: auto` steps.                                                                                                                                                                                                                           |
+| `config`              | object                          | No       | Static key-value configuration passed to the handler via `context.config`. Only meaningful on `execution: auto` steps with a `handler`.                                                                                                                                                                        |
+| `input_schema`        | object                          | No       | JSON Schema validated against the agent's submitted `params` before execution.                                                                                                                                                                                                                                 |
+| `preconditions`       | string[]                        | No       | Boolean expressions evaluated before the step runs. See [Preconditions](#preconditions).                                                                                                                                                                                                                       |
+| `trust`               | string                          | No       | Human oversight level. See [Trust levels](#trust-levels).                                                                                                                                                                                                                                                      |
+| `timeout_seconds`     | integer                         | No       | Step execution timeout in seconds. On expiry the run fails with `STEP_TIMEOUT`.                                                                                                                                                                                                                                |
+| `retry`               | object                          | No       | Retry configuration. See [Retry](#retry).                                                                                                                                                                                                                                                                      |
+| `instructions`        | string                          | No       | Agent-facing instructions. Delivered as `gate.agent_hint` when a gate is open.                                                                                                                                                                                                                                 |
+| `prompt`              | string                          | No       | Template-resolved task prompt delivered via `next_action.prompt`. On human gate steps, delivered as `gate.display`. Supports `{{ context.resources.STEP.FIELD }}` and `{{ run.params.FIELD }}`.                                                                                                                |
+| `gate`                | object                          | No       | Gate configuration. `gate.choices` lists the valid human response values.                                                                                                                                                                                                                                      |
+| `transitions`         | object                          | No       | Conditional routing. See [Transitions](#transitions).                                                                                                                                                                                                                                                          |
+| `input_map`           | `Record<string, string>`        | No       | Maps param names the service adapter receives to dot-path values from the run context. Only valid on `execution: auto` steps with `uses_service`. Each value is a dot-path: `run.params.<key>` reads from the run's start params; `context.resources.<step>.<field>` reads a field from a prior step's output. |
+| `agent_profile`       | string                          | No       | Agent profile name. Only valid on `execution: agent` steps. Must match a file in `profiles_dir`.                                                                                                                                                                                                               |
 
 ---
 
@@ -110,6 +111,33 @@ confirm_submission:
       step: extract_fields
       produces_state: revision_requested
 ```
+
+### `on_success`
+
+Conditionally routes an `execution: auto` step based on the value of a named field in the
+handler's output. The engine reads `field` from the handler result, looks it up in `routes`,
+and takes that transition. If no route matches, it takes `default`.
+
+| Sub-field | Type                         | Description                                                    |
+| --------- | ---------------------------- | -------------------------------------------------------------- |
+| `field`   | string                       | Name of the handler output field to read.                      |
+| `routes`  | `Record<string, transition>` | Map of field values to transition targets.                     |
+| `default` | transition                   | Taken when the field value does not match any key in `routes`. |
+
+```yaml
+transitions:
+  on_success:
+    field: matched
+    routes:
+      'true':
+        step: proceed_step
+        produces_state: verified
+    default:
+      step: fallback_step
+      produces_state: unverified
+```
+
+`on_success` is only valid on `execution: auto` steps.
 
 ---
 
