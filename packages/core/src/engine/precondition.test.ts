@@ -3,7 +3,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { evaluatePrecondition, checkPreconditions, evaluateAllPreconditions } from './precondition.js';
+import {
+  evaluatePrecondition,
+  checkPreconditions,
+  evaluateAllPreconditions,
+} from './precondition.js';
 import { executeStep } from './execution-loop.js';
 import { StateGuard } from './state-guard.js';
 import { JsonFileStore } from '../store/json-file-store.js';
@@ -40,10 +44,7 @@ describe('checkPreconditions', () => {
   it('returns the first failing precondition', () => {
     const evidence = { step_a: { count: 0 } };
     // First fails, second would pass.
-    const result = checkPreconditions(
-      ['step_a.count > 0', 'step_a.count >= 0'],
-      evidence,
-    );
+    const result = checkPreconditions(['step_a.count > 0', 'step_a.count >= 0'], evidence);
     expect(result).not.toBeNull();
     expect(result!.expression).toBe('step_a.count > 0');
     expect(result!.passed).toBe(false);
@@ -99,7 +100,7 @@ describe('executeStep blocks when precondition fails', () => {
 
     expect(envelope.status).toBe('blocked');
     expect(envelope.blocked_reason?.suggestion).toContain('Precondition failed');
-    expect(envelope.blocked_reason?.suggestion).toContain("step-a.result.count > 0");
+    expect(envelope.blocked_reason?.suggestion).toContain('step-a.result.count > 0');
   });
 });
 
@@ -114,10 +115,7 @@ describe('evaluateAllPreconditions', () => {
 
   it('returns results for both passing and failing expressions in order', () => {
     const evidence = { step_a: { count: 0 } };
-    const results = evaluateAllPreconditions(
-      ['step_a.count > 0', 'step_a.count >= 0'],
-      evidence,
-    );
+    const results = evaluateAllPreconditions(['step_a.count > 0', 'step_a.count >= 0'], evidence);
     expect(results).toHaveLength(2);
     expect(results[0]!.expression).toBe('step_a.count > 0');
     expect(results[0]!.passed).toBe(false);

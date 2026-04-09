@@ -51,7 +51,9 @@ describe('validate command (via loadWorkflowFromString)', () => {
   });
 
   it('step allowed from state not produced by any step throws WorkflowError', () => {
-    const content = VALID_WORKFLOW + `
+    const content =
+      VALID_WORKFLOW +
+      `
   step-three:
     description: Orphan step
     execution: auto

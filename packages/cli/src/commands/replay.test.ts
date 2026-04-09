@@ -92,9 +92,7 @@ describe('parseOverride', () => {
 
 describe('replayRun', () => {
   it('override makes a previously-passing precondition fail', () => {
-    const evidence = [
-      makeSnapshot('validate', { accepted_count: 3 }),
-    ];
+    const evidence = [makeSnapshot('validate', { accepted_count: 3 })];
     const run = makeRun(evidence);
     const results = replayRun(run, definition, [
       { step: 'validate', field: 'accepted_count', value: 0 },
@@ -116,9 +114,7 @@ describe('replayRun', () => {
   });
 
   it('multiple overrides are applied together', () => {
-    const evidence = [
-      makeSnapshot('validate', { accepted_count: 3, rejected_count: 1 }),
-    ];
+    const evidence = [makeSnapshot('validate', { accepted_count: 3, rejected_count: 1 })];
     const run = makeRun(evidence);
     const results = replayRun(run, definition, [
       { step: 'validate', field: 'accepted_count', value: 0 },
@@ -184,9 +180,7 @@ describe('replayRun', () => {
     const evidence = [makeSnapshot('validate', originalOutput)];
     const run = makeRun(evidence);
 
-    replayRun(run, nestedDef, [
-      { step: 'validate', field: 'result.accepted_count', value: 0 },
-    ]);
+    replayRun(run, nestedDef, [{ step: 'validate', field: 'result.accepted_count', value: 0 }]);
 
     // Original evidence must not have been mutated.
     expect(originalOutput.result.accepted_count).toBe(3);

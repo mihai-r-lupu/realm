@@ -26,14 +26,17 @@ export class GitHubAdapter implements ServiceAdapter {
   readonly id: string;
   private readonly baseUrl: string;
 
-  constructor(id: string, private readonly config: GitHubAdapterConfig = {}) {
+  constructor(
+    id: string,
+    private readonly config: GitHubAdapterConfig = {},
+  ) {
     this.id = id;
     this.baseUrl = config.base_url ?? 'https://api.github.com';
   }
 
   private buildHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
-      'Accept': 'application/json',
+      Accept: 'application/json',
       'Content-Type': 'application/json',
     };
     if (this.config.auth?.token !== undefined) {
@@ -63,11 +66,11 @@ export class GitHubAdapter implements ServiceAdapter {
       method === 'GET'
         ? { method, headers: this.buildHeaders(), signal: signal ?? null }
         : {
-          method,
-          headers: this.buildHeaders(),
-          body: JSON.stringify(body),
-          signal: signal ?? null,
-        };
+            method,
+            headers: this.buildHeaders(),
+            body: JSON.stringify(body),
+            signal: signal ?? null,
+          };
 
     let response: Response;
     try {

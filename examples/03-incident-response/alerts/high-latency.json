@@ -1,31 +1,28 @@
 {
-    "alert_id": "ALT-20240412-0847",
-    "fired_at": "2024-04-12T08:47:23Z",
-    "alert_name": "p99_latency_threshold_exceeded",
-    "service": "payments-api",
-    "environment": "production",
-    "threshold": "p99 > 2000ms for 5 consecutive minutes",
-    "current_value": "p99 = 4820ms",
-    "metrics": {
-        "p50_latency_ms": 180,
-        "p95_latency_ms": 2340,
-        "p99_latency_ms": 4820,
-        "error_rate_pct": 0.8,
-        "request_rate_rps": 1240,
-        "db_connection_pool_used": 98,
-        "db_connection_pool_max": 100,
-        "db_query_p99_ms": 4200
-    },
-    "related_services": [
-        "order-service",
-        "inventory-api"
-    ],
-    "runbook": "https://runbooks.internal/payments-api/high-latency",
-    "recent_deployments": [
-        {
-            "service": "payments-api",
-            "version": "v2.14.1",
-            "deployed_at": "2024-04-12T07:30:00Z"
-        }
-    ]
+  "alert_id": "ALT-20240412-0847",
+  "fired_at": "2024-04-12T08:47:23Z",
+  "alert_name": "p99_latency_threshold_exceeded",
+  "service": "payments-api",
+  "environment": "production",
+  "threshold": "p99 > 2000ms for 5 consecutive minutes",
+  "current_value": "p99 = 4820ms",
+  "metrics": {
+    "p50_latency_ms": 180,
+    "p95_latency_ms": 2340,
+    "p99_latency_ms": 4820,
+    "error_rate_pct": 0.8,
+    "request_rate_rps": 1240,
+    "db_connection_pool_used": 98,
+    "db_connection_pool_max": 100,
+    "db_query_p99_ms": 4200
+  },
+  "related_services": ["order-service", "inventory-api"],
+  "runbook": "https://runbooks.internal/payments-api/high-latency",
+  "recent_deployments": [
+    {
+      "service": "payments-api",
+      "version": "v2.14.1",
+      "deployed_at": "2024-04-12T07:30:00Z"
+    }
+  ]
 }

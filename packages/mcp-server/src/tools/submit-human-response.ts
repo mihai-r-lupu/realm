@@ -34,7 +34,7 @@ export async function handleSubmitHumanResponse(
 export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunStores): void {
   server.tool(
     'submit_human_response',
-    'Advance a gate-waiting run by submitting the human\'s choice.',
+    "Advance a gate-waiting run by submitting the human's choice.",
     {
       run_id: z.string(),
       gate_id: z.string(),
@@ -51,20 +51,27 @@ export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunS
         // where envelope construction is not possible.
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{
-            type: 'text' as const, text: JSON.stringify({
-              command: 'submit_human_response',
-              run_id: args.run_id,
-              status: 'error',
-              data: {},
-              evidence: [],
-              warnings: [],
-              errors: [message],
-              agent_action: 'stop',
-              context_hint: `Error submitting response for run '${args.run_id}'.`,
-              next_action: null,
-            }, null, 2)
-          }],
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  command: 'submit_human_response',
+                  run_id: args.run_id,
+                  status: 'error',
+                  data: {},
+                  evidence: [],
+                  warnings: [],
+                  errors: [message],
+                  agent_action: 'stop',
+                  context_hint: `Error submitting response for run '${args.run_id}'.`,
+                  next_action: null,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       }
     },

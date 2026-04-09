@@ -62,27 +62,40 @@ export async function handleExecuteStepTool(
     // where envelope construction is not possible.
     const message = err instanceof Error ? err.message : String(err);
     return {
-      content: [{
-        type: 'text' as const, text: JSON.stringify({
-          command: args.command,
-          run_id: args.run_id,
+      content: [
+        {
+          type: 'text' as const,
+          text: JSON.stringify(
+            {
+              command: args.command,
+              run_id: args.run_id,
 
-          status: 'error',
-          data: {},
-          evidence: [],
-          warnings: [],
-          errors: [message],
-          agent_action: 'stop',
-          context_hint: `Error executing step '${args.command}' for run '${args.run_id}'.`,
-          next_action: null,
-        }, null, 2)
-      }],
+              status: 'error',
+              data: {},
+              evidence: [],
+              warnings: [],
+              errors: [message],
+              agent_action: 'stop',
+              context_hint: `Error executing step '${args.command}' for run '${args.run_id}'.`,
+              next_action: null,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
     };
   }
 }
 
 /** Registers the execute_step MCP tool on the server. */
-export function registerExecuteStep(server: McpServer, opts?: { registry?: import('@sensigo/realm').ExtensionRegistry; secrets?: Record<string, string> }): void {
+export function registerExecuteStep(
+  server: McpServer,
+  opts?: {
+    registry?: import('@sensigo/realm').ExtensionRegistry;
+    secrets?: Record<string, string>;
+  },
+): void {
   server.tool(
     'execute_step',
     'Execute a workflow step. For agent steps, pass your output in params.',

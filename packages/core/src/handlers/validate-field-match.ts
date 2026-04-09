@@ -3,7 +3,12 @@
  *
  * Uses resolveResource and compareStrings primitives. Returns matched: false on mismatch — does not throw.
  */
-import type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from '../extensions/step-handler.js';
+import type {
+  StepHandler,
+  StepHandlerInputs,
+  StepContext,
+  StepHandlerResult,
+} from '../extensions/step-handler.js';
 import { resolveResource } from './primitives/resolve-resource.js';
 import { compareStrings } from './primitives/compare-strings.js';
 

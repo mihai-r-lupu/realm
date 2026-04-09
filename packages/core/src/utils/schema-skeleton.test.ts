@@ -34,8 +34,9 @@ describe('generateSchemaSkeleton', () => {
   });
 
   it('produces enum placeholder string', () => {
-    expect(generateSchemaSkeleton({ type: 'string', enum: ['low', 'medium', 'high'] }))
-      .toBe('<low|medium|high>');
+    expect(generateSchemaSkeleton({ type: 'string', enum: ['low', 'medium', 'high'] })).toBe(
+      '<low|medium|high>',
+    );
   });
 
   it('produces empty string for plain string', () => {

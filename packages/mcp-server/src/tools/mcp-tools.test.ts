@@ -137,7 +137,9 @@ describe('mcp tool handlers', () => {
     );
     expect(startResult.status).toBe('ok');
     // The auto step ran silently during start_run — it must be reported.
-    expect(startResult.chained_auto_steps).toEqual([{ step: 'step-auto', produced_state: 'state_a' }]);
+    expect(startResult.chained_auto_steps).toEqual([
+      { step: 'step-auto', produced_state: 'state_a' },
+    ]);
 
     // Run is now at state_a waiting for the agent step.
     const midRun = await runStore.get(startResult.run_id);
@@ -210,9 +212,15 @@ describe('mcp tool handlers', () => {
     // executeStep's internal error handling and propagates to handleExecuteStepTool's catch.
     const throwingOpts = {
       runStore: {
-        get: async () => { throw new Error('unexpected failure'); },
-        create: async () => { throw new Error('unexpected failure'); },
-        update: async () => { throw new Error('unexpected failure'); },
+        get: async () => {
+          throw new Error('unexpected failure');
+        },
+        create: async () => {
+          throw new Error('unexpected failure');
+        },
+        update: async () => {
+          throw new Error('unexpected failure');
+        },
         list: async () => [],
       } as unknown as JsonFileStore,
     };
@@ -231,7 +239,8 @@ describe('mcp tool handlers', () => {
     expect(parsed['command']).toBe('review_security');
   });
 
-  it('handleGetRunState returns run summary', async () => {    const workflowStore = new JsonWorkflowStore(workflowDir);
+  it('handleGetRunState returns run summary', async () => {
+    const workflowStore = new JsonWorkflowStore(workflowDir);
     await workflowStore.register(makeSimpleDef());
     const runStore = new JsonFileStore(runDir);
 
@@ -255,7 +264,7 @@ describe('mcp tool handlers', () => {
       version: 1,
       initial_state: 'created',
       steps: {
-        'review': {
+        review: {
           description: 'Human gate with on_reject',
           execution: 'auto',
           trust: 'human_confirmed',
@@ -266,7 +275,7 @@ describe('mcp tool handlers', () => {
             on_reject: { step: 'revise', produces_state: 'revision_needed' },
           },
         },
-        'revise': {
+        revise: {
           description: 'Agent revision step',
           execution: 'agent',
           allowed_from_states: ['revision_needed'],
@@ -295,7 +304,9 @@ describe('mcp tool handlers', () => {
 
     expect(rejectResult.status).toBe('ok');
     expect(rejectResult.next_action).not.toBeNull();
-    expect((rejectResult.next_action!.instruction!.params as Record<string, unknown>)['command']).toBe('revise');
+    expect(
+      (rejectResult.next_action!.instruction!.params as Record<string, unknown>)['command'],
+    ).toBe('revise');
     expect(rejectResult.chained_auto_steps).toBeDefined();
     expect(rejectResult.chained_auto_steps![0]!.branched_via).toBe('on_reject');
 

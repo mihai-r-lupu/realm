@@ -16,9 +16,7 @@ export interface CaptureEvidenceParams {
 
 /** Builds an EvidenceSnapshot from step execution parameters, including a SHA-256 content hash. */
 export function captureEvidence(params: CaptureEvidenceParams): EvidenceSnapshot {
-  const evidenceHash = createHash('sha256')
-    .update(JSON.stringify(params.output))
-    .digest('hex');
+  const evidenceHash = createHash('sha256').update(JSON.stringify(params.output)).digest('hex');
   return {
     step_id: params.stepId,
     started_at: params.startedAt.toISOString(),
@@ -31,6 +29,8 @@ export function captureEvidence(params: CaptureEvidenceParams): EvidenceSnapshot
     evidence_hash: evidenceHash,
     ...(params.diagnostics !== undefined ? { diagnostics: params.diagnostics } : {}),
     ...(params.agentProfile !== undefined ? { agent_profile: params.agentProfile } : {}),
-    ...(params.agentProfileHash !== undefined ? { agent_profile_hash: params.agentProfileHash } : {}),
+    ...(params.agentProfileHash !== undefined
+      ? { agent_profile_hash: params.agentProfileHash }
+      : {}),
   };
 }

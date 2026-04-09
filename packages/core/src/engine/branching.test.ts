@@ -10,7 +10,12 @@ import { WorkflowError } from '../types/workflow-error.js';
 import { ExtensionRegistry } from '../extensions/registry.js';
 import type { WorkflowDefinition } from '../types/workflow-definition.js';
 import type { StepDispatcher } from './execution-loop.js';
-import type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from '../extensions/step-handler.js';
+import type {
+  StepHandler,
+  StepHandlerInputs,
+  StepContext,
+  StepHandlerResult,
+} from '../extensions/step-handler.js';
 
 /** A handler that always throws a WorkflowError. */
 class FailingHandler implements StepHandler {
@@ -27,7 +32,7 @@ class FailingHandler implements StepHandler {
 
 /** A handler that returns { confidence: value } for on_success routing tests. */
 class ConfidenceHandler implements StepHandler {
-  constructor(private readonly value: string) { }
+  constructor(private readonly value: string) {}
   readonly id = 'confidence_handler';
   async execute(_inputs: StepHandlerInputs, _ctx: StepContext): Promise<StepHandlerResult> {
     return { data: { confidence: this.value } };
@@ -174,7 +179,9 @@ describe('on_error branching', () => {
     expect(result.status).toBe('ok');
     expect(result.next_action).not.toBeNull();
     expect(result.next_action?.instruction?.tool).toBe('execute_step');
-    expect((result.next_action?.instruction?.params as Record<string, unknown>)?.['command']).toBe('recover');
+    expect((result.next_action?.instruction?.params as Record<string, unknown>)?.['command']).toBe(
+      'recover',
+    );
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings[0]).toContain('validate');
     expect(result.warnings[0]).toContain('on_error');
@@ -383,7 +390,9 @@ describe('on_success branching', () => {
     const updatedRun = await store.get(run.id);
     expect(updatedRun.state).toBe('identity_uncertain');
     expect(result.next_action?.instruction?.tool).toBe('execute_step');
-    expect((result.next_action?.instruction?.params as Record<string, unknown>)?.['command']).toBe('manual_confirm');
+    expect((result.next_action?.instruction?.params as Record<string, unknown>)?.['command']).toBe(
+      'manual_confirm',
+    );
     expect(result.chained_auto_steps).toBeDefined();
     expect(result.chained_auto_steps![0]!.produced_state).toBe('identity_uncertain');
     expect(result.chained_auto_steps![0]!.branched_via).toBe('on_success');
@@ -511,7 +520,9 @@ describe('gate-response transition', () => {
     expect(rejectResult.status).toBe('ok');
     expect(rejectResult.next_action).not.toBeNull();
     expect(rejectResult.next_action?.instruction?.tool).toBe('execute_step');
-    expect((rejectResult.next_action?.instruction?.params as Record<string, unknown>)?.['command']).toBe('revise');
+    expect(
+      (rejectResult.next_action?.instruction?.params as Record<string, unknown>)?.['command'],
+    ).toBe('revise');
     expect(rejectResult.chained_auto_steps).toBeDefined();
     expect(rejectResult.chained_auto_steps![0]!.branched_via).toBe('on_reject');
     expect(rejectResult.chained_auto_steps![0]!.produced_state).toBe('revision_needed');

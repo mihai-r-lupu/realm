@@ -10,4 +10,3 @@ description: "Triage an incident alert through Realm's evidence-tracked workflow
 Use this workflow when the user asks to triage or analyze an alert or incident through Realm.
 Pass the alert file path as `params.path` to `start_run` — Realm reads the file automatically.
 Follow the Realm protocol in `realm.instructions.md` from there.
-

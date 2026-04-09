@@ -1,7 +1,14 @@
 // Tests for inspectRun business logic.
 import { describe, it, expect } from 'vitest';
 import { inspectRun } from './inspect.js';
-import type { RunStore, RunRecord, WorkflowRegistrar, WorkflowDefinition, EvidenceSnapshot, StepDiagnostics } from '@sensigo/realm';
+import type {
+  RunStore,
+  RunRecord,
+  WorkflowRegistrar,
+  WorkflowDefinition,
+  EvidenceSnapshot,
+  StepDiagnostics,
+} from '@sensigo/realm';
 
 function makeSnapshot(stepId: string, overrides: Partial<EvidenceSnapshot> = {}): EvidenceSnapshot {
   return {
@@ -52,7 +59,9 @@ function makeWorkflowStore(def?: WorkflowDefinition): WorkflowRegistrar {
   }
   return {
     register: async () => {},
-    get: async () => { throw new Error('Workflow not found'); },
+    get: async () => {
+      throw new Error('Workflow not found');
+    },
     list: async () => [],
   };
 }

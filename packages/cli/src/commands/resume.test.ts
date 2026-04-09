@@ -51,12 +51,7 @@ describe('resumeRun', () => {
       terminal_reason: 'Something went wrong',
     });
 
-    const { resetState } = await resumeRun(
-      run.id,
-      { from: 'step-one' },
-      runStore,
-      workflowStore,
-    );
+    const { resetState } = await resumeRun(run.id, { from: 'step-one' }, runStore, workflowStore);
 
     expect(resetState).toBe('created');
     const updated = await runStore.get(run.id);
@@ -74,13 +69,13 @@ describe('resumeRun', () => {
     });
     await runStore.update({ ...run, state: 'completed', terminal_state: true });
 
-    await expect(
-      resumeRun(run.id, { from: 'step-one' }, runStore, workflowStore),
-    ).rejects.toThrow(WorkflowError);
+    await expect(resumeRun(run.id, { from: 'step-one' }, runStore, workflowStore)).rejects.toThrow(
+      WorkflowError,
+    );
 
-    await expect(
-      resumeRun(run.id, { from: 'step-one' }, runStore, workflowStore),
-    ).rejects.toThrow("is not resumable");
+    await expect(resumeRun(run.id, { from: 'step-one' }, runStore, workflowStore)).rejects.toThrow(
+      'is not resumable',
+    );
   });
 
   it('throws when the step name does not exist in the workflow', async () => {
@@ -98,6 +93,6 @@ describe('resumeRun', () => {
 
     await expect(
       resumeRun(run.id, { from: 'nonexistent-step' }, runStore, workflowStore),
-    ).rejects.toThrow("not found");
+    ).rejects.toThrow('not found');
   });
 });

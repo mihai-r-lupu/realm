@@ -3,7 +3,12 @@ import { describe, it, expect } from 'vitest';
 import { diffRuns } from './diff.js';
 import type { RunRecord, EvidenceSnapshot } from '@sensigo/realm';
 
-function makeSnap(stepId: string, hash: string, status: 'success' | 'error' | 'skipped' = 'success', durationMs = 100): EvidenceSnapshot {
+function makeSnap(
+  stepId: string,
+  hash: string,
+  status: 'success' | 'error' | 'skipped' = 'success',
+  durationMs = 100,
+): EvidenceSnapshot {
   return {
     step_id: stepId,
     started_at: '2024-01-01T00:00:00.000Z',

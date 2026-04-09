@@ -33,7 +33,10 @@ const definition: WorkflowDefinition = {
   },
 };
 
-const echoDispatcher: StepDispatcher = async (_step, input, _run, _signal) => ({ ...input, echoed: true });
+const echoDispatcher: StepDispatcher = async (_step, input, _run, _signal) => ({
+  ...input,
+  echoed: true,
+});
 const failDispatcher: StepDispatcher = async () => {
   throw new WorkflowError('step failed', {
     code: 'ENGINE_HANDLER_FAILED',
@@ -239,7 +242,11 @@ describe('executeStep', () => {
         ...definition.steps,
         'step-one': {
           ...definition.steps['step-one']!,
-          input_schema: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } },
+          input_schema: {
+            type: 'object',
+            required: ['name'],
+            properties: { name: { type: 'string' } },
+          },
         },
       },
     };
@@ -272,7 +279,11 @@ describe('executeStep', () => {
         ...definition.steps,
         'step-one': {
           ...definition.steps['step-one']!,
-          input_schema: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } },
+          input_schema: {
+            type: 'object',
+            required: ['name'],
+            properties: { name: { type: 'string' } },
+          },
         },
       },
     };
@@ -654,7 +665,8 @@ describe('executeStep', () => {
     function makeHandler(data: Record<string, unknown>): StepHandler {
       return {
         id: 'my_handler',
-        execute: vi.fn<[StepHandlerInputs, StepContext], Promise<{ data: Record<string, unknown> }>>()
+        execute: vi
+          .fn<[StepHandlerInputs, StepContext], Promise<{ data: Record<string, unknown> }>>()
           .mockResolvedValue({ data }),
       };
     }
@@ -749,10 +761,12 @@ describe('executeStep', () => {
       const capturedContext: StepContext[] = [];
       const handler: StepHandler = {
         id: 'my_handler',
-        execute: vi.fn().mockImplementation(async (_inputs: StepHandlerInputs, ctx: StepContext) => {
-          capturedContext.push(ctx);
-          return { data: { captured: true } };
-        }),
+        execute: vi
+          .fn()
+          .mockImplementation(async (_inputs: StepHandlerInputs, ctx: StepContext) => {
+            capturedContext.push(ctx);
+            return { data: { captured: true } };
+          }),
       };
 
       const adapter: ServiceAdapter = {
@@ -931,19 +945,33 @@ describe('executeStep', () => {
       };
 
       const { findNextAction } = await import('./execution-loop.js');
-      const result = findNextAction('created', agentStepDef, { evidenceByStep: {}, runParams: {}, runId: 'test-run-id' });
+      const result = findNextAction('created', agentStepDef, {
+        evidenceByStep: {},
+        runParams: {},
+        runId: 'test-run-id',
+      });
 
       expect(result).not.toBeNull();
       expect(result!.instruction).not.toBeNull();
       expect(result!.instruction!.tool).toBe('execute_step');
-      expect((result!.instruction!.params as Record<string, unknown>)['command']).toBe('review-code');
-      expect((result!.instruction!.params as Record<string, unknown>)['run_id']).toBe('test-run-id');
+      expect((result!.instruction!.params as Record<string, unknown>)['command']).toBe(
+        'review-code',
+      );
+      expect((result!.instruction!.params as Record<string, unknown>)['run_id']).toBe(
+        'test-run-id',
+      );
       expect(result!.input_schema).toEqual(agentStepDef.steps['review-code']?.input_schema);
       // instruction.params must NOT contain input_schema
-      expect((result!.instruction!.params as Record<string, unknown>)['input_schema']).toBeUndefined();
+      expect(
+        (result!.instruction!.params as Record<string, unknown>)['input_schema'],
+      ).toBeUndefined();
       expect(result!.instruction!.call_with).toBeDefined();
-      expect((result!.instruction!.call_with as Record<string, unknown>)['run_id']).toBe('test-run-id');
-      expect((result!.instruction!.call_with as Record<string, unknown>)['command']).toBe('review-code');
+      expect((result!.instruction!.call_with as Record<string, unknown>)['run_id']).toBe(
+        'test-run-id',
+      );
+      expect((result!.instruction!.call_with as Record<string, unknown>)['command']).toBe(
+        'review-code',
+      );
       // input_schema is present → params should be a skeleton object, not a string
       const callWithParams = (result!.instruction!.call_with as Record<string, unknown>)['params'];
       expect(typeof callWithParams).toBe('object');
@@ -967,7 +995,11 @@ describe('executeStep', () => {
       };
 
       const { findNextAction } = await import('./execution-loop.js');
-      const result = findNextAction('created', autoStepDef, { evidenceByStep: {}, runParams: {}, runId: 'test-run-id' });
+      const result = findNextAction('created', autoStepDef, {
+        evidenceByStep: {},
+        runParams: {},
+        runId: 'test-run-id',
+      });
 
       expect(result).not.toBeNull();
       expect(result!.instruction).toBeNull();
@@ -1011,8 +1043,12 @@ describe('executeStep', () => {
       expect(envelope.next_action).not.toBeNull();
       expect(envelope.next_action!.instruction).not.toBeNull();
       expect(envelope.next_action!.instruction!.tool).toBe('submit_human_response');
-      expect((envelope.next_action!.instruction!.params as Record<string, unknown>)['run_id']).toBe(run.id);
-      expect((envelope.next_action!.instruction!.params as Record<string, unknown>)['gate_id']).toBe(envelope.gate!.gate_id);
+      expect((envelope.next_action!.instruction!.params as Record<string, unknown>)['run_id']).toBe(
+        run.id,
+      );
+      expect(
+        (envelope.next_action!.instruction!.params as Record<string, unknown>)['gate_id'],
+      ).toBe(envelope.gate!.gate_id);
       expect(envelope.gate!.response_spec).toBeDefined();
       expect(envelope.gate!.response_spec!.choices).toContain('approve');
       expect(envelope.gate!.response_spec!.choices).toContain('reject');

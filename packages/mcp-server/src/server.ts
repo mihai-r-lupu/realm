@@ -2,7 +2,12 @@
 // realm-mcp — MCP server exposing the Realm workflow engine to AI agents.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { ExtensionRegistry, FileSystemAdapter, JsonWorkflowStore, JsonFileStore } from '@sensigo/realm';
+import {
+  ExtensionRegistry,
+  FileSystemAdapter,
+  JsonWorkflowStore,
+  JsonFileStore,
+} from '@sensigo/realm';
 import { registerListWorkflows } from './tools/list-workflows.js';
 import { registerGetWorkflowProtocol } from './tools/get-workflow-protocol.js';
 import { registerStartRun } from './tools/start-run.js';
@@ -72,7 +77,10 @@ export function createRealmMcpServer(options?: RealmMcpServerOptions): McpServer
 }
 
 // Entry point: start the MCP server on stdio when run directly.
-if (process.argv[1] !== undefined && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
+if (
+  process.argv[1] !== undefined &&
+  import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))
+) {
   const server = createRealmMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);

@@ -99,7 +99,10 @@ export async function startGitHubMockServer(
       req.on('data', (chunk: Buffer) => chunks.push(chunk));
       req.on('end', () => {
         try {
-          const body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as Record<string, unknown>;
+          const body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as Record<
+            string,
+            unknown
+          >;
           const responseBody: Record<string, unknown> = {};
           for (const field of entry.echo) {
             responseBody[field] = body[field];

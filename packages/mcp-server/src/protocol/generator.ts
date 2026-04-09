@@ -1,6 +1,11 @@
 // Protocol generator — produces the full agent briefing from a WorkflowDefinition.
 // This is what an AI agent reads before starting a workflow run.
-import type { WorkflowDefinition, JsonSchema, SimpleTransition, OnSuccessTransition } from '@sensigo/realm';
+import type {
+  WorkflowDefinition,
+  JsonSchema,
+  SimpleTransition,
+  OnSuccessTransition,
+} from '@sensigo/realm';
 import { TERMINAL_STATES } from '@sensigo/realm';
 
 export interface ProtocolStepGate {
@@ -42,18 +47,22 @@ export interface WorkflowProtocol {
 }
 
 const DEFAULT_RULES = [
-  "Follow the next_action instruction in each response exactly.",
+  'Follow the next_action instruction in each response exactly.',
   "When you receive status 'confirm_required', read gate.agent_hint for instructions, present gate.display to the user verbatim, wait for their response, then call submit_human_response with their choice and the gate_id.",
-  "Do NOT auto-confirm any human gate. The user must decide.",
-  "Do NOT ask the user for permission between steps unless the system tells you to.",
+  'Do NOT auto-confirm any human gate. The user must decide.',
+  'Do NOT ask the user for permission between steps unless the system tells you to.',
 ];
 
 const ERROR_HANDLING: Record<string, string> = {
-  provide_input: "The engine rejected your input. Read the error details — they tell you exactly what was wrong. Fix the input and call the step again.",
-  report_to_user: "Something failed that you cannot fix automatically. Show the error message to the user and wait for their guidance.",
-  resolve_precondition: "A prerequisite step has not completed. The error includes which precondition failed and what step to call. Follow the suggestion.",
-  stop: "A critical error occurred. Report it to the user and do not attempt any further steps.",
-  wait_for_human: "A human decision is needed. Show the gate preview to the user and call submit_human_response with their choice.",
+  provide_input:
+    'The engine rejected your input. Read the error details — they tell you exactly what was wrong. Fix the input and call the step again.',
+  report_to_user:
+    'Something failed that you cannot fix automatically. Show the error message to the user and wait for their guidance.',
+  resolve_precondition:
+    'A prerequisite step has not completed. The error includes which precondition failed and what step to call. Follow the suggestion.',
+  stop: 'A critical error occurred. Report it to the user and do not attempt any further steps.',
+  wait_for_human:
+    'A human decision is needed. Show the gate preview to the user and call submit_human_response with their choice.',
 };
 
 /**
@@ -65,18 +74,17 @@ export function generateProtocol(definition: WorkflowDefinition): WorkflowProtoc
   let autoStepCount = 0;
 
   for (const [id, step] of Object.entries(definition.steps)) {
-    const hasGate =
-      step.trust === 'human_confirmed' || step.trust === 'human_reviewed';
+    const hasGate = step.trust === 'human_confirmed' || step.trust === 'human_reviewed';
 
     let agent_involvement: string;
     let possible_gate: ProtocolStepGate | undefined;
 
     if (step.execution === 'auto' && !hasGate) {
-      agent_involvement = "none — engine handles this automatically";
+      agent_involvement = 'none — engine handles this automatically';
       autoStepCount++;
     } else if (step.execution === 'auto' && hasGate) {
       agent_involvement =
-        "YOU will receive `status: confirm_required` after this step runs — the engine executes it automatically, then opens a gate. Read `gate.agent_hint` for presentation instructions, present `gate.display` to the user verbatim, collect their choice from `gate.response_spec.choices`, and call `submit_human_response`.";
+        'YOU will receive `status: confirm_required` after this step runs — the engine executes it automatically, then opens a gate. Read `gate.agent_hint` for presentation instructions, present `gate.display` to the user verbatim, collect their choice from `gate.response_spec.choices`, and call `submit_human_response`.';
       possible_gate = { choices: ['approve', 'reject'] };
       autoStepCount++;
     } else if (step.execution === 'agent' && !hasGate) {
@@ -93,8 +101,7 @@ export function generateProtocol(definition: WorkflowDefinition): WorkflowProtoc
             s.allowed_from_states.includes(step.produces_state),
         );
         if (immediateNext) {
-          agent_involvement +=
-            ` After you submit, you will receive status: confirm_required directly in response to this call — the engine runs '${immediateNext[0]}' automatically before returning.`;
+          agent_involvement += ` After you submit, you will receive status: confirm_required directly in response to this call — the engine runs '${immediateNext[0]}' automatically before returning.`;
         }
       }
 

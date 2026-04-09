@@ -105,7 +105,13 @@ export async function handleStartRun(
 }
 
 /** Registers the start_run MCP tool on the server. */
-export function registerStartRun(server: McpServer, opts?: { registry?: import('@sensigo/realm').ExtensionRegistry; secrets?: Record<string, string> }): void {
+export function registerStartRun(
+  server: McpServer,
+  opts?: {
+    registry?: import('@sensigo/realm').ExtensionRegistry;
+    secrets?: Record<string, string>;
+  },
+): void {
   server.tool(
     'start_run',
     'Create a new workflow run and chain through initial auto steps.',
@@ -123,20 +129,27 @@ export function registerStartRun(server: McpServer, opts?: { registry?: import('
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{
-            type: 'text' as const, text: JSON.stringify({
-              command: 'start_run',
-              run_id: '',
-              status: 'error',
-              data: {},
-              evidence: [],
-              warnings: [],
-              errors: [message],
-              agent_action: 'stop',
-              context_hint: `Error creating run for workflow '${args.workflow_id}'.`,
-              next_action: null,
-            }, null, 2)
-          }],
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  command: 'start_run',
+                  run_id: '',
+                  status: 'error',
+                  data: {},
+                  evidence: [],
+                  warnings: [],
+                  errors: [message],
+                  agent_action: 'stop',
+                  context_hint: `Error creating run for workflow '${args.workflow_id}'.`,
+                  next_action: null,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       }
     },

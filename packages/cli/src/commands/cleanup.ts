@@ -9,12 +9,15 @@ import { WorkflowError, WAITING_STATES } from '@sensigo/realm';
 function parseDuration(s: string): number {
   const match = /^(\d+)(d|h|m)$/.exec(s);
   if (match === null) {
-    throw new WorkflowError(`Invalid duration '${s}'. Use format: <number>(d|h|m), e.g. 30d, 6h, 10m`, {
-      code: 'VALIDATION_INPUT_SCHEMA',
-      category: 'VALIDATION',
-      agentAction: 'provide_input',
-      retryable: false,
-    });
+    throw new WorkflowError(
+      `Invalid duration '${s}'. Use format: <number>(d|h|m), e.g. 30d, 6h, 10m`,
+      {
+        code: 'VALIDATION_INPUT_SCHEMA',
+        category: 'VALIDATION',
+        agentAction: 'provide_input',
+        retryable: false,
+      },
+    );
   }
   const value = parseInt(match[1]!, 10);
   const unit = match[2]!;
@@ -66,7 +69,10 @@ export async function cleanupRuns(
 
 export const cleanupCommand = new Command('cleanup')
   .description('Mark idle non-terminal runs as abandoned')
-  .requiredOption('--older-than <duration>', 'Abandon runs idle longer than this duration (e.g. 30d, 6h, 10m)')
+  .requiredOption(
+    '--older-than <duration>',
+    'Abandon runs idle longer than this duration (e.g. 30d, 6h, 10m)',
+  )
   .option('--dry-run', 'Preview which runs would be abandoned without modifying them')
   .action(async (opts: { olderThan: string; dryRun?: boolean }) => {
     const { JsonFileStore } = await import('@sensigo/realm');

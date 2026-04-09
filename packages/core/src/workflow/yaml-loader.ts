@@ -202,7 +202,6 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
     if ('execution' in step && !VALID_EXECUTIONS.has(step['execution'] as string)) {
       errors.push(
         `Step '${stepName}': invalid execution value '${String(step['execution'])}'; must be 'auto' or 'agent'`,
-
       );
     }
 
@@ -280,18 +279,30 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
         // on_error is only valid on auto steps.
         if (transitionKey === 'on_error') {
           if (step['execution'] !== 'auto') {
-            errors.push(`Step '${stepName}': 'on_error' transition is only valid on execution: auto steps`);
+            errors.push(
+              `Step '${stepName}': 'on_error' transition is only valid on execution: auto steps`,
+            );
           }
         } else if (transitionKey === 'on_success') {
           if (step['execution'] !== 'auto') {
-            errors.push(`Step '${stepName}': 'on_success' transition is only valid on execution: auto steps`);
+            errors.push(
+              `Step '${stepName}': 'on_success' transition is only valid on execution: auto steps`,
+            );
           }
           if (typeof t['field'] !== 'string' || t['field'] === '') {
-            errors.push(`Step '${stepName}': 'on_success' transition is missing a non-empty 'field'`);
+            errors.push(
+              `Step '${stepName}': 'on_success' transition is missing a non-empty 'field'`,
+            );
           }
           const routes = t['routes'];
-          if (typeof routes !== 'object' || routes === null || Object.keys(routes as object).length === 0) {
-            errors.push(`Step '${stepName}': 'on_success.routes' must be an object with at least one key`);
+          if (
+            typeof routes !== 'object' ||
+            routes === null ||
+            Object.keys(routes as object).length === 0
+          ) {
+            errors.push(
+              `Step '${stepName}': 'on_success.routes' must be an object with at least one key`,
+            );
           }
           if (typeof t['default'] !== 'object' || t['default'] === null) {
             errors.push(`Step '${stepName}': 'on_success' transition is missing a 'default'`);
@@ -307,14 +318,21 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
             if (typeof targetStep !== 'string') {
               errors.push(`Step '${stepName}': on_success route '${routeKey}' is missing 'step'`);
             } else if (!(targetStep in stepsRaw)) {
-              errors.push(`Step '${stepName}': on_success route '${routeKey}' targets unknown step '${targetStep}'`);
+              errors.push(
+                `Step '${stepName}': on_success route '${routeKey}' targets unknown step '${targetStep}'`,
+              );
             } else {
               const routeProducesState = route['produces_state'];
               if (typeof routeProducesState === 'string') {
                 const targetStepRaw = stepsRaw[targetStep] as Record<string, unknown> | undefined;
                 const targetAllowedFrom = targetStepRaw?.['allowed_from_states'];
-                if (Array.isArray(targetAllowedFrom) && !(targetAllowedFrom as unknown[]).includes(routeProducesState)) {
-                  errors.push(`Step '${stepName}': on_success route '${routeKey}' produces_state '${routeProducesState}' is not in step '${targetStep}'.allowed_from_states`);
+                if (
+                  Array.isArray(targetAllowedFrom) &&
+                  !(targetAllowedFrom as unknown[]).includes(routeProducesState)
+                ) {
+                  errors.push(
+                    `Step '${stepName}': on_success route '${routeKey}' produces_state '${routeProducesState}' is not in step '${targetStep}'.allowed_from_states`,
+                  );
                 }
               }
             }
@@ -326,7 +344,9 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
           if (Array.isArray(gateChoices)) {
             const choice = transitionKey.startsWith('on_') ? transitionKey.slice(3) : transitionKey;
             if (!(gateChoices as unknown[]).includes(choice)) {
-              errors.push(`Step '${stepName}': transition key '${transitionKey}' is not in gate choices [${(gateChoices as string[]).join(', ')}]`);
+              errors.push(
+                `Step '${stepName}': transition key '${transitionKey}' is not in gate choices [${(gateChoices as string[]).join(', ')}]`,
+              );
             }
           }
         }
@@ -336,15 +356,22 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
         if (typeof targetStep !== 'string') {
           errors.push(`Step '${stepName}': transition '${transitionKey}' is missing 'step' field`);
         } else if (!(targetStep in stepsRaw)) {
-          errors.push(`Step '${stepName}': transition '${transitionKey}' targets unknown step '${targetStep}'`);
+          errors.push(
+            `Step '${stepName}': transition '${transitionKey}' targets unknown step '${targetStep}'`,
+          );
         } else {
           // produces_state must be in target step's allowed_from_states.
           const transitionProducesState = t['produces_state'];
           if (typeof transitionProducesState === 'string') {
             const targetStepRaw = stepsRaw[targetStep] as Record<string, unknown> | undefined;
             const targetAllowedFrom = targetStepRaw?.['allowed_from_states'];
-            if (Array.isArray(targetAllowedFrom) && !(targetAllowedFrom as unknown[]).includes(transitionProducesState)) {
-              errors.push(`Step '${stepName}': transition '${transitionKey}' produces_state '${transitionProducesState}' is not in step '${targetStep}'.allowed_from_states`);
+            if (
+              Array.isArray(targetAllowedFrom) &&
+              !(targetAllowedFrom as unknown[]).includes(transitionProducesState)
+            ) {
+              errors.push(
+                `Step '${stepName}': transition '${transitionKey}' produces_state '${transitionProducesState}' is not in step '${targetStep}'.allowed_from_states`,
+              );
             }
           }
         }

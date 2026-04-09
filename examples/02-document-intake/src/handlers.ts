@@ -1,6 +1,11 @@
 // handlers.ts — step handlers for the document-intake workflow.
 import { WorkflowError } from '@sensigo/realm';
-import type { StepHandler, StepHandlerInputs, StepContext, StepHandlerResult } from '@sensigo/realm';
+import type {
+  StepHandler,
+  StepHandlerInputs,
+  StepContext,
+  StepHandlerResult,
+} from '@sensigo/realm';
 
 /**
  * Validates extracted intake fields against quality requirements.
@@ -64,6 +69,8 @@ export class ValidateIntakeFieldsHandler implements StepHandler {
       });
     }
 
-    return { data: { validated: true, title: params.title, author: params.author, date: params.date } };
+    return {
+      data: { validated: true, title: params.title, author: params.author, date: params.date },
+    };
   }
 }

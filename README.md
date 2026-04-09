@@ -8,12 +8,12 @@ The result is not just a log of what ran — it is a cryptographically verifiabl
 
 ## Packages
 
-| Package | npm | Description |
-|---------|-----|-------------|
-| `@sensigo/realm` | [![npm](https://img.shields.io/npm/v/@sensigo/realm)](https://www.npmjs.com/package/@sensigo/realm) | Core engine — state guard, execution loop, evidence capture |
-| `@sensigo/realm-cli` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-cli)](https://www.npmjs.com/package/@sensigo/realm-cli) | `realm` CLI — 11 commands for building and operating workflows |
-| `@sensigo/realm-mcp` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-mcp)](https://www.npmjs.com/package/@sensigo/realm-mcp) | `realm-mcp` MCP server — 7 tools for AI agent connections |
-| `@sensigo/realm-testing` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-testing)](https://www.npmjs.com/package/@sensigo/realm-testing) | Testing utilities — fixtures, assertions, in-memory store |
+| Package                  | npm                                                                                                                 | Description                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `@sensigo/realm`         | [![npm](https://img.shields.io/npm/v/@sensigo/realm)](https://www.npmjs.com/package/@sensigo/realm)                 | Core engine — state guard, execution loop, evidence capture    |
+| `@sensigo/realm-cli`     | [![npm](https://img.shields.io/npm/v/@sensigo/realm-cli)](https://www.npmjs.com/package/@sensigo/realm-cli)         | `realm` CLI — 11 commands for building and operating workflows |
+| `@sensigo/realm-mcp`     | [![npm](https://img.shields.io/npm/v/@sensigo/realm-mcp)](https://www.npmjs.com/package/@sensigo/realm-mcp)         | `realm-mcp` MCP server — 7 tools for AI agent connections      |
+| `@sensigo/realm-testing` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-testing)](https://www.npmjs.com/package/@sensigo/realm-testing) | Testing utilities — fixtures, assertions, in-memory store      |
 
 ## Installation
 
@@ -55,13 +55,13 @@ This creates `my-workflow/` with `workflow.yaml`, `schema.json`, `.env.example`,
 
 ```yaml
 id: my-workflow
-name: "My Workflow"
+name: 'My Workflow'
 version: 1
 initial_state: created
 
 steps:
   gather_input:
-    description: "Agent collects the required information"
+    description: 'Agent collects the required information'
     execution: agent
     allowed_from_states: [created]
     produces_state: input_ready
@@ -73,7 +73,7 @@ steps:
           type: string
 
   finalize:
-    description: "Human reviews and approves"
+    description: 'Human reviews and approves'
     execution: auto
     trust: human_confirmed
     allowed_from_states: [input_ready]
@@ -138,23 +138,22 @@ When no registered workflow matches the task, the agent calls `create_workflow` 
 
 ## CLI Reference
 
-| Command | Description |
-|---------|-------------|
-| `realm workflow init <name>` | Scaffold a new workflow project directory |
-| `realm workflow validate <path>` | Validate a workflow YAML without registering it |
-| `realm workflow register <path>` | Register a workflow in the local store |
-| `realm workflow run <path>` | Run a workflow interactively (development mode) |
-| `realm workflow test <path>` | Run fixture-based tests against a workflow |
-| `realm run list` | List all runs |
-| `realm run resume <run-id>` | Resume a paused run |
-| `realm run respond <run-id>` | Submit a response to a human gate |
-| `realm run inspect <run-id>` | Print the full evidence chain for a run |
-| `realm run replay <run-id>` | Re-evaluate preconditions with modified step outputs |
-| `realm run diff <run-a> <run-b>` | Compare evidence chains of two runs side by side |
-| `realm run cleanup` | Mark idle non-terminal runs as abandoned |
+| Command                          | Description                                          |
+| -------------------------------- | ---------------------------------------------------- |
+| `realm workflow init <name>`     | Scaffold a new workflow project directory            |
+| `realm workflow validate <path>` | Validate a workflow YAML without registering it      |
+| `realm workflow register <path>` | Register a workflow in the local store               |
+| `realm workflow run <path>`      | Run a workflow interactively (development mode)      |
+| `realm workflow test <path>`     | Run fixture-based tests against a workflow           |
+| `realm run list`                 | List all runs                                        |
+| `realm run resume <run-id>`      | Resume a paused run                                  |
+| `realm run respond <run-id>`     | Submit a response to a human gate                    |
+| `realm run inspect <run-id>`     | Print the full evidence chain for a run              |
+| `realm run replay <run-id>`      | Re-evaluate preconditions with modified step outputs |
+| `realm run diff <run-a> <run-b>` | Compare evidence chains of two runs side by side     |
+| `realm run cleanup`              | Mark idle non-terminal runs as abandoned             |
 
 Run `realm <group> <command> --help` for full options on any command.
-
 
 ## Documentation
 
@@ -171,12 +170,12 @@ The open source CLI and MCP server run entirely locally, with no cloud dependenc
 
 [Realm Cloud](https://app.realm.dev) adds a hosted run history dashboard, cross-run analytics, scheduled workflow triggers, and the **Workflow Player UI** — a simple web interface that lets clients trigger runs, fill human gate prompts, and view their audit trail without needing an AI agent or MCP setup.
 
-| Plan | Price | For |
-|------|-------|-----|
-| Solo | $29/month | Developers running workflows for their own projects |
-| Builder | $79/month | Developers delivering AI workflows to clients — manage up to 5 client workspaces, invite clients to their own dashboard, export certified run reports |
-| Client Workspace | $19/month | End clients operating a delivered workflow day-to-day |
-| Enterprise | Custom | SSO, VPC/self-hosted, SOC2 evidence packages, SLA |
+| Plan             | Price     | For                                                                                                                                                   |
+| ---------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Solo             | $29/month | Developers running workflows for their own projects                                                                                                   |
+| Builder          | $79/month | Developers delivering AI workflows to clients — manage up to 5 client workspaces, invite clients to their own dashboard, export certified run reports |
+| Client Workspace | $19/month | End clients operating a delivered workflow day-to-day                                                                                                 |
+| Enterprise       | Custom    | SSO, VPC/self-hosted, SOC2 evidence packages, SLA                                                                                                     |
 
 30-day free trial, no credit card required. [Start free →](https://app.realm.dev)
 

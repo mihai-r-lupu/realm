@@ -36,7 +36,11 @@ describe('GitHubAdapter', () => {
   });
 
   it('get_linked_issues returns correct shape', async () => {
-    const result = await adapter.fetch('get_linked_issues', { repo: 'owner/repo', pr_number: '1' }, {});
+    const result = await adapter.fetch(
+      'get_linked_issues',
+      { repo: 'owner/repo', pr_number: '1' },
+      {},
+    );
     expect(result.status).toBe(200);
     const data = result.data as Record<string, unknown>;
     const issues = data['issues'] as Array<Record<string, unknown>>;

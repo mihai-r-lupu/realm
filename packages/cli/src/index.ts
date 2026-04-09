@@ -16,14 +16,10 @@ import { listCommand } from './commands/list.js';
 
 const program = new Command();
 
-program
-  .name('realm')
-  .description('Realm workflow engine CLI')
-  .version('0.1.0');
+program.name('realm').description('Realm workflow engine CLI').version('0.1.0');
 
 // realm workflow — operations on workflow definitions
-const workflowCmd = new Command('workflow')
-  .description('Manage workflow definitions');
+const workflowCmd = new Command('workflow').description('Manage workflow definitions');
 workflowCmd.addCommand(initCommand);
 workflowCmd.addCommand(validateCommand);
 workflowCmd.addCommand(registerCommand);
@@ -31,8 +27,7 @@ workflowCmd.addCommand(runCommand);
 workflowCmd.addCommand(testCommand);
 
 // realm run — operations on run instances
-const runCmd = new Command('run')
-  .description('Manage workflow run instances');
+const runCmd = new Command('run').description('Manage workflow run instances');
 runCmd.addCommand(listCommand);
 runCmd.addCommand(inspectCommand);
 runCmd.addCommand(replayCommand);

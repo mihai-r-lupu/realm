@@ -1,5 +1,5 @@
 ---
-applyTo: "**"
+applyTo: '**'
 ---
 
 # Realm Workflows
@@ -10,6 +10,7 @@ workflow — or triggers one by name — follow this protocol.
 ## Setup Check
 
 Before starting, confirm the Realm MCP server is connected:
+
 - Open the Chat view and verify the Realm tools appear in the tool list.
 - If not, run **MCP: List Servers** from the Command Palette, start the server, then open a new
   chat session.
@@ -42,6 +43,7 @@ it on every response, including errors.
 
 Call `next_action.instruction.tool` using `instruction.call_with` as the ready-to-use argument
 template. The `call_with` object contains placeholder values for agent-supplied fields:
+
 - Enum fields appear as `<value1|value2|value3>` — replace with one of the listed values.
 - Scalar fields appear as `0` or `""` — replace with your actual value.
 - Arrays appear as `[]` — populate with your items.
@@ -56,6 +58,7 @@ the indicated time (e.g. `"30s"`).
 ### 5. Repeat until done
 
 Repeat from step 4 until:
+
 - `status` is `confirm_required` — a human gate is open; handle it in step 6, then continue.
 - `status` is `ok` and `next_action` is `null` — the workflow has finished. No further steps exist.
 
@@ -95,13 +98,13 @@ recovery path was taken, and `context_hint` will describe what happened.
 Every `status: 'error'` and `status: 'blocked'` response carries `agent_action` that tells you
 what to do next. Do not parse the `errors` text to decide recovery strategy — use `agent_action`.
 
-| `agent_action` | Meaning | What to do |
-|---|---|---|
-| `stop` | The run is terminal or has failed unrecoverably. | Do not retry. Report to user. |
-| `report_to_user` | Engine state is inconsistent (e.g. snapshot mismatch). | Surface to user. Do not retry autonomously. |
-| `provide_input` | The params you submitted were invalid. | Fix the params and retry `execute_step` with the same command. `next_action` shows the correct tool call. |
-| `resolve_precondition` | Wrong step for current state. | Follow `next_action` if non-null to call the correct step instead. |
-| `wait_for_human` | A human gate is open and waiting for a choice. | Call `submit_human_response` with the user's choice. |
+| `agent_action`         | Meaning                                                | What to do                                                                                                |
+| ---------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `stop`                 | The run is terminal or has failed unrecoverably.       | Do not retry. Report to user.                                                                             |
+| `report_to_user`       | Engine state is inconsistent (e.g. snapshot mismatch). | Surface to user. Do not retry autonomously.                                                               |
+| `provide_input`        | The params you submitted were invalid.                 | Fix the params and retry `execute_step` with the same command. `next_action` shows the correct tool call. |
+| `resolve_precondition` | Wrong step for current state.                          | Follow `next_action` if non-null to call the correct step instead.                                        |
+| `wait_for_human`       | A human gate is open and waiting for a choice.         | Call `submit_human_response` with the user's choice.                                                      |
 
 When `agent_action` is `provide_input` or `resolve_precondition` and `next_action` is non-null,
 follow it exactly as you would after a successful step. When `next_action` is null, surface

@@ -56,15 +56,21 @@ describe('FileSystemAdapter', () => {
     await expect(adapter.fetch('read', { path: 'relative/path.ts' }, {})).rejects.toMatchObject({
       code: 'VALIDATION_INPUT_SCHEMA',
     });
-    await expect(adapter.fetch('read', { path: 'relative/path.ts' }, {})).rejects.toBeInstanceOf(WorkflowError);
+    await expect(adapter.fetch('read', { path: 'relative/path.ts' }, {})).rejects.toBeInstanceOf(
+      WorkflowError,
+    );
   });
 
   it('fetch read with nonexistent file throws RESOURCE_FETCH_FAILED', async () => {
     const adapter = new FileSystemAdapter('fs');
-    await expect(adapter.fetch('read', { path: '/nonexistent/missing-file.ts' }, {})).rejects.toMatchObject({
+    await expect(
+      adapter.fetch('read', { path: '/nonexistent/missing-file.ts' }, {}),
+    ).rejects.toMatchObject({
       code: 'RESOURCE_FETCH_FAILED',
     });
-    await expect(adapter.fetch('read', { path: '/nonexistent/missing-file.ts' }, {})).rejects.toBeInstanceOf(WorkflowError);
+    await expect(
+      adapter.fetch('read', { path: '/nonexistent/missing-file.ts' }, {}),
+    ).rejects.toBeInstanceOf(WorkflowError);
   });
 
   it('fetch with unknown operation throws ENGINE_ADAPTER_FAILED', async () => {
@@ -72,7 +78,9 @@ describe('FileSystemAdapter', () => {
     await expect(adapter.fetch('write', { path: tmpFilePath }, {})).rejects.toMatchObject({
       code: 'ENGINE_ADAPTER_FAILED',
     });
-    await expect(adapter.fetch('write', { path: tmpFilePath }, {})).rejects.toBeInstanceOf(WorkflowError);
+    await expect(adapter.fetch('write', { path: tmpFilePath }, {})).rejects.toBeInstanceOf(
+      WorkflowError,
+    );
   });
 
   it('create throws ENGINE_ADAPTER_FAILED (not supported)', async () => {

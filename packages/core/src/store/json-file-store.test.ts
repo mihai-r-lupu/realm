@@ -95,23 +95,48 @@ describe('JsonFileStore', () => {
     await store.update({ ...created, state: 'step_done' });
 
     // Second update with old version should fail
-    await expect(
-      store.update({ ...created, state: 'other' }),
-    ).rejects.toMatchObject({ code: 'STATE_SNAPSHOT_MISMATCH' });
+    await expect(store.update({ ...created, state: 'other' })).rejects.toMatchObject({
+      code: 'STATE_SNAPSHOT_MISMATCH',
+    });
   });
 
   it('list() returns all created runs', async () => {
-    await store.create({ workflowId: 'wf-1', workflowVersion: 1, initialState: 'created', params: {} });
-    await store.create({ workflowId: 'wf-1', workflowVersion: 1, initialState: 'created', params: {} });
-    await store.create({ workflowId: 'wf-2', workflowVersion: 1, initialState: 'created', params: {} });
+    await store.create({
+      workflowId: 'wf-1',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
+    await store.create({
+      workflowId: 'wf-1',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
+    await store.create({
+      workflowId: 'wf-2',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
 
     const all = await store.list();
     expect(all).toHaveLength(3);
   });
 
   it('list() filters by workflowId', async () => {
-    await store.create({ workflowId: 'wf-1', workflowVersion: 1, initialState: 'created', params: {} });
-    await store.create({ workflowId: 'wf-2', workflowVersion: 1, initialState: 'created', params: {} });
+    await store.create({
+      workflowId: 'wf-1',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
+    await store.create({
+      workflowId: 'wf-2',
+      workflowVersion: 1,
+      initialState: 'created',
+      params: {},
+    });
 
     const filtered = await store.list('wf-1');
     expect(filtered).toHaveLength(1);

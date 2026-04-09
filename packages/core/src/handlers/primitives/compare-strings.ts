@@ -10,11 +10,7 @@
  * @param mode  "exact" | "prefix" | "regex"
  * @returns     true if a matches b under the given mode.
  */
-export function compareStrings(
-  a: string,
-  b: string,
-  mode: 'exact' | 'prefix' | 'regex',
-): boolean {
+export function compareStrings(a: string, b: string, mode: 'exact' | 'prefix' | 'regex'): boolean {
   switch (mode) {
     case 'exact':
       return a === b;

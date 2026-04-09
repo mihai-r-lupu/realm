@@ -6,7 +6,11 @@
 import type { RunRecord, EvidenceSnapshot } from '../types/run-record.js';
 import type { ResponseEnvelope, NextAction } from '../types/response-envelope.js';
 import { WorkflowError } from '../types/workflow-error.js';
-import type { WorkflowDefinition, RetryConfig, StepDefinition } from '../types/workflow-definition.js';
+import type {
+  WorkflowDefinition,
+  RetryConfig,
+  StepDefinition,
+} from '../types/workflow-definition.js';
 import type { RunStore } from '../store/store-interface.js';
 import type { StateGuard } from './state-guard.js';
 import { captureEvidence } from '../evidence/snapshot.js';
@@ -94,9 +98,7 @@ function withTimeout<T>(
     }, ms);
   });
 
-  return Promise.race([dispatch(controller.signal), timeout]).finally(() =>
-    clearTimeout(timer),
-  );
+  return Promise.race([dispatch(controller.signal), timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -288,25 +290,25 @@ export function findNextAction(
   for (const [stepName, step] of Object.entries(definition.steps)) {
     if (step.allowed_from_states.includes(newState)) {
       const resolvedPrompt =
-        step.prompt !== undefined
-          ? resolvePromptTemplate(step.prompt, context)
-          : undefined;
+        step.prompt !== undefined ? resolvePromptTemplate(step.prompt, context) : undefined;
       return {
-        instruction: step.handler !== undefined
-          ? { tool: step.handler, params: {}, call_with: {} }
-          : step.execution === 'agent'
-            ? {
-              tool: 'execute_step',
-              params: { run_id: context.runId, command: stepName },
-              call_with: {
-                run_id: context.runId,
-                command: stepName,
-                params: step.input_schema !== undefined
-                  ? generateSchemaSkeleton(step.input_schema as Record<string, unknown>)
-                  : '<YOUR_PARAMS>',
-              },
-            }
-            : null,
+        instruction:
+          step.handler !== undefined
+            ? { tool: step.handler, params: {}, call_with: {} }
+            : step.execution === 'agent'
+              ? {
+                  tool: 'execute_step',
+                  params: { run_id: context.runId, command: stepName },
+                  call_with: {
+                    run_id: context.runId,
+                    command: stepName,
+                    params:
+                      step.input_schema !== undefined
+                        ? generateSchemaSkeleton(step.input_schema as Record<string, unknown>)
+                        : '<YOUR_PARAMS>',
+                  },
+                }
+              : null,
         ...(step.execution === 'agent' && step.input_schema !== undefined
           ? { input_schema: step.input_schema }
           : {}),
@@ -351,9 +353,10 @@ function makeErrorEnvelope(
   err: WorkflowError,
   definition?: WorkflowDefinition,
 ): ResponseEnvelope {
-  const hint = run !== null
-    ? `Error during '${options.command}'. Run remains in state '${run.state}'.`
-    : undefined;
+  const hint =
+    run !== null
+      ? `Error during '${options.command}'. Run remains in state '${run.state}'.`
+      : undefined;
   const base = errorEnvelope(
     options.command,
     options.runId,
@@ -432,9 +435,13 @@ export async function executeStep(
       agent_action: 'resolve_precondition' as const,
       context_hint: `Step '${options.command}' is not allowed in state '${run.state}'.`,
       next_action: nextAction,
-      blocked_reason: nextAction !== null
-        ? { ...blockedReason, suggestion: `Call the step indicated in next_action instead.` }
-        : { ...blockedReason, suggestion: `No valid next step exists from state '${run.state}'.` },
+      blocked_reason:
+        nextAction !== null
+          ? { ...blockedReason, suggestion: `Call the step indicated in next_action instead.` }
+          : {
+              ...blockedReason,
+              suggestion: `No valid next step exists from state '${run.state}'.`,
+            },
     };
   }
 
@@ -469,10 +476,7 @@ export async function executeStep(
   }
 
   // Build diagnostics metadata for every evidence snapshot produced by this step.
-  const preconditionTrace = evaluateAllPreconditions(
-    stepDef?.preconditions ?? [],
-    evidenceByStep,
-  );
+  const preconditionTrace = evaluateAllPreconditions(stepDef?.preconditions ?? [], evidenceByStep);
   const inputTokenEstimate = Math.ceil(JSON.stringify(options.input).length / 4);
 
   // Step 3b: Validate input schema
@@ -534,9 +538,10 @@ export async function executeStep(
           return options.dispatcher(options.command, options.input, pendingRun, signal);
         }
       };
-      attemptOutput = timeoutMs !== undefined
-        ? await withTimeout((signal) => makeCall(signal), timeoutMs, options.command)
-        : await makeCall();
+      attemptOutput =
+        timeoutMs !== undefined
+          ? await withTimeout((signal) => makeCall(signal), timeoutMs, options.command)
+          : await makeCall();
     } catch (err) {
       if (err instanceof WorkflowError) {
         attemptError = err;
@@ -554,8 +559,7 @@ export async function executeStep(
 
     const completedAt = new Date();
     const profile = stepDef?.agent_profile;
-    const profileData =
-      profile !== undefined ? definition.resolved_profiles?.[profile] : undefined;
+    const profileData = profile !== undefined ? definition.resolved_profiles?.[profile] : undefined;
     const baseSnap = captureEvidence({
       stepId: options.command,
       startedAt,
@@ -659,7 +663,13 @@ export async function executeStep(
         ...pendingRun,
         state: 'gate_waiting',
         evidence: [...pendingRun.evidence, ...allEvidence],
-        pending_gate: { gate_id, step_name, preview: output, choices, opened_at: new Date().toISOString() },
+        pending_gate: {
+          gate_id,
+          step_name,
+          preview: output,
+          choices,
+          opened_at: new Date().toISOString(),
+        },
       });
     } catch (err) {
       if (err instanceof WorkflowError) {
@@ -683,16 +693,16 @@ export async function executeStep(
     const resolvedGateDisplay =
       stepDef!.prompt !== undefined
         ? resolvePromptTemplate(stepDef!.prompt, {
-          evidenceByStep: gateEvidenceCtx,
-          runParams: run.params,
-        })
+            evidenceByStep: gateEvidenceCtx,
+            runParams: run.params,
+          })
         : undefined;
     const resolvedGateInstructions =
       stepDef!.instructions !== undefined
         ? resolvePromptTemplate(stepDef!.instructions, {
-          evidenceByStep: gateEvidenceCtx,
-          runParams: run.params,
-        })
+            evidenceByStep: gateEvidenceCtx,
+            runParams: run.params,
+          })
         : undefined;
 
     return {
@@ -772,7 +782,9 @@ export async function executeStep(
     evidenceByStep: { ...evidenceByStep, [options.command]: output },
     runParams: run.params,
   };
-  const nextAction = isTerminal ? null : findNextAction(newState, definition, { ...nextStepContext, runId: options.runId });
+  const nextAction = isTerminal
+    ? null
+    : findNextAction(newState, definition, { ...nextStepContext, runId: options.runId });
 
   return {
     command: options.command,
@@ -783,9 +795,10 @@ export async function executeStep(
     evidence: allEvidence,
     warnings: [],
     errors: [],
-    context_hint: nextAction !== null
-      ? nextAction.orientation
-      : `Run completed in terminal state '${newState}'. Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`,
+    context_hint:
+      nextAction !== null
+        ? nextAction.orientation
+        : `Run completed in terminal state '${newState}'. Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`,
     next_action: nextAction,
   };
 }
@@ -808,11 +821,11 @@ export async function submitHumanResponse(
       err instanceof WorkflowError
         ? err
         : new WorkflowError('Failed to load run from store', {
-          code: 'ENGINE_STORE_FAILED',
-          category: 'ENGINE',
-          agentAction: 'stop',
-          retryable: false,
-        });
+            code: 'ENGINE_STORE_FAILED',
+            category: 'ENGINE',
+            agentAction: 'stop',
+            retryable: false,
+          });
     return errorEnvelope('submit_gate', options.runId, options.snapshotId, e);
   }
 
@@ -872,15 +885,12 @@ export async function submitHumanResponse(
       run.pending_gate.step_name,
       options.runId,
       run.version.toString(),
-      new WorkflowError(
-        `Choice '${options.choice}' is not valid. Expected one of: ${expected}`,
-        {
-          code: 'VALIDATION_INPUT_SCHEMA',
-          category: 'VALIDATION',
-          agentAction: 'report_to_user',
-          retryable: false,
-        },
-      ),
+      new WorkflowError(`Choice '${options.choice}' is not valid. Expected one of: ${expected}`, {
+        code: 'VALIDATION_INPUT_SCHEMA',
+        category: 'VALIDATION',
+        agentAction: 'report_to_user',
+        retryable: false,
+      }),
       `Invalid choice for gate '${run.pending_gate.step_name}'. Run is in state '${run.state}'.`,
     );
   }
@@ -889,7 +899,9 @@ export async function submitHumanResponse(
   const gateStepName = run.pending_gate.step_name;
   const stepDef = definition.steps[gateStepName]!;
   const transitionKey = `on_${options.choice}`;
-  const transition = stepDef.transitions?.[transitionKey] as { step: string; produces_state: string } | undefined;
+  const transition = stepDef.transitions?.[transitionKey] as
+    | { step: string; produces_state: string }
+    | undefined;
   const newState = transition !== undefined ? transition.produces_state : stepDef.produces_state;
   const isTerminal = transition !== undefined ? false : isTerminalState(stepDef.produces_state);
 
@@ -921,12 +933,18 @@ export async function submitHumanResponse(
       err instanceof WorkflowError
         ? err
         : new WorkflowError('Failed to persist gate response', {
-          code: 'ENGINE_STORE_FAILED',
-          category: 'ENGINE',
-          agentAction: 'stop',
-          retryable: false,
-        });
-    return errorEnvelope(gateStepName, options.runId, run.version.toString(), e, `Failed to persist gate response. Run was in state '${run.state}'.`);
+            code: 'ENGINE_STORE_FAILED',
+            category: 'ENGINE',
+            agentAction: 'stop',
+            retryable: false,
+          });
+    return errorEnvelope(
+      gateStepName,
+      options.runId,
+      run.version.toString(),
+      e,
+      `Failed to persist gate response. Run was in state '${run.state}'.`,
+    );
   }
 
   // 7. Build response — merge step output with human choice for a complete data record.
@@ -936,10 +954,10 @@ export async function submitHumanResponse(
   const nextAction = isTerminal
     ? null
     : findNextAction(newState, definition, {
-      evidenceByStep,
-      runParams: savedRun.params,
-      runId: options.runId,
-    });
+        evidenceByStep,
+        runParams: savedRun.params,
+        runId: options.runId,
+      });
 
   return {
     command: gateStepName,
@@ -950,13 +968,18 @@ export async function submitHumanResponse(
     evidence: [],
     warnings: [],
     errors: [],
-    context_hint: nextAction !== null
-      ? nextAction.orientation
-      : `Run completed in terminal state '${newState}'. Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`,
+    context_hint:
+      nextAction !== null
+        ? nextAction.orientation
+        : `Run completed in terminal state '${newState}'. Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`,
     next_action: nextAction,
-    ...(transition !== undefined ? {
-      chained_auto_steps: [{ step: gateStepName, produced_state: newState, branched_via: transitionKey }],
-    } : {}),
+    ...(transition !== undefined
+      ? {
+          chained_auto_steps: [
+            { step: gateStepName, produced_state: newState, branched_via: transitionKey },
+          ],
+        }
+      : {}),
   };
 }
 
@@ -1016,7 +1039,9 @@ async function executeChainInternal(
         if (recoveryStepDef?.execution === 'auto') {
           // Auto recovery step — chain continues through it.
           const branchResult = await executeChainInternal(
-            store, guard, definition,
+            store,
+            guard,
+            definition,
             {
               runId: options.runId,
               command: onError.step,

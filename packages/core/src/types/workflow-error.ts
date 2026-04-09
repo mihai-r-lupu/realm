@@ -1,12 +1,6 @@
 // Structured, categorized error class used throughout the engine.
 
-export type ErrorCategory =
-  | 'NETWORK'
-  | 'SERVICE'
-  | 'STATE'
-  | 'VALIDATION'
-  | 'ENGINE'
-  | 'RESOURCE';
+export type ErrorCategory = 'NETWORK' | 'SERVICE' | 'STATE' | 'VALIDATION' | 'ENGINE' | 'RESOURCE';
 
 export type AgentAction =
   | 'report_to_user'

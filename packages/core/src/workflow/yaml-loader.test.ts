@@ -72,7 +72,9 @@ describe('loadWorkflowFromString', () => {
   });
 
   it('step allowed_from_state references state never produced throws WorkflowError', () => {
-    const content = VALID_YAML + `
+    const content =
+      VALID_YAML +
+      `
   step-three:
     description: Orphan step
     execution: auto
@@ -83,7 +85,9 @@ describe('loadWorkflowFromString', () => {
   });
 
   it('rejects workflows with duplicate allowed_from_states', () => {
-    const content = VALID_YAML + `
+    const content =
+      VALID_YAML +
+      `
   step-dupe:
     description: Duplicate source step
     execution: auto
@@ -128,7 +132,9 @@ steps:
     );
     const def = loadWorkflowFromString(content);
     expect(def.steps['auto_step']?.transitions?.['on_error']?.step).toBe('recovery_step');
-    expect(def.steps['auto_step']?.transitions?.['on_error']?.produces_state).toBe('recovery_needed');
+    expect(def.steps['auto_step']?.transitions?.['on_error']?.produces_state).toBe(
+      'recovery_needed',
+    );
   });
 
   it('on_error on an agent step throws WorkflowError', () => {
@@ -140,7 +146,9 @@ steps:
     try {
       loadWorkflowFromString(content);
     } catch (err) {
-      expect((err as WorkflowError).message).toContain("'on_error' transition is only valid on execution: auto steps");
+      expect((err as WorkflowError).message).toContain(
+        "'on_error' transition is only valid on execution: auto steps",
+      );
     }
   });
 
@@ -166,7 +174,9 @@ steps:
     try {
       loadWorkflowFromString(content);
     } catch (err) {
-      expect((err as WorkflowError).message).toContain("produces_state 'wrong_state' is not in step 'recovery_step'.allowed_from_states");
+      expect((err as WorkflowError).message).toContain(
+        "produces_state 'wrong_state' is not in step 'recovery_step'.allowed_from_states",
+      );
     }
   });
 
@@ -199,7 +209,9 @@ steps:
     try {
       loadWorkflowFromString(content);
     } catch (err) {
-      expect((err as WorkflowError).message).toContain("transition key 'on_cancel' is not in gate choices");
+      expect((err as WorkflowError).message).toContain(
+        "transition key 'on_cancel' is not in gate choices",
+      );
     }
   });
 
@@ -254,7 +266,9 @@ steps:
     try {
       loadWorkflowFromString(content);
     } catch (err) {
-      expect((err as WorkflowError).message).toContain("'on_success' transition is only valid on execution: auto steps");
+      expect((err as WorkflowError).message).toContain(
+        "'on_success' transition is only valid on execution: auto steps",
+      );
     }
   });
 
@@ -264,7 +278,9 @@ steps:
     try {
       loadWorkflowFromString(content);
     } catch (err) {
-      expect((err as WorkflowError).message).toContain("'on_success' transition is missing a non-empty 'field'");
+      expect((err as WorkflowError).message).toContain(
+        "'on_success' transition is missing a non-empty 'field'",
+      );
     }
   });
 
@@ -290,7 +306,9 @@ steps:
     try {
       loadWorkflowFromString(content);
     } catch (err) {
-      expect((err as WorkflowError).message).toContain("produces_state 'wrong_state' is not in step 'extract_step'.allowed_from_states");
+      expect((err as WorkflowError).message).toContain(
+        "produces_state 'wrong_state' is not in step 'extract_step'.allowed_from_states",
+      );
     }
   });
 
@@ -339,7 +357,9 @@ steps:
     try {
       loadWorkflowFromString(content);
     } catch (err) {
-      expect((err as WorkflowError).message).toContain("agent_profile' is only valid on execution: agent steps");
+      expect((err as WorkflowError).message).toContain(
+        "agent_profile' is only valid on execution: agent steps",
+      );
     }
   });
 });

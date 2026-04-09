@@ -23,7 +23,7 @@ export class GenericHttpAdapter implements ServiceAdapter {
   constructor(
     public readonly id: string,
     private readonly config: HttpAdapterConfig,
-  ) { }
+  ) {}
 
   private buildAuthHeaders(auth: HttpAdapterConfig['auth']): Record<string, string> {
     if (auth === undefined) return {};
@@ -65,11 +65,11 @@ export class GenericHttpAdapter implements ServiceAdapter {
       method === 'GET'
         ? { method, headers: baseHeaders, signal: signal ?? null }
         : {
-          method,
-          headers: { ...baseHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify(params),
-          signal: signal ?? null,
-        };
+            method,
+            headers: { ...baseHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify(params),
+            signal: signal ?? null,
+          };
 
     let response: Response;
     try {

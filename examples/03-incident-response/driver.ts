@@ -76,7 +76,9 @@ while (!currentRun.terminal_state) {
     const stepDef = definition.steps[nextStep];
     const isAutoStep = stepDef?.execution === 'auto';
     // Auto steps (e.g. service reads) use run.params as input; agent steps use fixture responses.
-    const agentResponse = isAutoStep ? {} : (fixture.agent_responses[nextStep] ?? {}) as Record<string, unknown>;
+    const agentResponse = isAutoStep
+      ? {}
+      : ((fixture.agent_responses[nextStep] ?? {}) as Record<string, unknown>);
     const stepInput = isAutoStep ? currentRun.params : agentResponse;
     const dispatcher: StepDispatcher = async () => agentResponse;
     const result = await executeChain(store, guard, definition, {
@@ -110,7 +112,9 @@ const evidence = currentRun.evidence;
 const allOk = evidence.every((s) => s.status === 'success');
 console.log('─'.repeat(57));
 console.log(`Final state: ${currentRun.state}`);
-console.log(`Evidence hash chain: ${allOk ? 'ok' : 'FAILED'} (${evidence.length}/${evidence.length})`);
+console.log(
+  `Evidence hash chain: ${allOk ? 'ok' : 'FAILED'} (${evidence.length}/${evidence.length})`,
+);
 console.log(`\nTo inspect: realm run inspect ${runId}\n`);
 process.exit(currentRun.state === 'completed' ? 0 : 1);
 

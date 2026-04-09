@@ -3,17 +3,13 @@
     "realm-incident-response": {
       "type": "stdio",
       "command": "node",
-      "args": [
-        "${workspaceFolder}/examples/03-incident-response/dist/mcp-server.js"
-      ],
+      "args": ["${workspaceFolder}/examples/03-incident-response/dist/mcp-server.js"],
       "autoStart": true
     },
     "realm-document-intake": {
       "type": "stdio",
       "command": "node",
-      "args": [
-        "${workspaceFolder}/examples/02-document-intake/dist/mcp-server.js"
-      ],
+      "args": ["${workspaceFolder}/examples/02-document-intake/dist/mcp-server.js"],
       "autoStart": true
     }
   }

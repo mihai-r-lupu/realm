@@ -2,7 +2,10 @@
 
 /** States from which the run cannot proceed without external intervention. */
 export const TERMINAL_STATES: ReadonlySet<string> = new Set([
-  'completed', 'cancelled', 'failed', 'abandoned',
+  'completed',
+  'cancelled',
+  'failed',
+  'abandoned',
 ]);
 
 /** Terminal states from which a run may be resumed. */

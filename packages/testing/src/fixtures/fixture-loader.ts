@@ -69,7 +69,10 @@ export function loadFixtureFromString(content: string): TestFixture {
   if (expected['evidence'] !== undefined) {
     expectedObj = {
       final_state: expected['final_state'],
-      evidence: expected['evidence'] as Array<{ step_id: string; status?: 'success' | 'error' | 'skipped' }>,
+      evidence: expected['evidence'] as Array<{
+        step_id: string;
+        status?: 'success' | 'error' | 'skipped';
+      }>,
     };
   } else {
     expectedObj = { final_state: expected['final_state'] };
@@ -79,8 +82,7 @@ export function loadFixtureFromString(content: string): TestFixture {
     name: parsed['name'],
     params: (parsed['params'] as Record<string, unknown>) ?? {},
     mocks: (parsed['mocks'] as Record<string, MockOperations>) ?? {},
-    agent_responses:
-      (parsed['agent_responses'] as Record<string, Record<string, unknown>>) ?? {},
+    agent_responses: (parsed['agent_responses'] as Record<string, Record<string, unknown>>) ?? {},
     expected: expectedObj,
   };
 
@@ -98,8 +100,6 @@ export function loadFixturesFromDir(dirPath: string): TestFixture[] {
   if (!existsSync(dirPath)) {
     throw new Error(`Fixture directory does not exist: ${dirPath}`);
   }
-  const files = readdirSync(dirPath).filter(
-    (f) => f.endsWith('.yaml') || f.endsWith('.yml'),
-  );
+  const files = readdirSync(dirPath).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
   return files.map((f) => loadFixtureFromFile(join(dirPath, f)));
 }

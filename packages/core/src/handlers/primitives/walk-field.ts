@@ -7,20 +7,13 @@
  * @returns          An array of every object (not array) that has fieldName as
  *                   a direct own property.
  */
-export function walkField(
-  data: unknown,
-  fieldName: string,
-): Record<string, unknown>[] {
+export function walkField(data: unknown, fieldName: string): Record<string, unknown>[] {
   const results: Record<string, unknown>[] = [];
   collect(data, fieldName, results);
   return results;
 }
 
-function collect(
-  data: unknown,
-  fieldName: string,
-  results: Record<string, unknown>[],
-): void {
+function collect(data: unknown, fieldName: string, results: Record<string, unknown>[]): void {
   if (Array.isArray(data)) {
     for (const item of data) {
       collect(item, fieldName, results);

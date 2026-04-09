@@ -7,6 +7,7 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Added
+
 - `create_workflow` MCP tool — Mode 2 self-directed execution. An agent calls `create_workflow` with a `steps` array and optional `metadata` to register a dynamic workflow and immediately start a run in a single call. Returns a `ResponseEnvelope` with `data.workflow_id` and a populated `next_action` pointing at the first step. The agent then drives the run to completion with `execute_step` exactly as it would for a YAML-registered workflow.
 - Dynamic workflow ID derivation — when `metadata.name` is provided, the ID is `<slug>-<6-char-hex-fragment>` (e.g. `jsDoc-audit-a1b2c3`); when omitted, `dynamic-<8-char-hex>`. IDs are deterministic from a UUID fragment and collision-safe in practice.
 - Validation on `create_workflow` input: step IDs must be unique, non-empty, and contain no spaces; step descriptions must be non-empty; `timeout_seconds` must be a positive integer if set; `depends_on` entries must reference step IDs that appear earlier in the array; `depends_on` supports at most one predecessor (linear engine). All validation errors are returned in a single `agent_action: 'provide_input'` response.
@@ -140,6 +141,7 @@ All notable changes to this project are documented here.
   Quality review step adds a required `summary` field.
 
 ### Fixed
+
 - MCP `start_run`: `command` in the response is now always `'start_run'`, regardless of whether the
   engine chained an initial `execution: auto` step. Previously the field reflected the internal auto
   step name (e.g. `'read_code'`), causing agents to misinterpret which tool they had called.
@@ -210,6 +212,7 @@ All notable changes to this project are documented here.
   `@sensigo/realm`.
 
 ### Fixed
+
 - Gate response look-up in `submitHumanResponse` — after `StepDefinition.transitions` changed
   from a flat `Record<string, { step; produces_state }>` to a discriminated-key union, the
   expression `stepDef.transitions?.[transitionKey]` no longer had `.produces_state` visible to
@@ -217,6 +220,7 @@ All notable changes to this project are documented here.
   `on_reject`, etc.) can never be `on_success`.
 
 ### Tests
+
 326 tests across all packages (215 core, 42 CLI, 29 MCP, 40 testing).
 
 ---

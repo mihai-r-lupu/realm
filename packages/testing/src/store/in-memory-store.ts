@@ -1,5 +1,10 @@
 // InMemoryStore — in-memory implementation of RunStore for use in tests.
-import { WorkflowError, type RunStore, type RunRecord, type CreateRunOptions } from '@sensigo/realm';
+import {
+  WorkflowError,
+  type RunStore,
+  type RunRecord,
+  type CreateRunOptions,
+} from '@sensigo/realm';
 
 /** In-memory implementation of RunStore. Uses a Map keyed by run ID. No I/O, no locking. */
 export class InMemoryStore implements RunStore {
