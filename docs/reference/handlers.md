@@ -498,13 +498,14 @@ Use `@sensigo/realm-testing` to test handlers in isolation:
 import { testStepHandler } from '@sensigo/realm-testing';
 import { myHandler } from './my-handler.js';
 
-const result = await testStepHandler(myHandler, {
-  inputs: { params: { candidates: [...] } },
-  context: {
+const result = await testStepHandler(
+  myHandler,
+  { params: { candidates: [...] } },
+  {
     config: { source_step: 'fetch_doc', source_field: 'text' },
     resources: { fetch_doc: { text: 'The original document.' } },
   },
-});
+);
 
 expect(result.data.accepted_count).toBe(2);
 ```

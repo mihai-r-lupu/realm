@@ -11,7 +11,7 @@ Realm exposes 7 MCP tools. This document covers the full protocol: tool call pat
 | `list_workflows`        | Returns all registered workflow IDs and names. Call this first to discover what is available.                                                 |
 | `get_workflow_protocol` | Returns the full agent briefing for a workflow: step list, input schemas, instructions, rules, and quick_start. Read this before `start_run`. |
 | `start_run`             | Starts a new run for a workflow. Accepts `workflow_id` and optional `params`.                                                                 |
-| `execute_step`          | Submits agent output for the current step. Accepts `run_id`, `command` (step name), `snapshot_id`, and `params`.                              |
+| `execute_step`          | Submits agent output for the current step. Accepts `run_id`, `command` (step name), and `params`.                                             |
 | `submit_human_response` | Submits a human gate response. Accepts `run_id`, `gate_id`, and `choice`.                                                                     |
 | `get_run_state`         | Returns the current state, evidence chain, and terminal status of a run.                                                                      |
 | `create_workflow`       | Registers a dynamic workflow from a `steps` array and immediately starts a run. No YAML file or `realm register` required.                    |
@@ -23,7 +23,7 @@ Realm exposes 7 MCP tools. This document covers the full protocol: tool call pat
 1. Call `list_workflows` — discover registered workflow IDs.
 2. Call `get_workflow_protocol` with the matched `workflow_id` — read the briefing.
 3. Call `start_run` — the engine auto-chains through initial auto steps and returns at the first agent step.
-4. Call `execute_step` with `params` shaped to `next_action.input_schema` — repeat until `status` is `completed` or `confirm_required`.
+4. Call `execute_step` with `params` shaped to `next_action.input_schema` — repeat until `status` is `ok` and `next_action` is `null`, or `status` is `confirm_required`.
 5. When `status: confirm_required` — present `gate.display` to the user, collect their choice, call `submit_human_response`.
 
 ---
@@ -36,7 +36,6 @@ Every tool call returns a `ResponseEnvelope`:
 | -------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `command`            | string         | The step name that was executed.                                                                                        |
 | `run_id`             | string         | Stable run identifier.                                                                                                  |
-| `snapshot_id`        | string         | Version counter of the run record after this call. Pass to the next `execute_step` call.                                |
 | `status`             | string         | `ok`, `error`, `blocked`, or `confirm_required`.                                                                        |
 | `data`               | object         | Step output from the handler or adapter.                                                                                |
 | `evidence`           | array          | Evidence snapshots produced by this call.                                                                               |
