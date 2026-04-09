@@ -141,8 +141,7 @@ Evidence (3 steps):
      Diagnostics: ~2100 tokens | preconditions: draft_response.result.root_cause != "" → true (log_rot…)
 ```
 
-**State colors:** green = completed, red = failed or abandoned, yellow = in-progress or
-gate_waiting, cyan = gate_waiting.
+**State colors:** green = completed, red = failed or abandoned, yellow = anything else (including gate_waiting and in-progress).
 
 **Output truncation:** Input and Output fields are truncated at 120 characters. A `…` suffix
 indicates truncation — use `realm run replay` to re-evaluate with modified values.
