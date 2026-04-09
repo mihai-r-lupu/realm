@@ -150,12 +150,17 @@ Evidence (3 steps):
 **Output truncation:** Input and Output fields are truncated at 120 characters. A `…` suffix
 indicates truncation — use `realm run replay` to re-evaluate with modified values.
 
+**Human gate steps:** A gate step appears in the evidence chain as a single entry — the same
+step ID covers both the gate opening (when the engine paused for human input) and the gate
+response (when a choice was submitted via `realm run respond`). The step count does not
+increase when a gate is responded to.
+
 #### Field reference
 
 | Field                          | What it tells you                                                                                                                                                                             |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **State**                      | Current state name. Terminal runs show `✓` (completed) or no suffix (failed/abandoned).                                                                                                       |
-| **Evidence (N steps)**         | Number of distinct steps that produced evidence. Steps with multiple attempts are counted once.                                                                                               |
+| **Evidence (N steps)**         | Number of distinct steps that produced evidence. Steps with multiple attempts are counted once. Human gate steps are counted once regardless of whether the gate has been responded to.       |
 | **Step number**                | Execution order, 1-based.                                                                                                                                                                     |
 | **Step name**                  | The `id` of the step in your workflow YAML.                                                                                                                                                   |
 | **`[profile: ...]`**           | Which agent profile handled this step. Present on agent steps only; absent on auto steps and human gates.                                                                                     |
