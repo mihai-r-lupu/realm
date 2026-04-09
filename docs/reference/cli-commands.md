@@ -100,6 +100,10 @@ realm run list --workflow <workflow-id>   # filter by workflow
 
 Output per run: `run-id  workflow-id vN  state  timestamp  N step(s)`
 
+`N step(s)` is the count of distinct steps that produced evidence (retried steps count once;
+gate responses are excluded). This is the same count shown in
+`realm run inspect` under `Evidence (N steps):`.
+
 State colors: green = completed, red = failed/abandoned, cyan = gate_waiting, yellow = in-progress.
 
 ---
