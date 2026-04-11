@@ -135,4 +135,50 @@ describe('watchWorkflow', () => {
     // Should resolve without throwing.
     await expect(watchPromise).resolves.toBeUndefined();
   });
+
+  it('re-registers when a profile file changes', async () => {
+    // Create a workflow directory with a profiles/ subdirectory and one profile.
+    const dir = join(tmpdir(), `realm-watch-test-${randomUUID()}`);
+    const profilesDir = join(dir, 'profiles');
+    mkdirSync(profilesDir, { recursive: true });
+    const filePath = join(dir, 'workflow.yaml');
+    writeFileSync(filePath, VALID_YAML, 'utf8');
+    const profilePath = join(profilesDir, 'my-agent.md');
+    writeFileSync(profilePath, '# Agent profile v1', 'utf8');
+
+    const store = makeStore();
+    const controller = new AbortController();
+
+    const watchPromise = watchWorkflow(filePath, store, controller.signal);
+    // Wait for initial registration.
+    await new Promise((r) => setTimeout(r, 100));
+    const countAfterStart = store.registered.length;
+
+    // Edit the profile file — should trigger re-registration.
+    writeFileSync(profilePath, '# Agent profile v2', 'utf8');
+    await new Promise((r) => setTimeout(r, 300));
+
+    controller.abort();
+    await watchPromise;
+
+    expect(store.registered.length).toBeGreaterThan(countAfterStart);
+  });
+
+  it('does not throw when the profiles directory does not exist', async () => {
+    // Workflow directory has no profiles/ subdirectory.
+    const filePath = makeTempFile(VALID_YAML);
+    const store = makeStore();
+    const controller = new AbortController();
+
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const watchPromise = watchWorkflow(filePath, store, controller.signal);
+    await new Promise((r) => setTimeout(r, 100));
+    controller.abort();
+    await expect(watchPromise).resolves.toBeUndefined();
+
+    spy.mockRestore();
+    // Initial registration should still have happened.
+    expect(store.registered).toHaveLength(1);
+  });
 });
