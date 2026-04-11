@@ -18,6 +18,8 @@ export interface ReplayStepResult {
   /** All preconditions pass with overridden evidence? */
   preconditions_replay: boolean;
   changed: boolean;
+  /** True when the step has at least one precondition defined. */
+  has_preconditions: boolean;
 }
 
 /** Parses a literal string into a typed value (number, boolean, or string). */
@@ -109,6 +111,7 @@ export function replayRun(
       preconditions_original: originalPass,
       preconditions_replay: replayPass,
       changed: originalPass !== replayPass,
+      has_preconditions: preconditions.length > 0,
     };
   });
 }

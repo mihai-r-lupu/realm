@@ -103,6 +103,7 @@ describe('replayRun', () => {
     expect(writeRow!.preconditions_original).toBe(true);
     expect(writeRow!.preconditions_replay).toBe(false);
     expect(writeRow!.changed).toBe(true);
+    expect(writeRow!.has_preconditions).toBe(true);
   });
 
   it('override has no effect when no downstream preconditions reference the overridden step', () => {
@@ -136,6 +137,7 @@ describe('replayRun', () => {
     expect(fetchRow!.preconditions_original).toBe(true);
     expect(fetchRow!.preconditions_replay).toBe(true);
     expect(fetchRow!.changed).toBe(false);
+    expect(fetchRow!.has_preconditions).toBe(false);
   });
 
   it('dot-path override correctly changes a nested-field precondition outcome', () => {
@@ -195,8 +197,9 @@ describe('saveReplay', () => {
       preconditions_original: true,
       preconditions_replay: true,
       changed: false,
+      has_preconditions: false,
     },
-    { step_id: 'write', preconditions_original: true, preconditions_replay: false, changed: true },
+    { step_id: 'write', preconditions_original: true, preconditions_replay: false, changed: true, has_preconditions: true },
   ];
 
   it('calls store.save() with correct fields when --save is set', async () => {
