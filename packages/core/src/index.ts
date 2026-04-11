@@ -35,6 +35,7 @@ export type {
   StepHandlerResult,
 } from './extensions/step-handler.js';
 export { ExtensionRegistry } from './extensions/registry.js';
+export { createDefaultRegistry } from './extensions/default-registry.js';
 
 // Evidence
 export { captureEvidence } from './evidence/snapshot.js';
