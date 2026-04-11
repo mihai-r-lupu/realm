@@ -1,0 +1,87 @@
+// realm workflow watch <path> — watches a workflow YAML and re-registers on change.
+import { watch } from 'node:fs';
+import { join } from 'node:path';
+import { Command } from 'commander';
+import { loadWorkflowFromFile, WorkflowError } from '@sensigo/realm';
+import type { WorkflowRegistrar } from '@sensigo/realm';
+
+/**
+ * Attempts to load and register a workflow YAML file.
+ * Logs the result (success or validation error) to stdout/stderr.
+ * @param filePath Path to the workflow YAML file.
+ * @param store    The registrar to register into.
+ */
+async function registerFile(filePath: string, store: WorkflowRegistrar): Promise<void> {
+  const timestamp = new Date().toISOString();
+  try {
+    const definition = loadWorkflowFromFile(filePath);
+    await store.register(definition);
+    console.log(
+      `[${timestamp}] Registered: ${definition.id} v${definition.version} (${Object.keys(definition.steps).length} steps)`,
+    );
+  } catch (err) {
+    if (err instanceof WorkflowError) {
+      console.error(`[${timestamp}] Invalid: ${err.message}`);
+    } else {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[${timestamp}] Error: ${message}`);
+    }
+  }
+}
+
+/**
+ * Watches a workflow YAML file and re-registers it into the given store on every change.
+ * Performs an initial registration before entering the watch loop.
+ * Resolves when the watcher is closed (e.g. when the AbortSignal fires).
+ *
+ * @param filePath Path to the workflow YAML file.
+ * @param store    The workflow registrar to register into — injected, never instantiated here.
+ * @param signal   Optional AbortSignal; when aborted the watcher stops and the promise resolves.
+ */
+export async function watchWorkflow(
+  filePath: string,
+  store: WorkflowRegistrar,
+  signal?: AbortSignal,
+): Promise<void> {
+  await registerFile(filePath, store);
+
+  return new Promise<void>((resolve, reject) => {
+    const watcher = watch(filePath, { persistent: false, signal });
+
+    watcher.on('change', (eventType: string) => {
+      if (eventType === 'change') {
+        void registerFile(filePath, store);
+      }
+    });
+
+    watcher.on('error', (err: Error) => {
+      reject(err);
+    });
+
+    watcher.on('close', () => {
+      resolve();
+    });
+  });
+}
+
+export const watchCommand = new Command('watch')
+  .argument('<path>', 'Path to workflow directory or workflow.yaml file')
+  .description('Watch a workflow YAML file and re-register it on every change')
+  .action(async (inputPath: string) => {
+    const filePath =
+      inputPath.endsWith('.yaml') || inputPath.endsWith('.yml')
+        ? inputPath
+        : join(inputPath, 'workflow.yaml');
+
+    const { JsonWorkflowStore } = await import('@sensigo/realm');
+    const store = new JsonWorkflowStore();
+
+    console.log(`Watching ${filePath} — press Ctrl+C to stop`);
+    try {
+      await watchWorkflow(filePath, store);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`Error: ${message}`);
+      process.exit(1);
+    }
+  });

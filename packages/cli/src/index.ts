@@ -12,6 +12,7 @@ import { replayCommand } from './commands/replay.js';
 import { diffCommand } from './commands/diff.js';
 import { initCommand } from './commands/init.js';
 import { testCommand } from './commands/test.js';
+import { watchCommand } from './commands/watch.js';
 import { listCommand } from './commands/list.js';
 
 const program = new Command();
@@ -23,6 +24,7 @@ const workflowCmd = new Command('workflow').description('Manage workflow definit
 workflowCmd.addCommand(initCommand);
 workflowCmd.addCommand(validateCommand);
 workflowCmd.addCommand(registerCommand);
+workflowCmd.addCommand(watchCommand);
 workflowCmd.addCommand(runCommand);
 workflowCmd.addCommand(testCommand);
 
