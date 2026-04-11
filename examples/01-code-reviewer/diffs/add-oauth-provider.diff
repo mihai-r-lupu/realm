@@ -1,0 +1,34 @@
+diff --git a/src/auth/client.ts b/src/auth/client.ts
+index a3f2c1d..b8e4201 100644
+--- a/src/auth/client.ts
++++ b/src/auth/client.ts
+@@ -1,6 +1,7 @@
+ import { HttpClient } from '../http/client';
+ import { AuthToken } from './types';
++import { OAuthProvider } from './providers';
+ 
+ export class AuthClient {
+   private readonly http: HttpClient;
+@@ -14,11 +15,17 @@ export class AuthClient {
+   /**
+    * Authenticate a user with the given credentials.
+    *
+-   * @param username - The user's email address
+-   * @param password - The user's password
++   * @param username  - The user's email address
++   * @param password  - The user's password
++   * @param provider  - OAuth provider to authenticate against ('google', 'github', 'microsoft')
+    */
+-  async authenticate(username: string, password: string): Promise<AuthToken> {
++  async authenticate(
++    username: string,
++    password: string,
++    provider: OAuthProvider,
++  ): Promise<AuthToken> {
+     const response = await this.http.post('/auth/token', {
+       username,
+       password,
++      provider,
+     });
+     return response.data as AuthToken;
+   }

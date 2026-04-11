@@ -1,0 +1,13 @@
+diff --git a/src/config/loader.ts b/src/config/loader.ts
+index 5c3a1b2..d94bc71 100644
+--- a/src/config/loader.ts
++++ b/src/config/loader.ts
+@@ -24,6 +24,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
+ 
+ export function getTimeout(config: Config | null): number {
++  if (!config) {
++    return DEFAULT_TIMEOUT;
++  }
++
+   return config.timeout ?? DEFAULT_TIMEOUT;
+ }
