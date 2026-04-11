@@ -2,7 +2,7 @@
 
 ## What this shows
 
-A five-step incident triage workflow. When an alert fires, an agent analyzes the root cause
+A four-step incident triage workflow. When an alert fires, an agent analyzes the root cause
 and drafts an oncall channel message. The run cannot post until an engineer explicitly approves
 it at a human gate. If the engineer rejects the draft, the run ends immediately — nothing is
 sent, and the decision is recorded. Every step is captured in an immutable evidence chain.
@@ -22,8 +22,8 @@ Four CRITICALs added after four real incidents. There is no record of what was s
 who approved it.
 
 With Realm: the post cannot happen until `confirm_and_send` receives the engineer's `send`
-choice — a structural constraint, not a prose rule. `record_decision` is
-`allowed_from_states: [approved]`, so it only runs once per approval. `realm run inspect` shows
+choice — a structural constraint, not a prose rule. Both `send` and `reject` land in `completed`
+— the gate choice is permanently recorded in the evidence chain. `realm run inspect` shows
 who approved, what the analysis was, and exactly what text was sent.
 
 ## What it demonstrates
@@ -44,71 +44,43 @@ who approved, what the analysis was, and exactly what text was sent.
 npm install  # from repo root — installs all workspace packages
 ```
 
-## Run it (headless)
+## Run fixture tests
 
 ```bash
-cd examples/03-incident-response
-npm run build
-node dist/driver.js fixtures/approved.yaml
+realm workflow test examples/03-incident-response --fixtures examples/03-incident-response/fixtures
 ```
 
 Expected output:
 
 ```
-Run: <uuid>
-Workflow: Incident First-Response v1
-Fixture: approved
+Realm Test — examples/03-incident-response
+  PASS approved
+  PASS rejected
 
-✓ analyze_cause              —   severity=P2   confidence=high
-✓ draft_response             —   headline=P2 — payments-api degraded — DB connection pool exhausted
-✓ confirm_and_send           —   choice=send
-─────────────────────────────────────────────────────────
-Final state: completed
-Evidence hash chain: ok (4/4)
+2/2 passed
 ```
 
-Try the rejection fixture — the engineer rejects the draft, nothing is sent:
+Both fixtures run the full workflow end-to-end against pre-recorded agent responses. The `approved`
+fixture routes through the `send` gate choice; the `rejected` fixture routes through `reject`. Both
+produce 4 evidence entries and land in `completed`.
+
+To inspect the evidence chain of any run:
 
 ```bash
-node dist/driver.js fixtures/rejected.yaml
-```
-
-Expected output:
-
-```
-Run: <uuid>
-Workflow: Incident First-Response v1
-Fixture: rejected
-
-✓ analyze_cause              —   severity=P1   confidence=medium
-✓ draft_response             —   headline=P1 — auth-service down — session-store dependency failure
-✓ confirm_and_send           —   choice=reject
-─────────────────────────────────────────────────────────
-Final state: completed
-Evidence hash chain: ok (4/4)
-```
-
-Both fixtures produce 4 evidence entries. The choice (`send` vs `reject`) is recorded in the
-gate evidence — `realm run inspect` shows who chose what and when.
-
-To inspect the full evidence chain of any run:
-
-```bash
-node ../../packages/cli/dist/index.js run inspect <uuid>
-# or, if realm-cli is installed globally:
-realm run inspect <uuid>
+realm run inspect <run-id>
 ```
 
 ## Run it with an AI agent (any VS Code agent with MCP support)
 
-**Step 1** — Build:
+**Step 1** — Register the workflow so the global Realm MCP server can find it:
 
 ```bash
-npm run build
+realm workflow register examples/03-incident-response
 ```
 
-**Step 2** — VS Code picks up `.vscode/mcp.json` automatically. The `realm-incident-response`
-MCP server starts on first use — no `settings.json` editing required.
+**Step 2** — VS Code picks up `.vscode/mcp.json` from the repo root automatically. The single
+`realm` MCP server starts on first use and serves all registered workflows — no build step,
+no per-example configuration required.
 
 **Step 3** — In Copilot chat, ask:
 

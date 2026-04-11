@@ -28,6 +28,8 @@ steps:
     trust: engine_delivered
     uses_service: alerts
     operation: read
+    input_map:
+      path: run.params.path
     allowed_from_states: [created]
     produces_state: alert_loaded
 

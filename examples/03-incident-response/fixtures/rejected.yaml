@@ -1,6 +1,16 @@
 name: rejected
 params:
-  path: alerts/error-spike.json
+  path: /fake/alerts/error-spike.json
+mocks:
+  alerts:
+    read:
+      status: 200
+      data:
+        path: /fake/alerts/error-spike.json
+        content: |
+          {"alert_name":"ErrorSpike","service":"auth-service","severity":"critical","error_rate":0.42,"baseline_error_rate":0.002,"recent_deployments":[],"upstream_deps":[{"name":"session-store","status":"unhealthy"}]}
+        line_count: 1
+        size_bytes: 198
 agent_responses:
   analyze_cause:
     root_cause: 'Session store dependency failure is causing all 5xx errors in auth-service — 1921 of 1938 errors trace to session-store.'

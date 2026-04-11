@@ -1,6 +1,16 @@
 name: approved
 params:
-  path: alerts/high-latency.json
+  path: /fake/alerts/high-latency.json
+mocks:
+  alerts:
+    read:
+      status: 200
+      data:
+        path: /fake/alerts/high-latency.json
+        content: |
+          {"alert_name":"HighLatency","service":"payments-api","severity":"critical","p99_latency_ms":4820,"threshold_ms":2000,"recent_deployments":[{"version":"v2.14.1","deployed_at":"2026-04-10T07:30:00Z"}],"db_connections":{"active":98,"max":100}}
+        line_count: 1
+        size_bytes: 235
 agent_responses:
   analyze_cause:
     root_cause: 'Database connection pool exhausted on payments-api following a throughput spike after the v2.14.1 deployment.'
