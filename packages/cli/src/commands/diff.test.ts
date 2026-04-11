@@ -111,12 +111,14 @@ describe('diffReplays', () => {
         preconditions_original: true,
         preconditions_replay: true,
         changed: false,
+        has_preconditions: false,
       },
       {
         step_id: 'write',
         preconditions_original: true,
         preconditions_replay: true,
         changed: false,
+        has_preconditions: true,
       },
     ];
     const recordA = makeReplayRecord(results);
@@ -126,6 +128,24 @@ describe('diffReplays', () => {
     expect(rows.every((r) => !r.differs)).toBe(true);
   });
 
+  it('step with has_preconditions false shows "none" in both columns', () => {
+    const results = [
+      {
+        step_id: 'fetch_doc',
+        preconditions_original: true,
+        preconditions_replay: true,
+        changed: false,
+        has_preconditions: false,
+      },
+    ];
+    const recordA = makeReplayRecord(results);
+    const recordB = makeReplayRecord(results);
+    const rows = diffReplays(recordA, recordB);
+    expect(rows[0]!.precond_a).toBe('none');
+    expect(rows[0]!.precond_b).toBe('none');
+    expect(rows[0]!.differs).toBe(false);
+  });
+
   it('one step changes from PASS→PASS to PASS→BLOCKED → that step has differs: true', () => {
     const resultsA = [
       {
@@ -133,12 +153,14 @@ describe('diffReplays', () => {
         preconditions_original: true,
         preconditions_replay: true,
         changed: false,
+        has_preconditions: false,
       },
       {
         step_id: 'write',
         preconditions_original: true,
         preconditions_replay: true,
         changed: false,
+        has_preconditions: true,
       },
     ];
     const resultsB = [
@@ -147,12 +169,14 @@ describe('diffReplays', () => {
         preconditions_original: true,
         preconditions_replay: true,
         changed: false,
+        has_preconditions: false,
       },
       {
         step_id: 'write',
         preconditions_original: true,
         preconditions_replay: false,
         changed: true,
+        has_preconditions: true,
       },
     ];
     const recordA = makeReplayRecord(resultsA);
@@ -173,12 +197,14 @@ describe('diffReplays', () => {
         preconditions_original: true,
         preconditions_replay: true,
         changed: false,
+        has_preconditions: false,
       },
       {
         step_id: 'extra_step',
         preconditions_original: true,
         preconditions_replay: true,
         changed: false,
+        has_preconditions: true,
       },
     ];
     const resultsB = [
@@ -187,6 +213,7 @@ describe('diffReplays', () => {
         preconditions_original: true,
         preconditions_replay: true,
         changed: false,
+        has_preconditions: false,
       },
     ];
     const recordA = makeReplayRecord(resultsA);

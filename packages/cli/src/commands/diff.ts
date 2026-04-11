@@ -22,11 +22,10 @@ export interface ReplayDiffRow {
 
 /** Formats a single replay result for the diff column. */
 function formatReplayColumn(
-  result: { preconditions_original: boolean; preconditions_replay: boolean } | undefined,
+  result: { preconditions_original: boolean; preconditions_replay: boolean; has_preconditions: boolean } | undefined,
 ): string {
   if (result === undefined) return 'missing';
-  // Pass hasPreconditions=true: in a cross-replay diff, all executed steps have meaningful state.
-  return formatPrecondColumn(result.preconditions_original, result.preconditions_replay, true);
+  return formatPrecondColumn(result.preconditions_original, result.preconditions_replay, result.has_preconditions);
 }
 
 /**
