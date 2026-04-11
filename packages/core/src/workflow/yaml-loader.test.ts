@@ -127,6 +127,178 @@ steps:
       threshold: 3,
     });
   });
+
+  it('expands use_template: call site into concrete steps; call site key is absent', () => {
+    const yaml = `
+id: tpl-wf
+name: Template Workflow
+version: 1
+initial_state: created
+templates:
+  simple_pair:
+    params:
+      svc:
+        required: true
+    steps:
+      fetch:
+        description: Fetch from {{ svc }}
+        execution: auto
+        allowed_from_states: ['{{ prefix }}_created']
+        produces_state: '{{ prefix }}_fetched'
+      review:
+        description: Review the result
+        execution: agent
+        allowed_from_states: ['{{ prefix }}_fetched']
+        produces_state: '{{ prefix }}_done'
+steps:
+  init:
+    description: Initialise
+    execution: auto
+    allowed_from_states: [created]
+    produces_state: doc_created
+  setup:
+    use_template: simple_pair
+    prefix: doc
+    params:
+      svc: documents
+`;
+    const def = loadWorkflowFromString(yaml);
+    const keys = Object.keys(def.steps);
+    expect(keys).toContain('doc_fetch');
+    expect(keys).toContain('doc_review');
+    expect(keys).not.toContain('setup');
+    expect(def.steps['doc_fetch']?.description).toBe('Fetch from documents');
+    expect(def.steps['doc_fetch']?.allowed_from_states).toEqual(['doc_created']);
+    expect(def.steps['doc_review']?.produces_state).toBe('doc_done');
+  });
+
+  it('throws WorkflowError when a required template param is missing at call site', () => {
+    const yaml = `
+id: tpl-missing-param
+name: Missing Param
+version: 1
+initial_state: created
+templates:
+  needs_svc:
+    params:
+      svc:
+        required: true
+    steps:
+      fetch:
+        description: Fetch from {{ svc }}
+        execution: auto
+        allowed_from_states: [created]
+        produces_state: fetched
+steps:
+  call:
+    use_template: needs_svc
+    prefix: x
+    params: {}
+`;
+    expect(() => loadWorkflowFromString(yaml)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(yaml);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain('svc');
+    }
+  });
+
+  it('throws WorkflowError when use_template references a non-existent template', () => {
+    const yaml = `
+id: tpl-bad-ref
+name: Bad Ref
+version: 1
+initial_state: created
+steps:
+  call:
+    use_template: does_not_exist
+    prefix: x
+`;
+    expect(() => loadWorkflowFromString(yaml)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(yaml);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain('does_not_exist');
+    }
+  });
+
+  it('expands two use_template instantiations of the same template with different prefixes', () => {
+    const yaml = `
+id: two-tpl-wf
+name: Two Template Uses
+version: 1
+initial_state: created
+templates:
+  one_step:
+    params:
+      label:
+        default: item
+    steps:
+      process:
+        description: Process {{ label }}
+        execution: agent
+        allowed_from_states: ['{{ prefix }}_created']
+        produces_state: '{{ prefix }}_done'
+steps:
+  init_alpha:
+    description: Init alpha
+    execution: auto
+    allowed_from_states: [created]
+    produces_state: alpha_created
+  first:
+    use_template: one_step
+    prefix: alpha
+    params:
+      label: alpha_item
+  init_beta:
+    description: Init beta
+    execution: auto
+    allowed_from_states: [alpha_done]
+    produces_state: beta_created
+  second:
+    use_template: one_step
+    prefix: beta
+    params:
+      label: beta_item
+`;
+    const def = loadWorkflowFromString(yaml);
+    const keys = Object.keys(def.steps);
+    expect(keys).toContain('alpha_process');
+    expect(keys).toContain('beta_process');
+    expect(def.steps['alpha_process']?.description).toBe('Process alpha_item');
+    expect(def.steps['beta_process']?.description).toBe('Process beta_item');
+  });
+
+  it('mixes a concrete step and a use_template instantiation in the same workflow', () => {
+    const yaml = `
+id: mixed-wf
+name: Mixed Workflow
+version: 1
+initial_state: created
+templates:
+  one_step:
+    steps:
+      run:
+        description: Run step
+        execution: agent
+        allowed_from_states: ['{{ prefix }}_created']
+        produces_state: '{{ prefix }}_done'
+steps:
+  prepare:
+    description: Prepare
+    execution: auto
+    allowed_from_states: [created]
+    produces_state: task_created
+  main:
+    use_template: one_step
+    prefix: task
+`;
+    const def = loadWorkflowFromString(yaml);
+    const keys = Object.keys(def.steps);
+    expect(keys).toContain('prepare');
+    expect(keys).toContain('task_run');
+    expect(keys).not.toContain('main');
+  });
 });
 
 describe('transitions validation', () => {

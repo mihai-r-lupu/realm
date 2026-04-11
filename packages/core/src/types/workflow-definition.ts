@@ -30,6 +30,18 @@ export interface ServiceDefinition {
   trust: ServiceTrust;
 }
 
+/** A single parameter declaration in a template. */
+export interface TemplateParam {
+  required?: boolean;
+  default?: string;
+}
+
+/** A named reusable step group with parameter placeholders. */
+export interface TemplateDefinition {
+  params?: Record<string, TemplateParam>;
+  steps: Record<string, StepDefinition>;
+}
+
 export interface RetryConfig {
   max_attempts: number;
   backoff: 'linear' | 'exponential' | 'fixed';
@@ -92,6 +104,12 @@ export interface StepDefinition {
    * For human_confirmed steps, delivered as gate.prompt when the gate opens.
    */
   prompt?: string;
+  /**
+   * When present, this entry is a template instantiation rather than a concrete step.
+   * Resolved by loadWorkflowFromString before validation — never present in a
+   * WorkflowDefinition returned to callers.
+   */
+  use_template?: string;
   /** Gate configuration — choices available to the human reviewer. */
   gate?: { choices?: string[] };
   /** Conditional routing based on step outcome or gate response. */
@@ -114,6 +132,8 @@ export interface WorkflowDefinition {
   /** Optional protocol customizations — overrides generated sections. */
   protocol?: ProtocolConfig;
   services?: Record<string, ServiceDefinition>;
+  /** Optional named step groups with {{ param }} placeholders; resolved at load time. */
+  templates?: Record<string, TemplateDefinition>;
   steps: Record<string, StepDefinition>;
   /** Optional: directory containing shared profile markdown files.
    *  Resolved relative to the workflow YAML file at load time.

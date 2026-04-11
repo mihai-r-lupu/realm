@@ -3,8 +3,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { load } from 'js-yaml';
-import type { WorkflowDefinition } from '../types/workflow-definition.js';
+import type { WorkflowDefinition, TemplateDefinition } from '../types/workflow-definition.js';
 import { WorkflowError } from '../types/workflow-error.js';
+import { resolveTemplates } from './template-resolver.js';
 
 const VALID_EXECUTIONS = new Set(['auto', 'agent']);
 const VALID_SERVICE_METHODS = new Set(['fetch', 'create', 'update']);
@@ -136,6 +137,13 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
       agentAction: 'report_to_user',
       retryable: false,
     });
+  }
+
+  // Step 1b: Resolve template instantiations before validation.
+  // Templates are optional; skip if neither templates nor use_template entries are present.
+  const rawTemplates = (doc['templates'] ?? {}) as Record<string, TemplateDefinition>;
+  if (Object.keys(rawTemplates).length > 0 || hasUseTemplateInSteps(doc['steps'])) {
+    doc['steps'] = resolveTemplates(doc['steps'] as Record<string, unknown>, rawTemplates);
   }
 
   const stepsRaw = doc['steps'] as Record<string, unknown>;
@@ -414,4 +422,12 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
 
   // Step 6: Return typed result
   return doc as unknown as WorkflowDefinition;
+}
+
+/** Returns true if any step in the raw steps map declares use_template. */
+function hasUseTemplateInSteps(steps: unknown): boolean {
+  if (typeof steps !== 'object' || steps === null) return false;
+  return Object.values(steps as Record<string, unknown>).some(
+    (s) => typeof s === 'object' && s !== null && 'use_template' in (s as object),
+  );
 }

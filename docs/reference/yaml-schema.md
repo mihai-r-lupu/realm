@@ -203,6 +203,118 @@ services:
 
 ---
 
+## Step Templates
+
+Step templates are reusable named step groups declared in a top-level `templates:` block.
+They are resolved at load time — there is zero runtime overhead and no new files on disk.
+Templates eliminate copy-paste in workflows that repeat the same step pattern with different
+service names, prefixes, or agent descriptions.
+
+### Declaring a template
+
+```yaml
+templates:
+  extract_and_record:
+    params:
+      service_name:
+        required: true
+      agent_description:
+        default: 'Review the extracted content.'
+    steps:
+      extract:
+        description: 'Extract content from {{ service_name }}'
+        execution: auto
+        uses_service: '{{ service_name }}'
+        operation: read
+        allowed_from_states: ['{{ prefix }}_ready']
+        produces_state: '{{ prefix }}_extracted'
+      review:
+        description: '{{ agent_description }}'
+        execution: agent
+        allowed_from_states: ['{{ prefix }}_extracted']
+        produces_state: '{{ prefix }}_reviewed'
+```
+
+### Using a template
+
+```yaml
+steps:
+  invoice_check:
+    use_template: extract_and_record
+    prefix: invoice
+    params:
+      service_name: invoices
+      agent_description: 'Review the extracted invoice for anomalies.'
+```
+
+`prefix` is mandatory when `use_template` is present. It is used both for step ID generation
+(`invoice_extract`, `invoice_review`) and as the `{{ prefix }}` placeholder in all template
+step strings. The parent key (`invoice_check`) is discarded after expansion.
+
+### Param declaration reference
+
+| Field      | Type    | Description                                                         |
+| ---------- | ------- | ------------------------------------------------------------------- |
+| `required` | boolean | If `true`, the caller must supply this param. Missing → load error. |
+| `default`  | string  | Used when the caller does not supply the param.                     |
+
+Unknown params passed at the call site are silently ignored (forward compatibility).
+
+### Complete end-to-end example
+
+```yaml
+id: document-pipeline
+name: Document Pipeline
+version: 1
+initial_state: created
+
+services:
+  documents:
+    adapter: filesystem
+    trust: engine_delivered
+
+templates:
+  fetch_and_review:
+    params:
+      service_name:
+        required: true
+      agent_description:
+        default: 'Review the document.'
+    steps:
+      fetch:
+        description: 'Fetch from {{ service_name }}'
+        execution: auto
+        uses_service: '{{ service_name }}'
+        operation: read
+        input_map:
+          path: run.params.path
+        allowed_from_states: ['{{ prefix }}_created']
+        produces_state: '{{ prefix }}_fetched'
+      review:
+        description: '{{ agent_description }}'
+        execution: agent
+        allowed_from_states: ['{{ prefix }}_fetched']
+        produces_state: '{{ prefix }}_reviewed'
+
+steps:
+  init:
+    description: Initialise the pipeline
+    execution: auto
+    allowed_from_states: [created]
+    produces_state: doc_created
+
+  doc_pipeline:
+    use_template: fetch_and_review
+    prefix: doc
+    params:
+      service_name: documents
+      agent_description: 'Review the fetched document for completeness.'
+```
+
+This expands to three concrete steps: `init`, `doc_fetch`, `doc_review`.
+
+---
+
 ## Agent profiles
 
 An `execution: agent` step can declare a reusable persona via the `agent_profile` field. The persona is defined in a Markdown file and delivered verbatim to the agent at step entry.
