@@ -93,6 +93,13 @@ recovery path was taken, and `context_hint` will describe what happened.
    - `gate_id` from `gate.gate_id` (required — distinct from `run_id`)
    - `choice` set to the user's selected value from `gate.response_spec.choices`
 
+## Checking Run State
+
+If you lose track of a run's current state (e.g. after an error or session gap), call
+`get_run_state` with the `run_id`. It returns the current state name, whether the run is
+terminal, the pending gate if any, and how many evidence entries exist. Use it to orient
+yourself before deciding the next tool call — do not guess the state.
+
 ## Error and Blocked Responses
 
 Every `status: 'error'` and `status: 'blocked'` response carries `agent_action` that tells you

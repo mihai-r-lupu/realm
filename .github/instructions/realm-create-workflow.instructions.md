@@ -71,13 +71,13 @@ Minimal call:
 
 Each step:
 
-| Field             | Required | Description                                                 |
-| ----------------- | -------- | ----------------------------------------------------------- |
-| `id`              | Yes      | Unique identifier. Snake_case verb-noun. No spaces.         |
-| `description`     | Yes      | What a correct output looks like (acceptance criterion).    |
-| `input_schema`    | No       | JSON Schema for the fields this step's output must include. |
-| `depends_on`      | No       | Advisory list of step IDs this step logically follows.      |
-| `timeout_seconds` | No       | Positive integer. If omitted, no timeout is enforced.       |
+| Field             | Required | Description                                                         |
+| ----------------- | -------- | ------------------------------------------------------------------- |
+| `id`              | Yes      | Unique identifier. Snake_case verb-noun. No spaces.                 |
+| `description`     | Yes      | What a correct output looks like (acceptance criterion).            |
+| `input_schema`    | No       | JSON Schema for the fields this step's output must include.         |
+| `depends_on`      | No       | At most one step ID this step logically follows (engine is linear). |
+| `timeout_seconds` | No       | Positive integer. If omitted, no timeout is enforced.               |
 
 ## Step Design Guidelines
 
@@ -109,9 +109,12 @@ The engine always runs steps in array order. Setting `depends_on` expresses logi
 dependencies for clarity but does not change execution order. Omit it when array order makes
 the sequence obvious.
 
-All IDs listed in `depends_on` must refer to steps that appear **earlier** in the `steps` array
-(no forward references). Violating this causes `create_workflow` to return
-`agent_action: 'provide_input'` — fix the array order or remove the invalid reference.
+`depends_on` accepts **at most one** step ID — this engine is linear. Listing more than one
+causes `create_workflow` to return `agent_action: 'provide_input'`.
+
+The referenced ID must refer to a step that appears **earlier** in the `steps` array (no
+forward references). Violating this also causes `agent_action: 'provide_input'` — fix the
+array order or remove the invalid reference.
 
 ## After Calling create_workflow
 
@@ -157,5 +160,6 @@ them as described in `realm.instructions.md`.
 - All steps in a dynamic workflow are `execution: agent` — the engine always returns them to
   you for execution. `handler:` and `uses_service:` are not available on dynamic steps; use
   a YAML-registered workflow if you need auto steps, service adapters, or handlers.
+- `depends_on` accepts at most one ID. Listing more than one causes `provide_input`.
 - `depends_on` references must point to steps earlier in the array. Forward references cause
   a `provide_input` error at `create_workflow` call time.
