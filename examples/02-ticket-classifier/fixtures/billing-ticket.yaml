@@ -1,0 +1,36 @@
+name: billing inquiry — double charge on March invoice
+params:
+  path: /fake/tickets/billing-overcharge.txt
+mocks:
+  tickets:
+    read:
+      status: 200
+      data:
+        path: /fake/tickets/billing-overcharge.txt
+        content: |
+          CUST-1122 — Incorrect Invoice — Double Charge
+
+          Customer: CUST-1122
+          Reported: 2026-04-09
+
+          We were charged twice for our March invoice — once on March 1 and again
+          on March 31. The duplicate charge was $499.00. Please issue a refund and
+          confirm when it will appear on our statement.
+        line_count: 9
+        size_bytes: 280
+agent_responses:
+  classify_ticket:
+    category: billing
+    priority: high
+    ticket_title: Double charge on March invoice — refund requested
+    customer_id: CUST-1122
+    one_line_summary: Customer billed twice for March; requesting $499.00 refund for the duplicate charge.
+expected:
+  final_state: completed
+  evidence:
+    - step_id: read_ticket
+      status: success
+    - step_id: classify_ticket
+      status: success
+    - step_id: record_ticket
+      status: success

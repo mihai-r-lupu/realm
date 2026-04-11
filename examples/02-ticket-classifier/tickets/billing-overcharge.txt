@@ -1,0 +1,13 @@
+CUST-1122 — Incorrect Invoice — Double Charge
+
+Customer: CUST-1122
+Reported: 2026-04-09
+
+Hello,
+
+We were charged twice for our March invoice — once on March 1 and again on
+March 31. The duplicate charge was for $499.00. Please issue a refund for
+the duplicate charge and confirm when it will appear on our statement.
+
+Thanks,
+Finance team, BetaCo

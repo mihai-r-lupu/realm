@@ -194,7 +194,7 @@ steps:
 
 The file path is taken from the run's `params` — declare it in `params_schema` and pass it when
 calling `start_run`. The step result is injected directly into the evidence; the agent cannot see
-or alter it. See `examples/03-incident-response/` and `examples/02-document-intake/` for working examples.
+or alter it. See `examples/03-incident-response/` and `examples/02-ticket-classifier/` for working examples.
 
 **When you provide a custom registry** (e.g. to register a handler), auto-registration does not
 apply — start from `createDefaultRegistry()` from `@sensigo/realm-mcp` and add your extensions

@@ -120,7 +120,7 @@ is present via `context.resources.read_alert.content`.
 
 ## What to look at next
 
-- [Example 2 — Document Intake](../02-document-intake/) — `on_error` branching, handler
-  validation, revision loop
+- [Example 2 — Ticket Classifier](../02-ticket-classifier/) — agent step schema enforcement,
+  `input_schema` validation, `provide_input` on schema rejection
 - [YAML Schema Reference](../../docs/reference/yaml-schema.md) — all step fields, execution
   modes, gate configuration, and transitions
