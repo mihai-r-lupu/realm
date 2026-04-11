@@ -8,12 +8,12 @@ The result is not just a log of what ran — it is a cryptographically verifiabl
 
 ## Packages
 
-| Package                  | npm                                                                                                                 | Description                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `@sensigo/realm`         | [![npm](https://img.shields.io/npm/v/@sensigo/realm)](https://www.npmjs.com/package/@sensigo/realm)                 | Core engine — state guard, execution loop, evidence capture    |
-| `@sensigo/realm-cli`     | [![npm](https://img.shields.io/npm/v/@sensigo/realm-cli)](https://www.npmjs.com/package/@sensigo/realm-cli)         | `realm` CLI — 11 commands for building and operating workflows |
-| `@sensigo/realm-mcp`     | [![npm](https://img.shields.io/npm/v/@sensigo/realm-mcp)](https://www.npmjs.com/package/@sensigo/realm-mcp)         | `realm-mcp` MCP server — 7 tools for AI agent connections      |
-| `@sensigo/realm-testing` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-testing)](https://www.npmjs.com/package/@sensigo/realm-testing) | Testing utilities — fixtures, assertions, in-memory store      |
+| Package                  | npm                                                                                                                 | Description                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `@sensigo/realm`         | [![npm](https://img.shields.io/npm/v/@sensigo/realm)](https://www.npmjs.com/package/@sensigo/realm)                 | Core engine — state guard, execution loop, evidence capture              |
+| `@sensigo/realm-cli`     | [![npm](https://img.shields.io/npm/v/@sensigo/realm-cli)](https://www.npmjs.com/package/@sensigo/realm-cli)         | `realm` CLI — 15 commands for building, operating, and serving workflows |
+| `@sensigo/realm-mcp`     | [![npm](https://img.shields.io/npm/v/@sensigo/realm-mcp)](https://www.npmjs.com/package/@sensigo/realm-mcp)         | `realm-mcp` MCP server — 7 tools for AI agent connections                |
+| `@sensigo/realm-testing` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-testing)](https://www.npmjs.com/package/@sensigo/realm-testing) | Testing utilities — fixtures, assertions, in-memory store                |
 
 ## Installation
 
@@ -92,16 +92,10 @@ realm workflow run ./my-workflow        # run interactively (development mode)
 
 ## Connect an AI Agent via MCP
 
-Start the MCP server:
+Start the MCP server (built into the CLI — no extra install needed):
 
 ```bash
-realm-mcp
-```
-
-Or with `npx` without a global install:
-
-```bash
-npx @sensigo/realm-mcp
+realm mcp
 ```
 
 **Claude Desktop — `claude_desktop_config.json`**
@@ -110,7 +104,8 @@ npx @sensigo/realm-mcp
 {
   "mcpServers": {
     "realm": {
-      "command": "realm-mcp"
+      "command": "realm",
+      "args": ["mcp"]
     }
   }
 }
@@ -122,11 +117,20 @@ npx @sensigo/realm-mcp
 {
   "mcpServers": {
     "realm": {
-      "command": "realm-mcp"
+      "command": "realm",
+      "args": ["mcp"]
     }
   }
 }
 ```
+
+**Hosted agent platforms** (OpenClaw, Claude.ai, custom backends) that cannot spawn a local subprocess use `realm serve` instead:
+
+```bash
+REALM_SERVE_TOKEN=<secret> realm serve --port 3001
+```
+
+This starts an HTTP MCP server protected by Bearer token authentication. Use `--dev` to skip auth during local development.
 
 Once connected the agent has access to 7 tools: `list_workflows`, `get_workflow_protocol`, `start_run`, `execute_step`, `submit_human_response`, `get_run_state`, and `create_workflow`.
 
@@ -138,22 +142,25 @@ When no registered workflow matches the task, the agent calls `create_workflow` 
 
 ## CLI Reference
 
-| Command                          | Description                                          |
-| -------------------------------- | ---------------------------------------------------- |
-| `realm workflow init <name>`     | Scaffold a new workflow project directory            |
-| `realm workflow validate <path>` | Validate a workflow YAML without registering it      |
-| `realm workflow register <path>` | Register a workflow in the local store               |
-| `realm workflow run <path>`      | Run a workflow interactively (development mode)      |
-| `realm workflow test <path>`     | Run fixture-based tests against a workflow           |
-| `realm run list`                 | List all runs                                        |
-| `realm run resume <run-id>`      | Resume a paused run                                  |
-| `realm run respond <run-id>`     | Submit a response to a human gate                    |
-| `realm run inspect <run-id>`     | Print the full evidence chain for a run              |
-| `realm run replay <run-id>`      | Re-evaluate preconditions with modified step outputs |
-| `realm run diff <run-a> <run-b>` | Compare evidence chains of two runs side by side     |
-| `realm run cleanup`              | Mark idle non-terminal runs as abandoned             |
+| Command                          | Description                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------- |
+| `realm workflow init <name>`     | Scaffold a new workflow project directory                                    |
+| `realm workflow validate <path>` | Validate a workflow YAML without registering it                              |
+| `realm workflow register <path>` | Register a workflow in the local store                                       |
+| `realm workflow watch <path>`    | Watch a workflow YAML and re-register on every change                        |
+| `realm workflow run <path>`      | Run a workflow interactively (development mode)                              |
+| `realm workflow test <path>`     | Run fixture-based tests against a workflow                                   |
+| `realm run list`                 | List all runs                                                                |
+| `realm run resume <run-id>`      | Resume a paused run                                                          |
+| `realm run respond <run-id>`     | Submit a response to a human gate                                            |
+| `realm run inspect <run-id>`     | Print the full evidence chain for a run                                      |
+| `realm run replay <run-id>`      | Re-evaluate preconditions with modified step outputs                         |
+| `realm run diff <run-a> <run-b>` | Compare evidence chains of two runs side by side                             |
+| `realm run cleanup`              | Mark idle non-terminal runs as abandoned                                     |
+| `realm mcp`                      | Start the MCP server over stdio (for local AI agents)                        |
+| `realm serve`                    | Start the MCP server over HTTP with Bearer token auth (for hosted platforms) |
 
-Run `realm <group> <command> --help` for full options on any command.
+Run `realm <command> --help` for full options on any command.
 
 ## Documentation
 
@@ -188,7 +195,7 @@ Building with Realm for a funded startup? [Apply to the startup program](https:/
 ```bash
 npm install          # install all workspace dependencies
 npm run build        # compile all packages
-npm run test         # run all tests (326 total)
+npm run test         # run all tests (428 total)
 npm run lint         # lint all packages
 ```
 
