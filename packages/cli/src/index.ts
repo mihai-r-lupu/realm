@@ -14,6 +14,8 @@ import { initCommand } from './commands/init.js';
 import { testCommand } from './commands/test.js';
 import { watchCommand } from './commands/watch.js';
 import { listCommand } from './commands/list.js';
+import { mcpCommand } from './commands/mcp.js';
+import { serveCommand } from './commands/serve.js';
 
 const program = new Command();
 
@@ -40,5 +42,7 @@ runCmd.addCommand(cleanupCommand);
 
 program.addCommand(workflowCmd);
 program.addCommand(runCmd);
+program.addCommand(mcpCommand);
+program.addCommand(serveCommand);
 
 program.parse();
