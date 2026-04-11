@@ -253,7 +253,7 @@ async function callHandler(
       {
         run_id: options.runId,
         run_params: pendingRun.params,
-        config: {},
+        config: stepDef.config ?? {},
         // Prior step outputs are exposed as resources so the handler can access
         // document text, extracted candidates, etc. without reading the store.
         resources: evidenceByStep,

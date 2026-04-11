@@ -103,6 +103,30 @@ describe('loadWorkflowFromString', () => {
       expect((err as WorkflowError).message).toContain('Ambiguous routing');
     }
   });
+
+  it('preserves step config block in parsed definition', () => {
+    const yaml = `
+id: cfg-test
+name: Config Test
+version: 1
+initial_state: idle
+steps:
+  validate:
+    description: "Validate something."
+    execution: auto
+    handler: my_handler
+    allowed_from_states: [idle]
+    produces_state: completed
+    config:
+      source_step: fetch_doc
+      threshold: 3
+`;
+    const def = loadWorkflowFromString(yaml);
+    expect(def.steps['validate']?.config).toEqual({
+      source_step: 'fetch_doc',
+      threshold: 3,
+    });
+  });
 });
 
 describe('transitions validation', () => {
