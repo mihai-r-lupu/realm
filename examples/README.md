@@ -4,10 +4,11 @@ Examples are ordered by the developer pain they address, starting with the most 
 felt problems. Each example has a **before** (the naive approach) and an **after** (the Realm
 workflow), so you can see exactly what changes and why.
 
-| Example                                               | Pain points demonstrated                                                                     | Realm primitive                                                              |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [02-ticket-classifier/](02-ticket-classifier/)        | Structured output failures, tool calling brittleness, hidden framework retry logic           | Agent step `input_schema` enforcement, schema-driven `provide_input`         |
-| [03-incident-response/](03-incident-response/)        | No human gate before irreversible action, no audit trail, duplicate posts on retry           | Human gate, idempotency via evidence chain, sequential agent steps           |
+| Example                                        | Pain points demonstrated                                                           | Realm primitive                                                      |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [01-code-reviewer/](01-code-reviewer/)         | Verification gap, non-determinism, instruction file spiral, no audit trail         | Workflow states as verification gates, `input_schema` enforcement    |
+| [02-ticket-classifier/](02-ticket-classifier/) | Structured output failures, tool calling brittleness, hidden framework retry logic | Agent step `input_schema` enforcement, schema-driven `provide_input` |
+| [03-incident-response/](03-incident-response/) | No human gate before irreversible action, no audit trail, duplicate posts on retry | Human gate, idempotency via evidence chain, sequential agent steps   |
 
 More examples covering checkpoint/resume and multi-agent coordination are planned.
 See `.private/realm-ai-automation-pain-points-final.md` for the full priority ladder.
@@ -33,6 +34,7 @@ workspace opens. Register the workflow you want to use:
 
 ```bash
 # From the repo root:
+realm workflow register examples/01-code-reviewer/workflow.yaml
 realm workflow register examples/02-ticket-classifier/workflow.yaml
 realm workflow register examples/03-incident-response/workflow.yaml
 ```
@@ -46,6 +48,7 @@ Then open (or restart) Copilot chat and refer to the example's README for the pr
 Each example ships with test fixtures under `fixtures/`. Run them with:
 
 ```bash
+realm workflow test examples/01-code-reviewer/workflow.yaml -f examples/01-code-reviewer/fixtures/
 realm workflow test examples/02-ticket-classifier/workflow.yaml -f examples/02-ticket-classifier/fixtures/
 realm workflow test examples/03-incident-response/workflow.yaml -f examples/03-incident-response/fixtures/
 ```

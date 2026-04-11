@@ -112,7 +112,7 @@ The agent will:
 
 ```bash
 # From the repo root:
-realm workflow test --workflow examples/02-ticket-classifier/workflow.yaml --fixtures examples/02-ticket-classifier/fixtures/
+realm workflow test examples/02-ticket-classifier/workflow.yaml -f examples/02-ticket-classifier/fixtures/
 ```
 
 Two fixtures are included:

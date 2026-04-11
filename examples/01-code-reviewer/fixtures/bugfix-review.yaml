@@ -1,0 +1,40 @@
+name: null pointer fix — early return guard
+params:
+  path: /fake/diffs/fix-null-pointer.diff
+mocks:
+  diffs:
+    read:
+      status: 200
+      data:
+        path: /fake/diffs/fix-null-pointer.diff
+        content: |
+          diff --git a/src/config/loader.ts b/src/config/loader.ts
+          index 5c3a1b2..d94bc71 100644
+          --- a/src/config/loader.ts
+          +++ b/src/config/loader.ts
+          @@ -24,6 +24,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
+           
+           export function getTimeout(config: Config | null): number {
+          +  if (!config) {
+          +    return DEFAULT_TIMEOUT;
+          +  }
+          +
+             return config.timeout ?? DEFAULT_TIMEOUT;
+           }
+        line_count: 13
+        size_bytes: 386
+agent_responses:
+  review_changes:
+    severity: low
+    summary: Adds an early return guard to prevent a null pointer dereference when the config object is not yet initialised.
+    breaking_changes: false
+    action_required: false
+expected:
+  final_state: completed
+  evidence:
+    - step_id: read_diff
+      status: success
+    - step_id: review_changes
+      status: success
+    - step_id: record_review
+      status: success
