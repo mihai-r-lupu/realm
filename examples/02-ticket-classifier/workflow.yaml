@@ -1,0 +1,87 @@
+# examples/02-ticket-classifier/workflow.yaml
+# Support Ticket Classifier — reads a raw support ticket from disk,
+# classifies it into a structured record using a tightly-typed schema,
+# and records the result.
+#
+# Demonstrates: agent step input_schema enforcement, enum and pattern validation,
+# schema-driven rejection with provide_input. No custom handlers or build step —
+# schema validation is a first-class engine primitive.
+id: ticket-classifier
+name: Support Ticket Classifier
+version: 1
+initial_state: created
+
+params_schema:
+  type: object
+  required: [path]
+  properties:
+    path:
+      type: string
+      description: 'Path to the support ticket text file'
+
+services:
+  tickets:
+    adapter: filesystem
+    trust: engine_delivered
+
+steps:
+  read_ticket:
+    description: Load the support ticket from disk
+    execution: auto
+    trust: engine_delivered
+    uses_service: tickets
+    operation: read
+    input_map:
+      path: run.params.path
+    allowed_from_states: [created]
+    produces_state: ticket_loaded
+
+  classify_ticket:
+    description: >
+      Classify the ticket into a structured record. Output must match the
+      declared schema exactly — the engine rejects any response that does not.
+    execution: agent
+    allowed_from_states: [ticket_loaded]
+    produces_state: classified
+    prompt: |
+      Classify the support ticket below into a structured record.
+
+      Required fields:
+      - category: one of bug | feature_request | billing | account | other
+      - priority: one of low | medium | high | critical
+      - ticket_title: a one-line summary, 5–120 characters
+      - customer_id: the customer ID from the ticket, format CUST-NNNN
+      - one_line_summary: one sentence describing the core issue (min 10 chars)
+
+      Return exactly these five fields. Any field missing, mistyped, or using
+      a value outside the allowed enums will be rejected before your response
+      is accepted.
+
+      Ticket:
+      {{ context.resources.read_ticket.content }}
+    input_schema:
+      type: object
+      required: [category, priority, ticket_title, customer_id, one_line_summary]
+      properties:
+        category:
+          type: string
+          enum: [bug, feature_request, billing, account, other]
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+        ticket_title:
+          type: string
+          minLength: 5
+          maxLength: 120
+        customer_id:
+          type: string
+          pattern: '^CUST-[0-9]{4}$'
+        one_line_summary:
+          type: string
+          minLength: 10
+
+  record_ticket:
+    description: Record the classified ticket
+    execution: auto
+    allowed_from_states: [classified]
+    produces_state: completed

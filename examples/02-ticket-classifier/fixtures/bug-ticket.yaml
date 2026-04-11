@@ -1,0 +1,38 @@
+name: bug report — payment gateway timeout
+params:
+  path: /fake/tickets/payment-gateway-bug.txt
+mocks:
+  tickets:
+    read:
+      status: 200
+      data:
+        path: /fake/tickets/payment-gateway-bug.txt
+        content: |
+          CUST-3847 — Payment Gateway Timeout
+
+          Customer: CUST-3847
+          Reported: 2026-04-10
+
+          Our payment gateway has been timing out intermittently for the past 6 hours.
+          About 30% of checkout attempts fail with a 504 error. This is happening in
+          production and is actively costing us revenue.
+
+          We last deployed v2.14.1 at 07:30 UTC. Timeouts started around 08:15 UTC.
+        line_count: 10
+        size_bytes: 320
+agent_responses:
+  classify_ticket:
+    category: bug
+    priority: critical
+    ticket_title: Payment gateway timing out — 30% of checkouts failing
+    customer_id: CUST-3847
+    one_line_summary: Payment gateway 504 errors since 08:15 UTC, affecting 30% of checkout attempts.
+expected:
+  final_state: completed
+  evidence:
+    - step_id: read_ticket
+      status: success
+    - step_id: classify_ticket
+      status: success
+    - step_id: record_ticket
+      status: success
