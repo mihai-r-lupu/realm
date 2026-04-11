@@ -4,9 +4,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   ExtensionRegistry,
-  FileSystemAdapter,
   JsonWorkflowStore,
   JsonFileStore,
+  createDefaultRegistry,
 } from '@sensigo/realm';
 import { registerListWorkflows } from './tools/list-workflows.js';
 import { registerGetWorkflowProtocol } from './tools/get-workflow-protocol.js';
@@ -32,18 +32,17 @@ export interface RealmMcpServerOptions {
  * Returns an ExtensionRegistry pre-populated with Realm's built-in adapters.
  * `FileSystemAdapter` is registered under the name `'filesystem'`.
  *
- * Use this as a starting point when you need built-in adapters alongside your own extensions:
+ * Use this as a starting point when you need to add your own handlers or adapters on top:
  * ```ts
  * const registry = createDefaultRegistry();
  * registry.register('handler', 'my_handler', myHandler);
  * const server = createRealmMcpServer({ workflowStore, registry });
  * ```
+ *
+ * When no registry is passed to `createRealmMcpServer`, the engine uses built-in adapters
+ * automatically — you only need this if you are adding custom extensions.
  */
-export function createDefaultRegistry(): ExtensionRegistry {
-  const r = new ExtensionRegistry();
-  r.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
-  return r;
-}
+export { createDefaultRegistry };
 
 /**
  * Creates and configures the Realm MCP server with all 7 workflow tools.

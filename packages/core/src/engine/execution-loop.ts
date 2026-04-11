@@ -18,6 +18,7 @@ import { validateInputSchema } from '../validation/input-schema.js';
 import { TERMINAL_STATES, isTerminalState } from './lifecycle.js';
 import { checkPreconditions, evaluateAllPreconditions } from './precondition.js';
 import { ExtensionRegistry } from '../extensions/registry.js';
+import { createDefaultRegistry } from '../extensions/default-registry.js';
 import type { ServiceResponse } from '../extensions/service-adapter.js';
 import { resolveSecret } from '../config/secrets.js';
 import { resolvePromptTemplate, resolvePath } from './prompt-template.js';
@@ -39,8 +40,9 @@ export interface ExecuteStepOptions {
   dispatcher: StepDispatcher;
   /**
    * Extension registry for resolving service adapters and step handlers.
-   * Required for auto steps that declare `uses_service` or `handler`.
-   * Callers that only drive agent steps may omit this.
+   * When omitted, the engine uses the built-in default registry (includes `FileSystemAdapter`).
+   * Pass a custom registry to add your own adapters and handlers, starting from
+   * `createDefaultRegistry()` if you also need the built-in adapters.
    */
   registry?: ExtensionRegistry;
   /** Resolved secrets passed to adapter configs (e.g. API tokens). */
@@ -172,7 +174,7 @@ async function callAdapter(
     });
   }
 
-  const adapter = options.registry?.getAdapter(serviceDef.adapter);
+  const adapter = (options.registry ?? createDefaultRegistry()).getAdapter(serviceDef.adapter);
   if (adapter === undefined) {
     throw new WorkflowError(
       `Adapter '${serviceDef.adapter}' for service '${serviceName}' is not registered`,
@@ -233,7 +235,7 @@ async function callHandler(
   signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
   const handlerName = stepDef.handler!;
-  const handler = options.registry?.getHandler(handlerName);
+  const handler = (options.registry ?? createDefaultRegistry()).getHandler(handlerName);
   if (handler === undefined) {
     throw new WorkflowError(`Handler '${handlerName}' is not registered`, {
       code: 'ENGINE_HANDLER_FAILED',
@@ -1155,8 +1157,15 @@ export async function executeChain(
   definition: WorkflowDefinition,
   options: ExecuteChainOptions,
 ): Promise<ResponseEnvelope> {
+  // Ensure built-in adapters are always available. Callers that only use the default
+  // set need not pass a registry at all; those with custom extensions start from
+  // createDefaultRegistry() and add their own on top.
+  const effectiveOptions: ExecuteChainOptions = {
+    ...options,
+    registry: options.registry ?? createDefaultRegistry(),
+  };
   const chained: Array<{ step: string; produced_state: string; branched_via?: string }> = [];
-  const result = await executeChainInternal(store, guard, definition, options, 0, chained);
+  const result = await executeChainInternal(store, guard, definition, effectiveOptions, 0, chained);
   const envelope = { ...result, command: options.command };
   return chained.length > 0 ? { ...envelope, chained_auto_steps: chained } : envelope;
 }

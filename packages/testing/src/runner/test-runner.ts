@@ -3,6 +3,7 @@ import {
   loadWorkflowFromFile,
   StateGuard,
   ExtensionRegistry,
+  createDefaultRegistry,
   executeChain,
   type WorkflowDefinition,
 } from '@sensigo/realm';
@@ -47,8 +48,9 @@ async function runSingleFixture(
   try {
     const store = new InMemoryStore();
 
-    // Build per-fixture registry: register mock adapters by adapter id.
-    const fixtureRegistry = new ExtensionRegistry();
+    // Build per-fixture registry: start from built-in adapters, then overlay
+    // mock adapters so fixture mocks take precedence over the real ones.
+    const fixtureRegistry = createDefaultRegistry();
     for (const [serviceName, mockOps] of Object.entries(fixture.mocks)) {
       const serviceDef = definition.services?.[serviceName];
       if (serviceDef !== undefined) {
@@ -95,12 +97,22 @@ async function runSingleFixture(
       }
 
       const nextStep = allowedSteps[0]!;
+      const stepDef = definition.steps[nextStep];
+      // Agent steps need the fixture's pre-built response as the input so the
+      // engine's input_schema validation passes before the dispatcher runs.
+      // Auto steps take no caller-provided input — the engine resolves it via
+      // input_map or the adapter/handler call.
+      const stepInput =
+        stepDef?.execution === 'agent'
+          ? ((fixture.agent_responses[nextStep] ?? {}) as Record<string, unknown>)
+          : {};
       const envelope = await executeChain(store, guard, definition, {
         runId,
         command: nextStep,
-        input: {},
+        input: stepInput,
         snapshotId: currentRun.version.toString(),
         dispatcher,
+        registry: fixtureRegistry,
       });
 
       if (envelope.status === 'error') {
