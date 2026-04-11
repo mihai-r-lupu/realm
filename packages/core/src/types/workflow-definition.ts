@@ -74,6 +74,11 @@ export interface StepDefinition {
    */
   input_map?: Record<string, string>;
   handler?: string;
+  /**
+   * Static key-value configuration passed to the step handler via context.config.
+   * Only meaningful on execution: auto steps with a handler declaration.
+   */
+  config?: Record<string, unknown>;
   input_schema?: JsonSchema;
   preconditions?: string[];
   trust?: TrustLevel;
