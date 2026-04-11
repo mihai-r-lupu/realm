@@ -45,6 +45,30 @@ realm workflow register ./my-workflow
 
 ---
 
+### `realm workflow watch <path>`
+
+Watches a workflow YAML file and re-registers it into the local store on every change.
+Performs an initial registration immediately on startup, then re-registers whenever the
+file is modified — no manual `realm workflow register` required during active development.
+
+```bash
+realm workflow watch ./my-workflow
+realm workflow watch ./my-workflow/workflow.yaml   # or point directly at the file
+```
+
+Press `Ctrl+C` to stop watching.
+
+Errors from an invalid YAML edit are logged (with a timestamp) to stderr but do not crash
+the watcher — fix the file and save again to recover.
+
+**Development inner loop:**
+
+1. Start `realm workflow watch ./my-workflow` in one terminal.
+2. Edit `workflow.yaml` freely — every save auto-registers.
+3. Run `realm workflow run ./my-workflow` or start your MCP session in another terminal.
+
+---
+
 ### `realm workflow run <path>`
 
 Runs a workflow interactively in development mode. For each agent step, prompts for JSON output.
@@ -261,3 +285,104 @@ realm run cleanup --dry-run          # preview without making changes
 ```
 
 `--older-than` accepts: `Nd` (days), `Nh` (hours), `Nm` (minutes). Example: `7d`, `6h`, `30m`.
+
+---
+
+## MCP server commands
+
+---
+
+### `realm mcp`
+
+Starts the Realm MCP server over stdio. All workflows registered via `realm workflow register`
+are immediately available. Use this command in AI client configs (Claude Desktop, Cursor, VS Code
+MCP) that can spawn a local subprocess.
+
+```bash
+realm mcp
+```
+
+**Claude Desktop — `claude_desktop_config.json`:**
+
+```json
+{
+  "mcpServers": {
+    "realm": {
+      "command": "realm",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**Cursor — `~/.cursor/mcp.json`:**
+
+```json
+{
+  "mcpServers": {
+    "realm": {
+      "command": "realm",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**VS Code — `.vscode/mcp.json`:**
+
+```json
+{
+  "servers": {
+    "realm": {
+      "type": "stdio",
+      "command": "realm",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+---
+
+### `realm serve`
+
+Starts the Realm MCP server over HTTP with Bearer token authentication. Designed for hosted
+agent platforms (OpenClaw, Claude.ai, LangChain cloud, custom backends) that cannot spawn a
+local subprocess via stdio.
+
+```bash
+REALM_SERVE_TOKEN=<secret> realm serve
+REALM_SERVE_TOKEN=<secret> realm serve --port 8080 --host 0.0.0.0
+realm serve --dev   # disable auth for local development only
+```
+
+| Option             | Default     | Description                                                        |
+| ------------------ | ----------- | ------------------------------------------------------------------ |
+| `--port <number>`  | `3001`      | Port to listen on                                                  |
+| `--host <address>` | `127.0.0.1` | Bind address                                                       |
+| `--dev`            | off         | Disable auth (local development only — do not expose to a network) |
+
+**Environment variables:**
+
+| Variable            | Description                                                                  |
+| ------------------- | ---------------------------------------------------------------------------- |
+| `REALM_SERVE_TOKEN` | Bearer token clients must send in the `Authorization: Bearer <token>` header |
+| `REALM_DEV`         | Set to `1` to disable auth — equivalent to the `--dev` flag                  |
+
+The server refuses to start if neither `REALM_SERVE_TOKEN` nor `--dev` / `REALM_DEV=1` is set.
+
+**Connecting from an HTTP MCP client (e.g. n8n, VS Code remote):**
+
+```json
+{
+  "servers": {
+    "realm": {
+      "type": "http",
+      "url": "http://127.0.0.1:3001",
+      "headers": {
+        "Authorization": "Bearer <your-token>"
+      }
+    }
+  }
+}
+```

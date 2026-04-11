@@ -86,6 +86,14 @@ realm workflow register ./                # store the workflow definition locall
 
 `realm workflow validate` catches schema errors, duplicate step IDs, and invalid state transitions before you run anything.
 
+**Development tip — auto-register on save:** instead of running `realm workflow register` after every edit, use `realm workflow watch`:
+
+```bash
+realm workflow watch ./   # registers immediately, then re-registers on every file change
+```
+
+Make edits to `workflow.yaml` freely — each save triggers a re-registration. Invalid YAML is logged but does not stop the watcher; fix the file and save again to recover. Press `Ctrl+C` to stop.
+
 ---
 
 ## 5. Run Interactively
@@ -405,18 +413,74 @@ For full interface documentation, context field reference, handler composition p
 
 ---
 
-## 10. Connect an AI Agent via MCP
+## 10. Adding Agent Profiles
 
-Install the MCP server:
+An agent profile is a Markdown file that defines a persona for an `execution: agent` step. The profile content is delivered to the AI agent verbatim as `agent_profile_instructions` when the step is reached, before it submits any output.
+
+### Create a profile file
+
+Add a `profiles/` directory next to your `workflow.yaml`:
+
+```
+extraction-demo/
+  workflow.yaml
+  profiles/
+    extractor.md
+```
+
+Write the persona in plain Markdown — no special syntax required:
+
+```markdown
+You are a precise document extraction specialist.
+
+Your output must be structured exactly as defined in the step schema.
+Do not paraphrase. Do not add context. Quote verbatim or omit entirely.
+```
+
+### Reference the profile in a step
+
+```yaml
+steps:
+  step_one:
+    description: Extract key facts from the document
+    execution: agent
+    agent_profile: extractor   # loads profiles/extractor.md
+    allowed_from_states: [created]
+    produces_state: extracted
+```
+
+The `profiles_dir` top-level field defaults to `profiles/` relative to the workflow YAML. Set it explicitly if your profiles live elsewhere:
+
+```yaml
+profiles_dir: ./shared/personas  # relative to workflow.yaml
+```
+
+### Register to apply changes
+
+Profile content is read from disk at **registration time** and baked into the stored workflow definition. The AI agent receives the content over MCP at runtime — no file system access is needed on the server.
 
 ```bash
-npm install -g @sensigo/realm-mcp
-````
+realm workflow register ./extraction-demo
+# ✓ Registered: extraction-demo v2 (2 steps)
+```
 
-Start it:
+If any referenced profile file is missing, registration fails immediately with the expected path in the error message.
+
+> **Re-registration required for profile updates.** If you edit a profile file after registering, run `realm workflow register` again. The server continues serving the previously baked content until you do.
+
+Multiple steps can share the same profile name — Realm reads the file once and records a single hash.
+
+For the complete field reference, see [Agent profiles](reference/yaml-schema.md#agent-profiles) in the YAML Schema Reference.
+
+---
+
+## 11. Connect an AI Agent via MCP
+
+The MCP server is built into the `realm` CLI — no extra install needed if you already have
+`@sensigo/realm-cli` installed globally. Start it with:
 
 ```bash
-realm-mcp
+realm mcp
 ```
 
 Configure your AI client. **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
@@ -425,7 +489,8 @@ Configure your AI client. **Claude Desktop** (`~/Library/Application Support/Cla
 {
   "mcpServers": {
     "realm": {
-      "command": "realm-mcp"
+      "command": "realm",
+      "args": ["mcp"]
     }
   }
 }
@@ -437,11 +502,15 @@ Configure your AI client. **Claude Desktop** (`~/Library/Application Support/Cla
 {
   "mcpServers": {
     "realm": {
-      "command": "realm-mcp"
+      "command": "realm",
+      "args": ["mcp"]
     }
   }
 }
 ```
+
+For hosted platforms that cannot spawn a local subprocess, use `realm serve` instead. See the
+[CLI Reference](reference/cli-commands.md#realm-serve) for details.
 
 The agent has access to 7 MCP tools:
 
@@ -509,7 +578,7 @@ For the full protocol — `next_action` fields, `chained_auto_steps`, `context_h
 
 ---
 
-## 11. Testing Workflows
+## 12. Testing Workflows
 
 Write a fixture file in `extraction-demo/fixtures/happy-path.yaml`:
 
@@ -569,3 +638,4 @@ assertStepOutput(run.evidence, 'step_one', { result: 'the document text' });
 - Read the [YAML Schema Reference](reference/yaml-schema.md) for all step fields, execution modes, and transitions.
 - Read the [MCP Protocol Reference](reference/mcp-protocol.md) for full tool and response envelope documentation.
 - Read the [`@sensigo/realm` source](../packages/core/src/index.ts) for the full public API.
+````
