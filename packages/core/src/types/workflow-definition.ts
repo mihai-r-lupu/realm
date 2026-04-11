@@ -112,7 +112,7 @@ export interface WorkflowDefinition {
   steps: Record<string, StepDefinition>;
   /** Optional: directory containing shared profile markdown files.
    *  Resolved relative to the workflow YAML file at load time.
-   *  Falls back to <workflow-dir>/agents/ if omitted. */
+   *  Falls back to <workflow-dir>/profiles/ if omitted. */
   profiles_dir?: string;
   /**
    * Map of resolved profile content keyed by profile name.

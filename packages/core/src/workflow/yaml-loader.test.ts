@@ -382,16 +382,16 @@ steps:
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'realm-profile-test-'));
-    mkdirSync(join(tmpDir, 'agents'));
+    mkdirSync(join(tmpDir, 'profiles'));
   });
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('resolves profile content and hash when agents/ directory exists', () => {
+  it('resolves profile content and hash when profiles/ directory exists', () => {
     writeFileSync(join(tmpDir, 'workflow.yaml'), workflowYaml);
-    writeFileSync(join(tmpDir, 'agents', 'my-profile.md'), 'You are a helpful agent.');
+    writeFileSync(join(tmpDir, 'profiles', 'my-profile.md'), 'You are a helpful agent.');
 
     const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
     expect(def.resolved_profiles).toBeDefined();
@@ -402,7 +402,7 @@ steps:
 
   it('throws WorkflowError when profile file is missing', () => {
     writeFileSync(join(tmpDir, 'workflow.yaml'), workflowYaml);
-    // no agents/my-profile.md written
+    // no profiles/my-profile.md written
 
     expect(() => loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'))).toThrow(WorkflowError);
     try {
@@ -434,7 +434,7 @@ steps:
     produces_state: done
 `;
     writeFileSync(join(tmpDir, 'workflow.yaml'), sharedYaml);
-    writeFileSync(join(tmpDir, 'agents', 'shared-profile.md'), 'Shared persona content.');
+    writeFileSync(join(tmpDir, 'profiles', 'shared-profile.md'), 'Shared persona content.');
 
     const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
     expect(def.resolved_profiles).toBeDefined();

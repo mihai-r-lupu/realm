@@ -15,10 +15,10 @@ All notable changes to this project are documented here.
 - `list_workflows` hint updated — the response now includes a note directing agents to call `create_workflow` when no registered workflow matches their task.
 - `agent_profile` field on `StepDefinition` — associates a named agent persona with an
   `execution: agent` step. The profile content is loaded at register time from a Markdown file
-  under the workflow's `profiles_dir` (defaults to `<workflow-dir>/agents/`). Using `agent_profile`
+  under the workflow's `profiles_dir` (defaults to `<workflow-dir>/profiles/`). Using `agent_profile`
   on an `execution: auto` step is a hard validation error.
 - `profiles_dir` field on `WorkflowDefinition` — optional path (relative to the workflow YAML
-  file) pointing to the directory that contains `.md` profile files. Defaults to `agents/` adjacent
+  file) pointing to the directory that contains `.md` profile files. Defaults to `profiles/` adjacent
   to the workflow YAML when omitted.
 - `resolved_profiles` on `WorkflowDefinition` (runtime-only) — populated by `loadWorkflowFromFile`
   after register-time resolution. Each entry holds `{ content, content_hash }` where `content_hash`
@@ -30,8 +30,8 @@ All notable changes to this project are documented here.
   profile, the snapshot records both the profile name and the SHA-256 content hash for auditability.
 - `realm inspect` profile display — when a step's evidence snapshot includes `agent_profile`, the
   step name is followed by a cyan `[profile: <name>]` annotation.
-- `code-review` example agent profiles — `agents/security-reviewer.md` and
-  `agents/quality-reviewer.md` added; `review_security` and `assess_quality` steps reference them
+- `code-review` example agent profiles — `profiles/security-reviewer.md` and
+  `profiles/quality-reviewer.md` added; `review_security` and `assess_quality` steps reference them
   via `agent_profile`.
 - Hard validation error on missing profiles — `realm validate` and `realm register` fail immediately
   with the searched path in the error message when a referenced profile file cannot be found.
