@@ -33,7 +33,7 @@ export function loadWorkflowFromFile(filePath: string): WorkflowDefinition {
   const profilesDir =
     definition.profiles_dir !== undefined
       ? resolve(workflowDir, definition.profiles_dir)
-      : join(workflowDir, 'agents');
+      : join(workflowDir, 'profiles');
 
   const resolvedProfiles: Record<string, { content: string; content_hash: string }> = {};
   const profileErrors: string[] = [];

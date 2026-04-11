@@ -16,7 +16,7 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 | `services`      | object  | No       | Named service definitions. Referenced by steps via `uses_service`.                                                           |
 | `steps`         | object  | Yes      | Map of step name → step definition.                                                                                          |
 | `protocol`      | object  | No       | Optional protocol customisations. See [Protocol](#protocol-customisation).                                                   |
-| `profiles_dir`  | string  | No       | Path to agent profile files, relative to the workflow YAML. Defaults to `agents/` in the same directory.                     |
+| `profiles_dir`  | string  | No       | Path to agent profile files, relative to the workflow YAML. Defaults to `profiles/` in the same directory.                   |
 
 ---
 
@@ -205,18 +205,32 @@ services:
 
 ## Agent profiles
 
-An `execution: agent` step can declare a reusable persona:
+An `execution: agent` step can declare a reusable persona via the `agent_profile` field. The persona is defined in a Markdown file and delivered verbatim to the agent at step entry.
 
 ```yaml
-profiles_dir: agents # relative to workflow YAML; this is also the default
+profiles_dir: profiles # relative to workflow YAML; defaults to profiles/
 
 steps:
   review_security:
     execution: agent
-    agent_profile: security-reviewer # loads agents/security-reviewer.md
+    agent_profile: security-reviewer # reads profiles/security-reviewer.md
 ```
 
-The profile file must exist in `profiles_dir`. If it is missing, `realm workflow register` fails immediately and includes the expected file path in the error message. The profile content is delivered to the agent as `agent_profile_instructions` on the protocol step. Its SHA-256 hash is recorded in the evidence snapshot for auditability.
+### Registration lifecycle
+
+Profile content is resolved at **registration time**, not at runtime. When you run `realm workflow register`, the loader reads every referenced `.md` file from `profiles_dir`, computes a SHA-256 hash, and bakes both the content and hash into the stored workflow definition at `~/.realm/workflows/<id>.json`. After registration the `profiles/` directory on disk is not consulted again.
+
+Consequences of this model:
+
+- **Editing a profile file has no effect until you re-run `realm workflow register`.**
+- Multiple steps referencing the same profile name are resolved once — the file is read and hashed a single time.
+- If any referenced file is missing at registration time, the command fails immediately and includes the expected file path in the error message.
+
+### Runtime delivery
+
+When a consumer calls `get_workflow_protocol`, the full profile content is included in the step's `agent_profile_instructions` field. No file system access is needed at runtime — the content is served from the stored definition over MCP.
+
+The profile name and its SHA-256 hash are recorded in the evidence snapshot for every step that ran with a profile. `realm run inspect` displays them as `[profile: <name>]` annotations.
 
 ---
 
