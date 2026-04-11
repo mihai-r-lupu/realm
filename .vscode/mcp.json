@@ -1,16 +1,19 @@
 {
   "servers": {
-    "realm-incident-response": {
+    "realm": {
       "type": "stdio",
-      "command": "node",
-      "args": ["${workspaceFolder}/examples/03-incident-response/dist/mcp-server.js"],
-      "autoStart": true
-    },
-    "realm-document-intake": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["${workspaceFolder}/examples/02-document-intake/dist/mcp-server.js"],
-      "autoStart": true
+      "command": "realm",
+      "args": ["mcp"],
+      "autoStart": true,
+      "autoApprove": [
+        "list_workflows",
+        "get_workflow_protocol",
+        "start_run",
+        "execute_step",
+        "submit_human_response",
+        "get_run_state",
+        "create_workflow"
+      ]
     }
   }
 }
