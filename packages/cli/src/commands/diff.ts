@@ -2,6 +2,54 @@
 import chalk from 'chalk';
 import { Command } from 'commander';
 import type { RunRecord, EvidenceSnapshot } from '@sensigo/realm';
+import { formatPrecondColumn } from './replay-format.js';
+import type { ReplayRecord } from '../store/replay-store.js';
+
+/** Returns true when the given ID is a replay ID (starts with "rpl_"). */
+export function isReplayId(id: string): boolean {
+  return id.startsWith('rpl_');
+}
+
+export interface ReplayDiffRow {
+  step_id: string;
+  /** Precondition column for replay A. */
+  precond_a: string;
+  /** Precondition column for replay B. */
+  precond_b: string;
+  /** Whether the two replay outcomes differ for this step. */
+  differs: boolean;
+}
+
+/** Formats a single replay result for the diff column. */
+function formatReplayColumn(
+  result: { preconditions_original: boolean; preconditions_replay: boolean } | undefined,
+): string {
+  if (result === undefined) return 'missing';
+  // Pass hasPreconditions=true: in a cross-replay diff, all executed steps have meaningful state.
+  return formatPrecondColumn(result.preconditions_original, result.preconditions_replay, true);
+}
+
+/**
+ * Compares step-level precondition results from two replay records.
+ * @param recordA First replay record.
+ * @param recordB Second replay record.
+ */
+export function diffReplays(recordA: ReplayRecord, recordB: ReplayRecord): ReplayDiffRow[] {
+  const mapA = new Map(recordA.results.map((r) => [r.step_id, r]));
+  const mapB = new Map(recordB.results.map((r) => [r.step_id, r]));
+
+  const allSteps = new Set<string>();
+  for (const r of recordA.results) allSteps.add(r.step_id);
+  for (const r of recordB.results) allSteps.add(r.step_id);
+
+  return Array.from(allSteps).map((stepId) => {
+    const a = mapA.get(stepId);
+    const b = mapB.get(stepId);
+    const precond_a = formatReplayColumn(a);
+    const precond_b = formatReplayColumn(b);
+    return { step_id: stepId, precond_a, precond_b, differs: precond_a !== precond_b };
+  });
+}
 
 export interface DiffStepRow {
   step_id: string;
@@ -83,10 +131,70 @@ function formatDelta(row: DiffStepRow): string {
 }
 
 export const diffCommand = new Command('diff')
-  .argument('<run-id-a>', 'First run ID')
-  .argument('<run-id-b>', 'Second run ID')
+  .argument('<run-id-a>', 'First run or replay ID')
+  .argument('<run-id-b>', 'Second run or replay ID')
   .description('Compare evidence chains of two runs side by side')
   .action(async (runIdA: string, runIdB: string) => {
+    if (isReplayId(runIdA) !== isReplayId(runIdB)) {
+      console.error(
+        'Error: cannot diff a run against a replay. Provide two run IDs or two replay IDs.',
+      );
+      process.exit(1);
+    }
+
+    if (isReplayId(runIdA) && isReplayId(runIdB)) {
+      const { JsonFileReplayStore } = await import('../store/replay-store.js');
+      const replayStore = new JsonFileReplayStore();
+
+      let recordA: ReplayRecord;
+      let recordB: ReplayRecord;
+      try {
+        recordA = await replayStore.get(runIdA);
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      }
+      try {
+        recordB = await replayStore.get(runIdB);
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      }
+
+      const rows = diffReplays(recordA, recordB);
+
+      console.log(`Replay diff: ${runIdA}  vs  ${runIdB}`);
+      console.log(`Origin runs: ${recordA.origin_run_id}  vs  ${recordB.origin_run_id}`);
+      if (recordA.overrides.length === 0) {
+        console.log('Overrides A: (none)');
+      } else {
+        for (const ov of recordA.overrides) console.log(`Overrides A: ${ov}`);
+      }
+      if (recordB.overrides.length === 0) {
+        console.log('Overrides B: (none)');
+      } else {
+        for (const ov of recordB.overrides) console.log(`Overrides B: ${ov}`);
+      }
+      console.log('');
+
+      const col1 = 22;
+      const col2 = 38;
+      const sep1 = '\u2500'.repeat(col1 - 1);
+      const sep2 = '\u2500'.repeat(col2 - 1);
+      console.log(
+        `${'Step'.padEnd(col1)} ${'Replay A'.padEnd(col2)} ${'Replay B'.padEnd(col2)} Diff?`,
+      );
+      console.log(`${sep1}  ${sep2}  ${sep2}  ${'\u2500'.repeat(5)}`);
+
+      for (const row of rows) {
+        const diffCol = row.differs ? chalk.yellow('\u2260') : '=';
+        console.log(
+          `${row.step_id.padEnd(col1)} ${row.precond_a.padEnd(col2)} ${row.precond_b.padEnd(col2)} ${diffCol}`,
+        );
+      }
+      return;
+    }
+
     const { JsonFileStore } = await import('@sensigo/realm');
     const store = new JsonFileStore();
 

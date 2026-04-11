@@ -1,7 +1,8 @@
-// Tests for diffRuns business logic.
+// Tests for diffRuns, diffReplays, and isReplayId business logic.
 import { describe, it, expect } from 'vitest';
-import { diffRuns } from './diff.js';
+import { diffRuns, diffReplays, isReplayId } from './diff.js';
 import type { RunRecord, EvidenceSnapshot } from '@sensigo/realm';
+import type { ReplayRecord } from '../store/replay-store.js';
 
 function makeSnap(
   stepId: string,
@@ -71,5 +72,143 @@ describe('diffRuns', () => {
     const rows = diffRuns(runA, runB);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.same_output).toBe(true);
+  });
+});
+
+describe('isReplayId', () => {
+  it('returns true for an rpl_-prefixed ID', () => {
+    expect(isReplayId('rpl_abc123-def456')).toBe(true);
+  });
+
+  it('returns false for a plain run UUID', () => {
+    expect(isReplayId('550e8400-e29b-41d4-a716-446655440000')).toBe(false);
+  });
+
+  it('returns false for an empty string', () => {
+    expect(isReplayId('')).toBe(false);
+  });
+});
+
+function makeReplayRecord(
+  stepResults: ReplayRecord['results'],
+  overrides: string[] = [],
+): ReplayRecord {
+  return {
+    id: `rpl_${Math.random().toString(36).slice(2)}`,
+    origin_run_id: `run_${Math.random().toString(36).slice(2)}`,
+    workflow_id: 'test-workflow',
+    overrides,
+    results: stepResults,
+    created_at: '2024-01-01T00:00:00.000Z',
+  };
+}
+
+describe('diffReplays', () => {
+  it('two identical replays produce all differs: false rows', () => {
+    const results = [
+      {
+        step_id: 'fetch_doc',
+        preconditions_original: true,
+        preconditions_replay: true,
+        changed: false,
+      },
+      {
+        step_id: 'write',
+        preconditions_original: true,
+        preconditions_replay: true,
+        changed: false,
+      },
+    ];
+    const recordA = makeReplayRecord(results);
+    const recordB = makeReplayRecord(results);
+    const rows = diffReplays(recordA, recordB);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => !r.differs)).toBe(true);
+  });
+
+  it('one step changes from PASS→PASS to PASS→BLOCKED → that step has differs: true', () => {
+    const resultsA = [
+      {
+        step_id: 'validate',
+        preconditions_original: true,
+        preconditions_replay: true,
+        changed: false,
+      },
+      {
+        step_id: 'write',
+        preconditions_original: true,
+        preconditions_replay: true,
+        changed: false,
+      },
+    ];
+    const resultsB = [
+      {
+        step_id: 'validate',
+        preconditions_original: true,
+        preconditions_replay: true,
+        changed: false,
+      },
+      {
+        step_id: 'write',
+        preconditions_original: true,
+        preconditions_replay: false,
+        changed: true,
+      },
+    ];
+    const recordA = makeReplayRecord(resultsA);
+    const recordB = makeReplayRecord(resultsB);
+    const rows = diffReplays(recordA, recordB);
+    const validateRow = rows.find((r) => r.step_id === 'validate');
+    const writeRow = rows.find((r) => r.step_id === 'write');
+    expect(validateRow!.differs).toBe(false);
+    expect(writeRow!.differs).toBe(true);
+    expect(writeRow!.precond_a).toContain('PASS');
+    expect(writeRow!.precond_b).toContain('BLOCKED');
+  });
+
+  it('step present in A but absent from B → precond_b is "missing" and differs: true', () => {
+    const resultsA = [
+      {
+        step_id: 'fetch_doc',
+        preconditions_original: true,
+        preconditions_replay: true,
+        changed: false,
+      },
+      {
+        step_id: 'extra_step',
+        preconditions_original: true,
+        preconditions_replay: true,
+        changed: false,
+      },
+    ];
+    const resultsB = [
+      {
+        step_id: 'fetch_doc',
+        preconditions_original: true,
+        preconditions_replay: true,
+        changed: false,
+      },
+    ];
+    const recordA = makeReplayRecord(resultsA);
+    const recordB = makeReplayRecord(resultsB);
+    const rows = diffReplays(recordA, recordB);
+    const extraRow = rows.find((r) => r.step_id === 'extra_step');
+    expect(extraRow).toBeDefined();
+    expect(extraRow!.precond_b).toBe('missing');
+    expect(extraRow!.differs).toBe(true);
+  });
+});
+
+describe('mixed-ID rejection guard', () => {
+  it('isReplayId(runId) !== isReplayId(replayId) evaluates true for mixed pair', () => {
+    const runId = '550e8400-e29b-41d4-a716-446655440000';
+    const replayId = 'rpl_abc123';
+    expect(isReplayId(runId) !== isReplayId(replayId)).toBe(true);
+  });
+
+  it('isReplayId(replayIdA) !== isReplayId(replayIdB) evaluates false for two replay IDs', () => {
+    const replayIdA = 'rpl_aaa';
+    const replayIdB = 'rpl_bbb';
+    expect(isReplayId(replayIdA) !== isReplayId(replayIdB)).toBe(false);
   });
 });

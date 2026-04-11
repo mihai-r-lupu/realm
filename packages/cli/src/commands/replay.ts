@@ -2,6 +2,8 @@
 import { Command } from 'commander';
 import type { RunRecord, WorkflowDefinition } from '@sensigo/realm';
 import { checkPreconditions } from '@sensigo/realm';
+import { formatPrecondColumn } from './replay-format.js';
+import type { ReplayStore } from '../store/replay-store.js';
 
 export interface ReplayOverride {
   step: string;
@@ -111,23 +113,32 @@ export function replayRun(
   });
 }
 
-/** Formats a precondition comparison column for the replay output table. */
-function formatPrecondColumn(
-  originalPass: boolean,
-  replayPass: boolean,
-  hasPreconditions: boolean,
-): string {
-  if (!hasPreconditions) return 'none';
-  const orig = originalPass ? 'PASS' : 'BLOCKED';
-  const replay = replayPass ? 'PASS' : 'BLOCKED';
-  return `${orig} \u2192 ${replay}`;
+/**
+ * Persists a replay result to the store and returns the assigned replay ID.
+ * Extracted for testability — tests inject a mock ReplayStore.
+ */
+export async function saveReplay(
+  store: ReplayStore,
+  runId: string,
+  run: RunRecord,
+  withExprs: string[],
+  results: ReplayStepResult[],
+): Promise<string> {
+  const record = await store.save({
+    origin_run_id: runId,
+    workflow_id: run.workflow_id,
+    overrides: withExprs,
+    results,
+  });
+  return record.id;
 }
 
 export const replayCommand = new Command('replay')
   .argument('<run-id>', 'ID of the completed run to replay')
   .option('--with <override...>', 'Override a step output field: step.field=value')
+  .option('--save', 'Persist the replay result and print the replay ID')
   .description('Re-evaluate preconditions with modified step outputs (read-only)')
-  .action(async (runId: string, opts: { with?: string[] }) => {
+  .action(async (runId: string, opts: { with?: string[]; save?: boolean }) => {
     const { JsonFileStore, JsonWorkflowStore } = await import('@sensigo/realm');
     const runStore = new JsonFileStore();
     const workflowStore = new JsonWorkflowStore();
@@ -188,5 +199,12 @@ export const replayCommand = new Command('replay')
       );
       const changedCol = row.changed ? 'YES \u26A0' : 'no';
       console.log(`${row.step_id.padEnd(col1)} ${precondCol.padEnd(col2)} ${changedCol}`);
+    }
+
+    if (opts.save) {
+      const { JsonFileReplayStore } = await import('../store/replay-store.js');
+      const replayStore = new JsonFileReplayStore();
+      const replayId = await saveReplay(replayStore, runId, run, withExprs, results);
+      console.log(`\nSaved replay: ${replayId}`);
     }
   });
