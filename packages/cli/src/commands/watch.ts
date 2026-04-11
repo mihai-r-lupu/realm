@@ -1,6 +1,6 @@
 // realm workflow watch <path> — watches a workflow YAML and re-registers on change.
-import { watch } from 'node:fs';
-import { join } from 'node:path';
+import { watch, existsSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
 import { Command } from 'commander';
 import { loadWorkflowFromFile, WorkflowError } from '@sensigo/realm';
 import type { WorkflowRegistrar } from '@sensigo/realm';
@@ -31,21 +31,42 @@ async function registerFile(filePath: string, store: WorkflowRegistrar): Promise
 
 /**
  * Watches a workflow YAML file and re-registers it into the given store on every change.
+ * Also watches the profiles directory alongside the YAML — any file change there triggers
+ * re-registration. If the profiles directory does not exist, only the YAML is watched.
  * Performs an initial registration before entering the watch loop.
  * Resolves when the watcher is closed (e.g. when the AbortSignal fires).
  *
- * @param filePath Path to the workflow YAML file.
- * @param store    The workflow registrar to register into — injected, never instantiated here.
- * @param signal   Optional AbortSignal; when aborted the watcher stops and the promise resolves.
+ * @param filePath    Path to the workflow YAML file.
+ * @param store       The workflow registrar to register into — injected, never instantiated here.
+ * @param signal      Optional AbortSignal; when aborted the watcher stops and the promise resolves.
+ * @param profilesDir Optional override for the profiles directory path. Defaults to
+ *                    `<workflow-dir>/profiles` (or `profiles_dir` declared in the YAML).
  */
 export async function watchWorkflow(
   filePath: string,
   store: WorkflowRegistrar,
   signal?: AbortSignal,
+  profilesDir?: string,
 ): Promise<void> {
   await registerFile(filePath, store);
 
-  return new Promise<void>((resolve, reject) => {
+  // Derive the profiles directory: caller override → YAML profiles_dir → default.
+  let resolvedProfilesDir = profilesDir;
+  if (resolvedProfilesDir === undefined) {
+    const workflowDir = dirname(resolve(filePath));
+    try {
+      const definition = loadWorkflowFromFile(filePath);
+      resolvedProfilesDir =
+        definition.profiles_dir !== undefined
+          ? resolve(workflowDir, definition.profiles_dir)
+          : join(workflowDir, 'profiles');
+    } catch {
+      // If the YAML is invalid on startup we still run the YAML watcher.
+      resolvedProfilesDir = join(workflowDir, 'profiles');
+    }
+  }
+
+  const watchYaml = new Promise<void>((resolve, reject) => {
     const watcher = watch(filePath, { persistent: false, signal });
 
     watcher.on('change', (eventType: string) => {
@@ -62,6 +83,30 @@ export async function watchWorkflow(
       resolve();
     });
   });
+
+  // Only watch the profiles directory if it exists.
+  if (!existsSync(resolvedProfilesDir)) {
+    return watchYaml;
+  }
+
+  const profilesDirPath = resolvedProfilesDir;
+  const watchProfiles = new Promise<void>((resolve, reject) => {
+    const watcher = watch(profilesDirPath, { persistent: false, signal });
+
+    watcher.on('change', () => {
+      void registerFile(filePath, store);
+    });
+
+    watcher.on('error', (err: Error) => {
+      reject(err);
+    });
+
+    watcher.on('close', () => {
+      resolve();
+    });
+  });
+
+  await Promise.all([watchYaml, watchProfiles]);
 }
 
 export const watchCommand = new Command('watch')
