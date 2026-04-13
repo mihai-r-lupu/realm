@@ -1,84 +1,86 @@
-# Example 2 — Reliable Output, Every Time
+# Example 2 — Verified Data Flows Between Steps
 
 ## What this shows
 
-When an AI agent submits step output, Realm validates it against the declared
-`input_schema` **before accepting it**. If the output is missing a required field,
-uses a wrong enum value, or does not match a declared pattern — the engine rejects
-it immediately, returns `provide_input` to the agent, and nothing advances
-downstream.
+Most LLM pipelines extract and classify in a single step. When that step is wrong,
+you cannot tell whether the extraction failed or the classification failed — the error
+is in the combined output, and the trace is one opaque blob.
+
+Realm separates extraction from classification into two sequential agent steps. Each
+step's output is validated before the next step starts. The second step receives data
+from the first via `context.resources` — the prompt literally names where each field
+came from. `realm run inspect` shows the full chain: what each step received, what it
+returned, and which schema check confirmed it.
 
 **Pain points addressed:**
 
-- **Non-determinism + structured output failures (#2)** — an agent might return
-  `priority: "urgent"` instead of `priority: "high"` on a bad day. In most
-  frameworks, that propagates silently. In Realm, it never leaves the step.
-- **Tool calling brittleness (#5)** — invalid step output is caught before
-  execution advances, not discovered in a downstream failure hours later.
-- **Framework magic (#12)** — no hidden retry logic, no swallowed exceptions.
-  The rejection is explicit and recorded in the evidence chain.
+- **No audit trail / observability (#3)** — `realm run inspect` shows two linked
+  evidence entries: what `identify_ticket` extracted and what `classify_ticket`
+  produced. When the classifier gets the category wrong, you can see whether it
+  misread the ticket or misclassified correct data.
+- **Tool calling brittleness (#6)** — `classify_ticket` cannot receive bad extraction
+  data. `identify_ticket`'s schema is enforced before `classify_ticket` starts.
+- **Framework magic / hidden complexity (#7)** — no hidden retry, no swallowed
+  exceptions. Both steps, their inputs, and their outputs are explicit YAML.
 
 ## The before / after
 
-**Before (a plain LLM chain):**
+**Before (a plain LLM chain with one step):**
 
 ```python
 result = llm.invoke(classify_prompt.format(ticket=ticket_text))
-# result might be {"category": "technical", "priority": "urgent", ...}
-# "technical" is not a valid category. "urgent" is not a valid priority.
-# The chain continues. The downstream record is garbage.
+# result might be {"category": "billing", ...} but the extraction was wrong:
+# the agent misread CUST-3847 as a billing account, not a payment gateway bug.
+# You only find out downstream when the SLA routing is wrong.
+# And you can't tell if the extractor was wrong or the classifier was wrong.
 ```
 
-No validation fires. The schema mismatch is discovered hours later in a broken
-downstream query — or never.
+Everything is in one call. The trace is one blob. When the output is wrong,
+you re-run the whole call. You cannot narrow the failure.
 
-**After (Realm):**
+**After (Realm — two chained steps):**
 
 ```yaml
-classify_ticket:
+identify_ticket:
   execution: agent
+  produces_state: ticket_identified
   input_schema:
     type: object
-    required: [category, priority, ticket_title, customer_id, one_line_summary]
+    required: [customer_id, product_area, product_version, reported_issue]
     properties:
-      category:
-        type: string
-        enum: [bug, feature_request, billing, account, other]
-      priority:
-        type: string
-        enum: [low, medium, high, critical]
       customer_id:
-        type: string
         pattern: '^CUST-[0-9]{4}$'
+
+classify_ticket:
+  execution: agent
+  allowed_from_states: [ticket_identified]   # cannot start until identify passes
+  prompt: |
+    Classify this {{ context.resources.identify_ticket.product_area }} ticket.
+    Reported issue: {{ context.resources.identify_ticket.reported_issue }}
 ```
 
-If the agent returns `category: "technical"` or `priority: "urgent"`, the engine
-rejects the step immediately:
-
-```json
-{
-  "agent_action": "provide_input",
-  "errors": ["'urgent' is not one of [low, medium, high, critical]"]
-}
-```
-
-The agent must correct and resubmit. Nothing proceeds on bad data.
+`classify_ticket`'s prompt explicitly names what it received and from which step.
+The classifier cannot invent a product area — it receives the value the extractor
+validated. When the classifier is wrong, the evidence chain shows the inputs it
+received were correct; you have narrowed the failure to the classification logic.
 
 ## Steps
 
 ```
-read_ticket      (auto — filesystem adapter, reads the ticket text)
+read_ticket      (auto — filesystem adapter, loads the raw ticket text)
      │ → ticket_loaded
-classify_ticket  (agent — classifies into category, priority, title, customer_id)
-     │ → classified        (all schema checks pass)
-     ↻ provide_input       (schema rejected — agent must correct and resubmit)
-record_ticket    (auto — records the classified ticket)
+identify_ticket  (agent — extracts: customer_id, product_area, product_version, reported_issue)
+     │ → ticket_identified    ← schema enforced before classify_ticket starts
+classify_ticket  (agent — classifies: category, priority, one_line_summary)
+                 (prompt reads context.resources.identify_ticket.product_area)
+     │ → classified
+record_ticket    (auto — records the full structured result)
      │ → completed
 ```
 
-Schema rejection does not advance the workflow state. The run stays in
-`ticket_loaded`, and the agent receives `agent_action: provide_input` with the
-validation error. The agent corrects its output and calls `execute_step` again.
+`identify_ticket` and `classify_ticket` each have their own `input_schema`. Each must
+pass before the run advances. The run stays in its current state on rejection — the
+agent receives `agent_action: provide_input` with the validation error and resubmits.
 Nothing downstream runs on bad data.
 
 ## Install and run
@@ -94,6 +96,13 @@ realm mcp
 With VS Code: open the workspace — `realm mcp` starts automatically via
 `.vscode/mcp.json`.
 
+> **Custom agents (Copilot, Claude):** if you are using a custom agent defined in
+> `.github/agents/*.agent.md`, make sure its `tools:` list includes the Realm MCP
+> tools — for example `realm-list_workflows`, `realm-start_run`, `realm-execute_step`.
+> The MCP server can be running and the workflow registered, but the tools will not
+> appear in the agent's session unless they are explicitly listed. Default (non-custom)
+> agents in VS Code pick up all MCP tools automatically.
+
 Then ask your agent:
 
 > "Classify this support ticket: /path/to/ticket.txt"
@@ -101,12 +110,30 @@ Then ask your agent:
 The agent will:
 
 1. Start the run — `read_ticket` executes automatically.
-2. Receive a `next_action.prompt` asking it to classify the ticket.
-3. Submit the classification. If any field violates the schema, it receives
-   `agent_action: provide_input` with the validation error and must correct its
-   output and resubmit. The workflow state does not advance until the schema
-   passes.
-4. Once the schema passes, `record_ticket` runs and the workflow completes.
+2. Receive a `next_action.prompt` asking it to extract ticket identity. It submits
+   `customer_id`, `product_area`, `product_version`, and `reported_issue`. If any
+   field fails schema validation, it receives `provide_input` and must correct and
+   resubmit. The state stays at `ticket_loaded` until the schema passes.
+3. Receive a second `next_action.prompt` asking it to classify the ticket. The prompt
+   already contains the verified product area and reported issue from step 2. It
+   submits `category`, `priority`, and `one_line_summary`. Same schema enforcement
+   applies.
+4. Once the classification schema passes, `record_ticket` runs and the workflow
+   completes.
+
+## Inspect the evidence chain
+
+After the run completes, check what each step received and produced:
+
+```bash
+realm run inspect <run-id>
+```
+
+The evidence chain shows four entries in order: `read_ticket`, `identify_ticket`,
+`classify_ticket`, `record_ticket`. The `identify_ticket` entry shows the extracted
+fields. The `classify_ticket` entry shows the inputs it received (from
+`context.resources.identify_ticket`) and its output. If classification is wrong, the
+evidence chain tells you whether the extractor or the classifier was at fault.
 
 ## Test headlessly
 
@@ -117,8 +144,11 @@ realm workflow test examples/02-ticket-classifier/workflow.yaml -f examples/02-t
 
 Two fixtures are included:
 
-- `bug-ticket.yaml` — a P1 bug report from `CUST-3847`, expected: `completed`
-- `billing-ticket.yaml` — a billing inquiry from `CUST-1122`, expected: `completed`
+- `bug-ticket.yaml` — a P1 payment gateway bug from `CUST-3847`, expected: `completed`
+- `billing-ticket.yaml` — a billing overcharge from `CUST-1122`, expected: `completed`
+
+Each fixture has two `agent_responses` entries — one for `identify_ticket`, one for
+`classify_ticket` — and an `expected.evidence` with all four steps.
 
 ## Configuration reference
 
@@ -130,7 +160,10 @@ Two fixtures are included:
 
 ## What to look at next
 
-- [Example 3 — Incident Response](../03-incident-response/) — human gate, sequential
-  agent steps with personas, idempotent record step
+- [Example 3 — Incident Response](../03-incident-response/) — builds on the
+  `context.resources` data-flow pattern from this example and adds a human gate:
+  execution is structurally blocked until an engineer chooses to send or reject the
+  drafted response.
 - [YAML Schema Reference](../../docs/reference/yaml-schema.md) — all step fields,
   execution modes, gate configuration, and transitions
+

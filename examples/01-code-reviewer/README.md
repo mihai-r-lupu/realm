@@ -55,13 +55,14 @@ and resubmits. Every attempt is recorded in the immutable evidence chain.
 
 **Pain points addressed:**
 
-- **Verification gap (#1)** — step output is verified structurally before the run advances.
+- **Instruction file spiral (#1)** — the five prose rules in `skill.md` are replaced
+  by the `input_schema` declaration. No `IMPORTANT:` annotations accumulate.
 - **Non-determinism + structured output failures (#2)** — invalid enum values and
   short summaries are rejected at the boundary, not discovered downstream.
-- **Instruction file spiral (#6)** — the five prose rules in `skill.md` are replaced
-  by the `input_schema` declaration. No `IMPORTANT:` annotations accumulate.
-- **No audit trail (#8)** — every run produces an immutable evidence chain:
+- **No audit trail (#3)** — every run produces an immutable evidence chain:
   who reviewed what, what fields were returned, whether any step was rejected.
+- **Verification gap / no test gating (#8)** — step output is verified structurally
+  before the run advances; a step cannot complete with invalid output.
 
 ## Install
 
@@ -100,7 +101,16 @@ realm mcp
 ```
 
 With VS Code: open the workspace — `realm mcp` starts automatically via
-`.vscode/mcp.json`. Then ask your agent:
+`.vscode/mcp.json`.
+
+> **Custom agents (Copilot, Claude):** if you are using a custom agent defined in
+> `.github/agents/*.agent.md`, make sure its `tools:` list includes the Realm MCP
+> tools — for example `realm-list_workflows`, `realm-start_run`, `realm-execute_step`.
+> The MCP server can be running and the workflow registered, but the tools will not
+> appear in the agent's session unless they are explicitly listed. Default (non-custom)
+> agents in VS Code pick up all MCP tools automatically.
+
+Then ask your agent:
 
 > "Review this diff: examples/01-code-reviewer/diffs/add-oauth-provider.diff"
 
