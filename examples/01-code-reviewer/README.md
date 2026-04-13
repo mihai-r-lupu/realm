@@ -110,11 +110,20 @@ With VS Code: open the workspace — `realm mcp` starts automatically via
 > appear in the agent's session unless the agent explicitly includes them. Default
 > (non-custom) agents in VS Code pick up all MCP tools automatically.
 
-Then ask your agent:
+**Option A — Realm agent (zero friction)**
+
+Switch to the **Realm** agent in the VS Code Chat agent picker. Then ask:
 
 > "Review this diff: examples/01-code-reviewer/diffs/add-oauth-provider.diff"
 
-The agent will start the run, load the diff automatically, then receive a prompt
+**Option B — Skill file (default agent)**
+
+Copy `realm-code-reviewer.md` from this directory to your workspace's `.github/skills/`
+folder. With the default agent, trigger it with:
+
+> "Review this diff with Realm: examples/01-code-reviewer/diffs/add-oauth-provider.diff"
+
+Either way, the agent starts the run, loads the diff automatically, then receives a prompt
 asking for the structured review. If any field violates the schema — wrong enum
 value, summary too short, missing boolean — it receives `agent_action: provide_input`
 with the exact validation error and must correct and resubmit. The workflow state

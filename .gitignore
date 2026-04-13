@@ -5,8 +5,9 @@
 prompts/
 reports/
 
-# Local agent customisation files
-.github/agents/
+# Local agent customisation files — personal agents stay private, shared Realm agent is committed
+.github/agents/master-architect.agent.md
+.github/agents/implementation-agent.agent.md
 .github/instructions/pre-publication.instructions.md
 
 # Local scripts
