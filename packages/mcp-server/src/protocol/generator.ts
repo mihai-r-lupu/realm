@@ -62,7 +62,7 @@ const ERROR_HANDLING: Record<string, string> = {
     'A prerequisite step has not completed. The error includes which precondition failed and what step to call. Follow the suggestion.',
   stop: 'A critical error occurred. Report it to the user and do not attempt any further steps.',
   wait_for_human:
-    'A human decision is needed. Show the gate preview to the user and call submit_human_response with their choice.',
+    'An external service is unavailable and cannot be retried automatically (e.g. network unreachable, upstream server error). Show the error to the user and wait for them to confirm the issue is resolved — the run cannot continue until the external dependency is back.',
 };
 
 /**

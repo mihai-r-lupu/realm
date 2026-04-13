@@ -23,7 +23,7 @@ export interface NextAction {
   prompt?: string;
 }
 
-export type RunStatus = 'ok' | 'error' | 'blocked' | 'confirm_required' | 'warning';
+export type RunStatus = 'ok' | 'error' | 'blocked' | 'confirm_required';
 
 export interface BlockedReason {
   current_state: string;
