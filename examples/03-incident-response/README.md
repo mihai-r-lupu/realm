@@ -50,6 +50,17 @@ approves or rejects based on what the drafter actually received, not what the dr
 | `FileSystemAdapter`              | Reads alert JSON from disk — zero auth, zero network                                     |
 | Swap-readiness                   | Replace the filesystem service with a Slack or PagerDuty adapter — zero YAML changes     |
 
+**Pain points addressed:**
+
+- **No structured human gate / HITL (#5)** — `confirm_and_send` structurally blocks
+  execution until an engineer chooses `send` or `reject`. There is no prose rule asking
+  the agent to wait for approval; the run physically cannot advance without the gate response.
+- **Idempotency / duplicate side effects (#9)** — a completed step cannot re-execute.
+  Retries, race conditions, and ambiguous alerts cannot cause duplicate posts to the channel.
+- **No audit trail / observability (#3)** — both `send` and `reject` land in `completed`.
+  The gate choice, the analysis, the draft, and the timing are all captured in the evidence
+  chain. `realm run inspect` shows exactly what was sent, when, and who approved it.
+
 ## Install
 
 ```bash
