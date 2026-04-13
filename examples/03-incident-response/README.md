@@ -91,6 +91,13 @@ realm workflow register examples/03-incident-response
 `realm` MCP server starts on first use and serves all registered workflows — no build step,
 no per-example configuration required.
 
+> **Custom agents (Copilot, Claude):** if you are using a custom agent defined in
+> `.github/agents/*.agent.md`, make sure its `tools:` list includes the Realm MCP
+> tools — for example `realm-list_workflows`, `realm-start_run`, `realm-execute_step`.
+> The MCP server can be running and the workflow registered, but the tools will not
+> appear in the agent's session unless they are explicitly listed. Default (non-custom)
+> agents in VS Code pick up all MCP tools automatically.
+
 **Step 3** — In Copilot chat, ask:
 
 > "Triage this alert with Realm: examples/03-incident-response/alerts/high-latency.json"
