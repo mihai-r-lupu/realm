@@ -105,10 +105,14 @@ agent picker. Then ask:
 
 > "Triage this alert: examples/03-incident-response/alerts/high-latency.json"
 
+> "Triage this alert: examples/03-incident-response/alerts/error-spike.json"
+
 **Option B — Skill file (default agent):** Copy `realm-incident-response.md` from this directory
 to your workspace's `.github/skills/` folder. With the default agent, trigger it with:
 
 > "Triage this alert with Realm: examples/03-incident-response/alerts/high-latency.json"
+
+> "Triage this alert with Realm: examples/03-incident-response/alerts/error-spike.json"
 
 > **Why "with Realm"?** The skill file's `description` intentionally includes that phrase
 > as a trigger signal so the default agent routes to Realm only when explicitly asked to.
