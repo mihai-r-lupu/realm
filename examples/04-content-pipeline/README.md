@@ -86,11 +86,20 @@ With VS Code: open the workspace — `realm mcp` starts automatically via `.vsco
 > appear in the agent's session unless the agent explicitly includes them. Default
 > (non-custom) agents in VS Code pick up all MCP tools automatically.
 
-Then ask your agent:
+**Option A — Realm agent (zero friction)**
+
+Switch to the **Realm** agent in the VS Code Chat agent picker. Then ask:
+
+> "Enrich this article: /path/to/article.txt"
+
+**Option B — Skill file (default agent)**
+
+Copy `realm-content-pipeline.md` from this directory to your workspace's `.github/skills/`
+folder. With the default agent, trigger it with:
 
 > "Enrich this article with Realm: /path/to/article.txt"
 
-The agent will:
+Either way, the agent will:
 
 1. Start the run — `fetch_content` executes automatically via the filesystem adapter.
 2. Receive a `next_action.prompt` asking it to summarise the article. It submits `title`,

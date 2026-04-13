@@ -98,12 +98,20 @@ no per-example configuration required.
 > appear in the agent's session unless the agent explicitly includes them. Default
 > (non-custom) agents in VS Code pick up all MCP tools automatically.
 
-**Step 3** — In Copilot chat, ask:
+**Step 3** — Choose your agent path:
+
+**Option A — Realm agent (zero friction):** Switch to the **Realm** agent in the VS Code Chat
+agent picker. Then ask:
+
+> "Triage this alert: examples/03-incident-response/alerts/high-latency.json"
+
+**Option B — Skill file (default agent):** Copy `realm-incident-response.md` from this directory
+to your workspace's `.github/skills/` folder. With the default agent, trigger it with:
 
 > "Triage this alert with Realm: examples/03-incident-response/alerts/high-latency.json"
 
 The workspace instruction file (`.github/instructions/realm.instructions.md`) gives your agent
-the generic Realm protocol. The `skill.md` in this directory layers the workflow-specific
+the generic Realm protocol. The `realm-incident-response.md` skill layers the workflow-specific
 behaviour on top.
 
 The MCP session produces a run-id. Once the run completes, inspect the full evidence chain:

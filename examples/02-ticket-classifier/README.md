@@ -103,13 +103,20 @@ With VS Code: open the workspace — `realm mcp` starts automatically via
 > appear in the agent's session unless the agent explicitly includes them. Default
 > (non-custom) agents in VS Code pick up all MCP tools automatically.
 
-Then ask your agent:
+**Option A — Realm agent (zero friction)**
+
+Switch to the **Realm** agent in the VS Code Chat agent picker. Then ask:
 
 > "Classify this support ticket: examples/02-ticket-classifier/tickets/billing-overcharge.txt"
 
-> "Classify this support ticket: examples/02-ticket-classifier/tickets/payment-gateway-bug.txt"
+**Option B — Skill file (default agent)**
 
-The agent will:
+Copy `realm-ticket-classifier.md` from this directory to your workspace's `.github/skills/`
+folder. With the default agent, trigger it with:
+
+> "Classify this support ticket with Realm: examples/02-ticket-classifier/tickets/billing-overcharge.txt"
+
+Either way, the agent will:
 
 1. Start the run — `read_ticket` executes automatically.
 2. Receive a `next_action.prompt` asking it to extract ticket identity. It submits
