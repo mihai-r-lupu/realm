@@ -13,10 +13,10 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
  * Built-in adapters (FileSystemAdapter etc.) are included automatically.
  */
 export const mcpCommand = new Command('mcp')
-    .description('Start the Realm MCP server (serves all registered workflows via stdio)')
-    .action(async () => {
-        const workflowStore = new JsonWorkflowStore();
-        const server = createRealmMcpServer({ workflowStore });
-        const transport = new StdioServerTransport();
-        await server.connect(transport);
-    });
+  .description('Start the Realm MCP server (serves all registered workflows via stdio)')
+  .action(async () => {
+    const workflowStore = new JsonWorkflowStore();
+    const server = createRealmMcpServer({ workflowStore });
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+  });
