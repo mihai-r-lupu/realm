@@ -109,12 +109,16 @@ Switch to the **Realm** agent in the VS Code Chat agent picker. Then ask:
 
 > "Classify this support ticket: examples/02-ticket-classifier/tickets/billing-overcharge.txt"
 
+> "Classify this support ticket: examples/02-ticket-classifier/tickets/payment-gateway-bug.txt"
+
 **Option B — Skill file (default agent)**
 
 Copy `realm-ticket-classifier.md` from this directory to your workspace's `.github/skills/`
 folder. With the default agent, trigger it with:
 
 > "Classify this support ticket with Realm: examples/02-ticket-classifier/tickets/billing-overcharge.txt"
+
+> "Classify this support ticket with Realm: examples/02-ticket-classifier/tickets/payment-gateway-bug.txt"
 
 > **Why "with Realm"?** The skill file's `description` intentionally includes that phrase
 > as a trigger signal so the default agent routes to Realm only when explicitly asked to.
