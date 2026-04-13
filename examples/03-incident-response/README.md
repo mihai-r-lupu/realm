@@ -7,6 +7,12 @@ and drafts an oncall channel message. The run cannot post until an engineer expl
 it at a human gate. If the engineer rejects the draft, the run ends immediately — nothing is
 sent, and the decision is recorded. Every step is captured in an immutable evidence chain.
 
+This example builds on the chained data-flow pattern from [Example 2](../02-ticket-classifier/)
+— `draft_response` reads validated fields from `analyze_cause` via `context.resources`, so
+the drafter cannot invent a root cause or severity. The new concept introduced here is the
+human gate: after two verified agent steps, execution is structurally blocked until an engineer
+chooses to send or reject the draft.
+
 **The before/after:**
 
 Before Realm, an oncall agent built on a growing SKILL.md fires on every alert and posts
@@ -28,12 +34,18 @@ who approved, what the analysis was, and exactly what text was sent.
 
 ## What it demonstrates
 
+`draft_response` reads `context.resources.analyze_cause` — the same chained data-flow pattern
+introduced in [Example 2](../02-ticket-classifier/), now applied to a step that feeds a human
+gate. The drafter receives the analyzer's validated `root_cause` and `severity` fields; it
+cannot invent a root cause from thin air. This matters here more than anywhere: the engineer
+approves or rejects based on what the drafter actually received, not what the drafter assumed.
+
 | Feature                          | How it appears                                                                           |
 | -------------------------------- | ---------------------------------------------------------------------------------------- |
 | Human gate with real stakes      | `confirm_and_send` blocks until engineer chooses `send` or `reject`                      |
 | Gate choice recorded in evidence | Both `send` and `reject` produce `completed` — the choice is in the evidence audit trail |
 | Idempotency                      | A completed step cannot re-execute — duplicate retries cannot re-post                    |
-| Sequential agent steps           | `draft_response` cannot run until `analyze_cause` output is validated                    |
+| Chained agent steps              | `draft_response` reads `context.resources.analyze_cause` — drafter gets verified data   |
 | Evidence chain                   | Analysis, draft, and gate choice all captured with timing and hash                       |
 | `FileSystemAdapter`              | Reads alert JSON from disk — zero auth, zero network                                     |
 | Swap-readiness                   | Replace the filesystem service with a Slack or PagerDuty adapter — zero YAML changes     |
