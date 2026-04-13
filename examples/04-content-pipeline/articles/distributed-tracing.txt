@@ -1,0 +1,15 @@
+Distributed Tracing at Scale
+
+Distributed tracing solves a specific problem: when a request passes through
+fifteen services and something is slow, which one is responsible? Without tracing,
+the answer is "run the same request again and add logging everywhere". With tracing,
+you have a timeline.
+
+The operational cost of tracing is not instrumentation — it is sampling. Tracing
+every request at high throughput is expensive. Head-based sampling (decide at the
+first service) is simple but misses rare tail-latency events. Tail-based sampling
+(decide after the trace is complete) is accurate but requires buffering full traces
+before making a decision.
+
+Most teams start with head-based sampling at 1–5% and add tail-based sampling for
+error traces only. This covers 95% of debugging needs at a fraction of the cost.

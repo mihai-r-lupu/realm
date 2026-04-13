@@ -1,0 +1,45 @@
+name: happy path — ML infrastructure article
+params:
+  path: /fake/articles/ml-infrastructure.txt
+mocks:
+  articles:
+    read:
+      status: 200
+      data:
+        path: /fake/articles/ml-infrastructure.txt
+        content: |
+          Building Reliable ML Infrastructure
+
+          Modern ML systems fail in ways that differ from traditional software.
+          A model that produces confident but wrong predictions is harder to detect
+          than a service returning a 500. Reliability engineering for ML requires
+          new primitives: data validation at ingestion, model performance monitoring,
+          and — critically — the ability to replay failed batch jobs from their last
+          checkpoint.
+
+          Layered validation at ingestion, feature extraction, and prediction time
+          addresses this. Each layer is a checkpoint.
+        line_count: 12
+        size_bytes: 510
+agent_responses:
+  summarise:
+    title: Building Reliable ML Infrastructure
+    summary: >
+      The article examines how ML system failures differ from traditional software
+      failures and argues that layered validation — at ingestion, feature extraction,
+      and prediction — is the key reliability primitive. Each validation layer acts
+      as a checkpoint that enables partial replay rather than full restart.
+    word_count: 210
+  tag_content:
+    tags: [machine-learning, infrastructure, reliability, mlops, data-validation]
+expected:
+  final_state: completed
+  evidence:
+    - step_id: fetch_content
+      status: success
+    - step_id: summarise
+      status: success
+    - step_id: tag_content
+      status: success
+    - step_id: record_result
+      status: success

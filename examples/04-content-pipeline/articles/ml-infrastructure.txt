@@ -1,0 +1,15 @@
+Building Reliable ML Infrastructure
+
+Modern ML systems fail in ways that differ from traditional software. A model that
+produces confident but wrong predictions is harder to detect than a service returning
+a 500. Reliability engineering for ML requires new primitives: data validation at
+ingestion, model performance monitoring, and — critically — the ability to replay
+failed batch jobs from their last checkpoint.
+
+The most common failure mode in production ML is silent: the pipeline completes,
+the predictions are stored, and nobody notices the input data was malformed until
+a downstream report shows anomalous numbers three weeks later.
+
+Layered validation — at ingestion, at feature extraction, and at prediction time —
+addresses this. Each layer is a checkpoint. When one fails, you resume from that
+layer, not from data collection.
