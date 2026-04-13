@@ -199,7 +199,13 @@ describe('saveReplay', () => {
       changed: false,
       has_preconditions: false,
     },
-    { step_id: 'write', preconditions_original: true, preconditions_replay: false, changed: true, has_preconditions: true },
+    {
+      step_id: 'write',
+      preconditions_original: true,
+      preconditions_replay: false,
+      changed: true,
+      has_preconditions: true,
+    },
   ];
 
   it('calls store.save() with correct fields when --save is set', async () => {

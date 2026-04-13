@@ -18,7 +18,7 @@ import { FileSystemAdapter } from '../adapters/file-adapter.js';
  * ```
  */
 export function createDefaultRegistry(): ExtensionRegistry {
-    const r = new ExtensionRegistry();
-    r.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
-    return r;
+  const r = new ExtensionRegistry();
+  r.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
+  return r;
 }

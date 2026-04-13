@@ -1,6 +1,7 @@
 {
   "name": "@sensigo/realm-mcp",
   "version": "0.1.0",
+  "description": "MCP server for Realm — exposes 7 tools for AI agent connections over stdio or HTTP.",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",

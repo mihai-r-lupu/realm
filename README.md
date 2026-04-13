@@ -173,23 +173,6 @@ Run `realm <command> --help` for full options on any command.
 - [CLI Reference](docs/reference/cli-commands.md) — all commands with options
 - [Examples](examples/) — working workflow examples
 
-## Realm Cloud
-
-The open source CLI and MCP server run entirely locally, with no cloud dependency.
-
-[Realm Cloud](https://app.realm.dev) adds a hosted run history dashboard, cross-run analytics, scheduled workflow triggers, and a **workflow dashboard** — a simple web interface where clients can view run status, inspect step evidence, and respond to human gate prompts without needing an AI agent or MCP setup.
-
-| Plan             | Price     | For                                                                                                                                                   |
-| ---------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Solo             | $29/month | Developers running workflows for their own projects                                                                                                   |
-| Builder          | $79/month | Developers delivering AI workflows to clients — manage up to 5 client workspaces, invite clients to their own dashboard, export certified run reports |
-| Client Workspace | $19/month | End clients operating a delivered workflow day-to-day                                                                                                 |
-| Enterprise       | Custom    | SSO, VPC/self-hosted, SOC2 evidence packages, SLA                                                                                                     |
-
-30-day free trial, no credit card required. [Start free →](https://app.realm.dev)
-
-Building with Realm for a funded startup? [Apply to the startup program](https://realm.dev/startups) for 6 months free on Builder.
-
 ## Development
 
 **Prerequisites:** Node.js 20+, npm 10+
@@ -197,7 +180,7 @@ Building with Realm for a funded startup? [Apply to the startup program](https:/
 ```bash
 npm install          # install all workspace dependencies
 npm run build        # compile all packages
-npm run test         # run all tests (428 total)
+npm run test         # run all tests (470 total)
 npm run lint         # lint all packages
 ```
 
