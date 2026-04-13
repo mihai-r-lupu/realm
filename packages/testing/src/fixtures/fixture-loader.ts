@@ -26,6 +26,20 @@ export interface TestFixture {
    */
   agent_responses: Record<string, Record<string, unknown>>;
   /**
+   * Ordered list of error messages to inject for an agent step before its real response is
+   * returned. The dispatcher returns each message as a WorkflowError in order, one per call.
+   * Once all errors are exhausted the step receives its normal `agent_responses` entry.
+   *
+   * The test runner automatically resets the run state after each injected error (simulating
+   * what `realm run resume --from <step>` does interactively), then retries the step.
+   *
+   * Example:
+   *   agent_errors:
+   *     tag_content:
+   *       - "provider timed out after 30s"
+   */
+  agent_errors?: Record<string, string[]>;
+  /**
    * Gate choices keyed by step name. Defaults to 'approve' for any step not listed.
    */
   gate_responses?: Record<string, string>;
@@ -86,6 +100,9 @@ export function loadFixtureFromString(content: string): TestFixture {
     expected: expectedObj,
   };
 
+  if (parsed['agent_errors'] !== undefined) {
+    base.agent_errors = parsed['agent_errors'] as Record<string, string[]>;
+  }
   if (parsed['gate_responses'] !== undefined) {
     return { ...base, gate_responses: parsed['gate_responses'] as Record<string, string> };
   }

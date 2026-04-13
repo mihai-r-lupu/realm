@@ -531,6 +531,44 @@ describe('createAgentDispatcher', () => {
     const result = await dispatcher('no-handler-step', {}, makeMinimalRun());
     expect(result).toEqual({});
   });
+
+  it('injects errors from agentErrors before returning the real response', async () => {
+    const registry = new ExtensionRegistry();
+    const dispatcher = createAgentDispatcher(
+      DISPATCHER_DEFINITION,
+      registry,
+      { 'agent-step': { score: 42 } },
+      undefined,
+      { 'agent-step': ['provider timed out'] },
+    );
+    // First call: error injected
+    await expect(dispatcher('agent-step', {}, makeMinimalRun())).rejects.toMatchObject({
+      message: 'provider timed out',
+      code: 'ENGINE_HANDLER_FAILED',
+    });
+    // Second call: real response returned
+    const result = await dispatcher('agent-step', {}, makeMinimalRun());
+    expect(result['score']).toBe(42);
+  });
+
+  it('multiple errors are injected in order before the real response', async () => {
+    const registry = new ExtensionRegistry();
+    const dispatcher = createAgentDispatcher(
+      DISPATCHER_DEFINITION,
+      registry,
+      { 'agent-step': { score: 1 } },
+      undefined,
+      { 'agent-step': ['error-one', 'error-two'] },
+    );
+    await expect(dispatcher('agent-step', {}, makeMinimalRun())).rejects.toMatchObject({
+      message: 'error-one',
+    });
+    await expect(dispatcher('agent-step', {}, makeMinimalRun())).rejects.toMatchObject({
+      message: 'error-two',
+    });
+    const result = await dispatcher('agent-step', {}, makeMinimalRun());
+    expect(result['score']).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -679,5 +717,41 @@ expected:
     const byName = Object.fromEntries(results.map((r) => [r.name, r]));
     expect(byName['happy path']!.passed).toBe(true);
     expect(byName['failing fixture']!.passed).toBe(false);
+  });
+
+  it('agent_errors: step fails once then succeeds after auto-resume — fixture passes', async () => {
+    writeFileSync(join(tmpDir, 'workflow.yaml'), THREE_STEP_WORKFLOW);
+    writeFileSync(
+      join(tmpDir, 'fixtures', 'resume.yaml'),
+      `
+name: resume after mock error
+params: {}
+mocks: {}
+agent_responses:
+  agent-step:
+    result: recovered
+agent_errors:
+  agent-step:
+    - provider timed out after 30s
+expected:
+  final_state: completed
+  evidence:
+    - step_id: auto-start
+      status: success
+    - step_id: agent-step
+      status: success
+    - step_id: auto-finish
+      status: success
+`,
+    );
+
+    const results = await runFixtureTests({
+      workflowPath: join(tmpDir, 'workflow.yaml'),
+      fixturesPath: join(tmpDir, 'fixtures'),
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.passed).toBe(true);
+    expect(results[0]!.error).toBeUndefined();
   });
 });

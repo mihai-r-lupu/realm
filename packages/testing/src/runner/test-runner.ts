@@ -64,6 +64,7 @@ async function runSingleFixture(
       fixtureRegistry,
       fixture.agent_responses,
       options.registry,
+      fixture.agent_errors,
     );
 
     const run = await store.create({
@@ -77,6 +78,8 @@ async function runSingleFixture(
     const maxIterations = Object.keys(definition.steps).length * 2 + 10;
     let iterations = 0;
     let currentRun = run;
+    // Tracks how many times each step has been resumed after a mock error.
+    const stepResumeCount: Record<string, number> = {};
 
     while (!currentRun.terminal_state) {
       if (iterations++ >= maxIterations) {
@@ -116,6 +119,21 @@ async function runSingleFixture(
       });
 
       if (envelope.status === 'error') {
+        // If this step has mock errors configured and we haven't exhausted them yet,
+        // simulate `realm run resume --from <step>`: reset the run to the step's
+        // allowed_from_state and continue the loop instead of failing the test.
+        const mockErrors = fixture.agent_errors?.[nextStep];
+        const resumesDone = stepResumeCount[nextStep] ?? 0;
+        if (mockErrors !== undefined && resumesDone < mockErrors.length) {
+          stepResumeCount[nextStep] = resumesDone + 1;
+          const stepDef = definition.steps[nextStep]!;
+          const resetState = stepDef.allowed_from_states[0]!;
+          const failedRun = await store.get(runId);
+          const { terminal_reason: _tr, ...rest } = failedRun;
+          await store.update({ ...rest, state: resetState, terminal_state: false });
+          currentRun = await store.get(runId);
+          continue;
+        }
         return {
           name: fixture.name,
           passed: false,
