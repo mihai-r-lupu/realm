@@ -123,7 +123,7 @@ what to do next. Do not parse the `errors` text to decide recovery strategy — 
 | `report_to_user`       | Engine state is inconsistent (e.g. snapshot mismatch). | Surface to user. Do not retry autonomously.                                                               |
 | `provide_input`        | The params you submitted were invalid.                 | Fix the params and retry `execute_step` with the same command. `next_action` shows the correct tool call. |
 | `resolve_precondition` | Wrong step for current state.                          | Follow `next_action` if non-null to call the correct step instead.                                        |
-| `wait_for_human`       | A human gate is open and waiting for a choice.         | Call `submit_human_response` with the user's choice.                                                      |
+| `wait_for_human`       | An external service is unavailable (network down, upstream 5xx). The run cannot continue until the dependency recovers. | Show the error to the user and wait for them to confirm the issue is resolved before retrying. |
 
 When `agent_action` is `provide_input` or `resolve_precondition` and `next_action` is non-null,
 follow it exactly as you would after a successful step. When `next_action` is null, surface
