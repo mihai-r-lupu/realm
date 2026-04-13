@@ -116,6 +116,14 @@ folder. With the default agent, trigger it with:
 
 > "Classify this support ticket with Realm: examples/02-ticket-classifier/tickets/billing-overcharge.txt"
 
+> **Why "with Realm"?** The skill file's `description` intentionally includes that phrase
+> as a trigger signal so the default agent routes to Realm only when explicitly asked to.
+> Without it, a general prompt like "classify this ticket" could match the skill and start
+> a Realm run silently. If you want fully natural-language invocation without the trigger
+> phrase, open `realm-ticket-classifier.md` and remove the phrase from the `description`
+> field — the skill will then fire on any ticket classification request. Use the Realm
+> agent (Option A) if you want that behaviour without modifying the skill file.
+
 Either way, the agent will:
 
 1. Start the run — `read_ticket` executes automatically.

@@ -99,6 +99,14 @@ folder. With the default agent, trigger it with:
 
 > "Enrich this article with Realm: /path/to/article.txt"
 
+> **Why "with Realm"?** The skill file's `description` intentionally includes that phrase
+> as a trigger signal so the default agent routes to Realm only when explicitly asked to.
+> Without it, a general prompt like "enrich this article" could match the skill and start
+> a Realm run silently. If you want fully natural-language invocation without the trigger
+> phrase, open `realm-content-pipeline.md` and remove the phrase from the `description`
+> field — the skill will then fire on any content enrichment request. Use the Realm agent
+> (Option A) if you want that behaviour without modifying the skill file.
+
 Either way, the agent will:
 
 1. Start the run — `fetch_content` executes automatically via the filesystem adapter.

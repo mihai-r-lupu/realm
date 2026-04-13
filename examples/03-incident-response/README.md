@@ -110,6 +110,14 @@ to your workspace's `.github/skills/` folder. With the default agent, trigger it
 
 > "Triage this alert with Realm: examples/03-incident-response/alerts/high-latency.json"
 
+> **Why "with Realm"?** The skill file's `description` intentionally includes that phrase
+> as a trigger signal so the default agent routes to Realm only when explicitly asked to.
+> Without it, a general prompt like "triage this alert" could match the skill and start a
+> Realm run silently. If you want fully natural-language invocation without the trigger
+> phrase, open `realm-incident-response.md` and remove the phrase from the `description`
+> field — the skill will then fire on any incident triage request. Use the Realm agent
+> (Option A) if you want that behaviour without modifying the skill file.
+
 The workspace instruction file (`.github/instructions/realm.instructions.md`) gives your agent
 the generic Realm protocol. The `realm-incident-response.md` skill layers the workflow-specific
 behaviour on top.
