@@ -38,19 +38,25 @@ immediately.
 
 Read `next_action.prompt` first — that is your complete task for this step. It is resolved from
 the workflow's step definition at runtime and supersedes any static instructions you may have
-about this workflow. `context_hint` describes what just happened and the current run state — read
-it on every response, including errors.
+about this workflow. `prompt` is optional; when absent, use `next_action.human_readable` instead
+— it is always present and gives an equivalent agent-facing task description. `context_hint`
+describes what just happened and the current run state — read it on every response, including errors.
 
-Call `next_action.instruction.tool` using `instruction.call_with` as the ready-to-use argument
-template. The `call_with` object contains placeholder values for agent-supplied fields:
+Call the tool named in `next_action.instruction.tool` using `instruction.call_with` as the
+ready-to-use argument template. For ordinary agent steps this is `execute_step`, but for handler
+steps it will be the handler's own tool name — always use the value from the response, never
+hardcode `execute_step`.
 
+The `call_with` object is pre-populated with placeholders:
+
+- When `input_schema` is present, `call_with.params` is already a skeleton object with the correct
+  field names and type-appropriate defaults — fill in the values, do not reconstruct the shape.
 - Enum fields appear as `<value1|value2|value3>` — replace with one of the listed values.
 - Scalar fields appear as `0` or `""` — replace with your actual value.
 - Arrays appear as `[]` — populate with your items.
 
-Supply your work output in `params`, shaped to `next_action.input_schema`. `next_action.orientation`
-describes the current state and what step comes next (distinct from `context_hint`, which describes
-what just happened).
+`next_action.orientation` describes the current state and what step comes next (distinct from
+`context_hint`, which describes what just happened).
 
 If `next_action.expected_timeout` is set, the step has a declared timeout — complete within
 the indicated time (e.g. `"30s"`).
@@ -64,8 +70,9 @@ Repeat from step 4 until:
 
 ### 5a. Reading `chained_auto_steps`
 
-When `start_run` or `execute_step` triggers auto steps before returning, `chained_auto_steps`
-records each one in order:
+When `start_run`, `execute_step`, or `submit_human_response` triggers auto steps before returning,
+`chained_auto_steps` records each one in order. The field is omitted entirely when no auto steps
+ran — only present when the array would be non-empty:
 
 ```json
 "chained_auto_steps": [
@@ -74,8 +81,9 @@ records each one in order:
 ]
 ```
 
-`branched_via` is present when a transition fired — `on_error`, an `on_success` route key, or a
-gate-response key. Use this to understand which path the engine took before returning to you.
+`branched_via` is present when a transition fired — `on_error`, an `on_success` route key, or
+`on_<choice>` from a gate response (e.g. `on_approve`, `on_reject`). Use this to understand which
+path the engine took before returning to you.
 
 ### 5b. `status: ok` with warnings — recovery branch taken
 
@@ -87,11 +95,15 @@ recovery path was taken, and `context_hint` will describe what happened.
 ### 6. Human gate (`status: confirm_required`)
 
 1. Read `gate.agent_hint` for instructions on how to present the gate (if set).
-2. Present `gate.display` to the user verbatim.
+2. Present `gate.display` to the user verbatim. If `gate.display` is absent, construct a prompt
+   from `gate.preview` — the step output awaiting human review.
 3. Collect the user's choice from `gate.response_spec.choices`.
 4. Call `submit_human_response` using `next_action.instruction.call_with` with:
    - `gate_id` from `gate.gate_id` (required — distinct from `run_id`)
    - `choice` set to the user's selected value from `gate.response_spec.choices`
+5. After `submit_human_response` returns, check `chained_auto_steps` — the gate response may
+   trigger an `on_<choice>` transition that chains through additional auto steps before returning
+   the next agent step. The final state is always reflected in `next_action`.
 
 ## Checking Run State
 

@@ -116,6 +116,72 @@ The referenced ID must refer to a step that appears **earlier** in the `steps` a
 forward references). Violating this also causes `agent_action: 'provide_input'` — fix the
 array order or remove the invalid reference.
 
+## Efficiency Guidelines
+
+These rules prevent the most common performance problems when orchestrating Realm workflows.
+Every minute of wall time in a Realm run is agent time — the engine itself is instant. Waste
+comes from unnecessary subagent invocations, large step params, and avoidable I/O round-trips.
+
+### 1. Never use a subagent for read-only work
+
+Reading files, extracting fields, and summarising document content do not require LLM judgment.
+Do this work yourself using `read_file`, `grep_search`, or `semantic_search` before calling
+`create_workflow`. Pass the extracted data as initial workflow params or inline it in the first
+step's `execute_step` call.
+
+**Anti-pattern:** `read_strategy` step → Explore subagent reads the file → returns 2000-token
+summary as step output → next step receives it as input.
+
+**Correct pattern:** Read both files in parallel with `read_file` before starting the workflow.
+Extract the fields you need. Pass them into the step that actually requires reasoning.
+
+### 2. Parallelize inputs before the workflow, not inside it
+
+Realm's execution is linear by design. If two documents need to be read before comparison can
+begin, read them in parallel before calling `create_workflow` — not as two sequential workflow
+steps. Two `read_file` calls in parallel take ~100ms. Two sequential Explore subagent steps
+take 4-6 minutes.
+
+Reserve workflow steps for work that is genuinely sequential: the output of step N is required
+as input to step N+1.
+
+### 3. Step params are audit records, not document mirrors
+
+Step `params` become evidence chain entries. They should record **decisions, diffs, and
+structured summaries** — not full document content. If a step's output exceeds a few hundred
+tokens, the step is doing too much or returning too much. Common signs:
+
+- The step param contains full file content or multi-paragraph quotes
+- The token count in `realm run inspect` diagnostics is in the thousands
+- A downstream step simply re-reads the same data from the prior step's output
+
+Keep step outputs to the fields that the next step or the user actually needs. Everything
+else belongs in the files on disk, which are the real record.
+
+### 4. Use subagents only when LLM judgment is genuinely required
+
+A subagent invocation is a full independent LLM session. It takes 2-4 minutes, initialises its
+own context, and adds substantial overhead. Use subagents only for steps that require reasoning,
+writing, or analysis — not for data collection.
+
+Good reasons to spawn a subagent: writing a section of a document, comparing two sets of
+requirements, generating a structured report.
+
+Bad reasons: reading a file, listing directory contents, searching for a string, checking
+whether a value exists.
+
+If a step can be done with a single tool call, do it directly. Don't delegate it.
+
+### 5. Never write data to a file just to read it back
+
+If data returned from a subagent or tool call needs to be passed to `execute_step`, format it
+directly into `params` from the in-memory result. Writing to an intermediate file and then
+reading it back adds two file I/O operations and burns tokens. The data is already in memory.
+
+The only valid reason to write intermediate output to disk is if the data would exceed what
+can reasonably be represented in a `params` field — in which case, store the file path in
+`params` (not the content) and let the next step read it if needed.
+
 ## After Calling create_workflow
 
 The response is a `ResponseEnvelope` in the same shape as a `start_run` response. The run has
