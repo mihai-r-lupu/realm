@@ -123,6 +123,14 @@ folder. With the default agent, trigger it with:
 
 > "Review this diff with Realm: examples/01-code-reviewer/diffs/add-oauth-provider.diff"
 
+> **Why "with Realm"?** The skill file's `description` intentionally includes that phrase
+> as a trigger signal so the default agent routes to Realm only when explicitly asked to.
+> Without it, a general prompt like "review this diff" could match the skill and start a
+> Realm run silently. If you want fully natural-language invocation without the trigger
+> phrase, open `realm-code-reviewer.md` and remove the phrase from the `description`
+> field — the skill will then fire on any code review request. Use the Realm agent
+> (Option A) if you want that behaviour without modifying the skill file.
+
 Either way, the agent starts the run, loads the diff automatically, then receives a prompt
 asking for the structured review. If any field violates the schema — wrong enum
 value, summary too short, missing boolean — it receives `agent_action: provide_input`
