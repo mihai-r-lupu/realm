@@ -64,12 +64,8 @@ Both fixtures run the full workflow end-to-end against pre-recorded agent respon
 fixture routes through the `send` gate choice; the `rejected` fixture routes through `reject`. Both
 produce 4 evidence entries and land in `completed`.
 
-Fixture tests use an in-memory store — no run-id is produced. To inspect a persisted evidence chain,
-run the workflow via an AI agent (see below) and use the run-id the MCP session returns:
-
-```bash
-realm run inspect <run-id>
-```
+Fixture tests use an in-memory store — no run-id is produced and `realm run list` will not show
+these runs. To get an inspectable run record, use the AI agent mode below.
 
 ## Run it with an AI agent (any VS Code agent with MCP support)
 
@@ -90,6 +86,12 @@ no per-example configuration required.
 The workspace instruction file (`.github/instructions/realm.instructions.md`) gives your agent
 the generic Realm protocol. The `skill.md` in this directory layers the workflow-specific
 behaviour on top.
+
+The MCP session produces a run-id. Once the run completes, inspect the full evidence chain:
+
+```bash
+realm run inspect <run-id>
+```
 
 If the tools don't appear in Copilot, see [examples/README.md](../README.md#troubleshooting-mcp--vs-code).
 
