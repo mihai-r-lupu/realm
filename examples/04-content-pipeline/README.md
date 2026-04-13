@@ -92,12 +92,16 @@ Switch to the **Realm** agent in the VS Code Chat agent picker. Then ask:
 
 > "Enrich this article: examples/04-content-pipeline/articles/ml-infrastructure.txt"
 
+> "Enrich this article: examples/04-content-pipeline/articles/distributed-tracing.txt"
+
 **Option B — Skill file (default agent)**
 
 Copy `realm-content-pipeline.md` from this directory to your workspace's `.github/skills/`
 folder. With the default agent, trigger it with:
 
 > "Enrich this article with Realm: examples/04-content-pipeline/articles/ml-infrastructure.txt"
+
+> "Enrich this article with Realm: examples/04-content-pipeline/articles/distributed-tracing.txt"
 
 > **Why "with Realm"?** The skill file's `description` intentionally includes that phrase
 > as a trigger signal so the default agent routes to Realm only when explicitly asked to.
@@ -118,9 +122,6 @@ Either way, the agent will:
    contains the verified title and summary from step 2. It submits `tags`. Same schema
    enforcement applies — each tag is checked for length, lowercase, and no spaces.
 4. Once the tags schema passes, `record_result` runs and the workflow completes.
-
-You can also use `examples/04-content-pipeline/articles/distributed-tracing.txt` — this is
-the article used by the `resume-after-timeout` fixture and exercises the same workflow.
 
 **When `tag_content` fails with a provider timeout:**
 

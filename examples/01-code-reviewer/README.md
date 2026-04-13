@@ -116,12 +116,16 @@ Switch to the **Realm** agent in the VS Code Chat agent picker. Then ask:
 
 > "Review this diff: examples/01-code-reviewer/diffs/add-oauth-provider.diff"
 
+> "Review this diff: examples/01-code-reviewer/diffs/fix-null-pointer.diff"
+
 **Option B — Skill file (default agent)**
 
 Copy `realm-code-reviewer.md` from this directory to your workspace's `.github/skills/`
 folder. With the default agent, trigger it with:
 
 > "Review this diff with Realm: examples/01-code-reviewer/diffs/add-oauth-provider.diff"
+
+> "Review this diff with Realm: examples/01-code-reviewer/diffs/fix-null-pointer.diff"
 
 > **Why "with Realm"?** The skill file's `description` intentionally includes that phrase
 > as a trigger signal so the default agent routes to Realm only when explicitly asked to.
