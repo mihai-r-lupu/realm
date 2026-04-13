@@ -64,7 +64,8 @@ Both fixtures run the full workflow end-to-end against pre-recorded agent respon
 fixture routes through the `send` gate choice; the `rejected` fixture routes through `reject`. Both
 produce 4 evidence entries and land in `completed`.
 
-To inspect the evidence chain of any run:
+Fixture tests use an in-memory store — no run-id is produced. To inspect a persisted evidence chain,
+run the workflow via an AI agent (see below) and use the run-id the MCP session returns:
 
 ```bash
 realm run inspect <run-id>
