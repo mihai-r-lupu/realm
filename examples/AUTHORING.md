@@ -39,8 +39,8 @@ Every example must satisfy all four:
 
 1. **Zero credentials for the first run.** No API keys, no OAuth, no external services. A developer who just ran `npm install` can complete the example.
 2. **Runnable in two modes:**
-   - **Mode 1 — Live (MCP client):** the agent drives execution interactively; the human responds to human gate prompts.
-   - **Mode 2 — Headless (driver script):** `node dist/driver.js <fixture>` drives the workflow programmatically. Exits 0 on success, prints the full evidence chain.
+   - **Example mode: Live (MCP client):** the agent drives execution interactively; the human responds to human gate prompts. Run-ids are printed by the MCP session and can be passed to `realm run inspect`.
+   - **Example mode: Fixture (simulated):** `realm workflow test <path> -f <fixtures-dir>` replays pre-recorded agent responses and gate choices without a real LLM. Reports PASS/FAIL per fixture. Uses in-memory store — no run-id is persisted; use the Live mode to generate inspectable run records.
 3. **Screen-recordable.** Terminal output must tell the story without narration. `realm run inspect <run-id>` output must be visually compelling on its own.
 4. **Swap-ready.** Every mock adapter is declared in the YAML and wired at startup. Replacing a mock with a real service requires changing one env var. Zero YAML changes.
 
@@ -54,15 +54,17 @@ Always reference prior step output explicitly via `context.resources.STEP_NAME.F
 
 ---
 
-## Driver Script Pattern
+## Fixture Test Pattern
 
-All drivers follow the same five-step structure:
+The fixture test runner (`realm workflow test`) follows this structure — this is how `@sensigo/realm-testing` works internally:
 
-1. Load fixture file from the CLI argument
-2. Initialise `InMemoryStore` + `ExtensionRegistry`; register adapters and handlers
+1. Load fixture YAML file(s) from the fixtures directory
+2. Initialise `InMemoryStore` + `ExtensionRegistry`; register adapters and handlers from the fixture `mocks:` section
 3. Call `startRun(definition, params, { store, registry, secrets })`
-4. Loop: call `executeChain` until terminal state; inject agent response from fixture when `status` is `agent_required`; inject gate response when `status` is `gate_waiting`
-5. Print evidence chain table; exit 0 if `completed`, exit 1 otherwise
+4. Loop: call `executeChain` until terminal state; inject agent response from fixture `agent_responses:` when `status` is `agent_required`; inject gate response from fixture `gate_choices:` when `status` is `gate_waiting`
+5. Compare final state to fixture `expected:` block; report PASS/FAIL and exit 0 if all pass
+
+Note: the runner uses `InMemoryStore` — runs are not persisted to disk and cannot be inspected with `realm run inspect` afterward. To generate a persisted run record, use the Live (MCP) mode.
 
 ---
 
@@ -72,8 +74,8 @@ Every example README must have exactly these five sections, in this order:
 
 1. **What this shows** — one paragraph, no jargon
 2. **Install** — `npm install` from repo root (that's it)
-3. **Run it (headless)** — single command and exact expected terminal output
-4. **Run it with an AI agent** — three steps: MCP config snippet, how to start the agent, what prompt to use
+3. **Run fixture tests** — single `realm workflow test` command and exact expected terminal output
+4. **Run it with an AI agent** — three steps: MCP config snippet, how to start the agent, what prompt to use. Include a note that the agent session produces a run-id which can be passed to `realm run inspect`.
 5. **What to look at next** — link to the next example + link to the most relevant documentation page
 
 ---
@@ -82,11 +84,10 @@ Every example README must have exactly these five sections, in this order:
 
 An example is complete when all of the following are true:
 
-- [ ] `node dist/driver.js fixtures/happy-path.yaml` exits 0 and prints a valid evidence chain
-- [ ] All fixture-based tests pass
-- [ ] A developer who has never seen Realm can read the README and successfully run Mode 2 in under 5 minutes
+- [ ] `realm workflow test <path> -f <fixtures-dir>` exits 0 with all fixtures PASS
+- [ ] A developer who has never seen Realm can read the README and successfully run the fixture tests in under 5 minutes
 - [ ] A developer can swap the mock adapter for a real one by changing one env var — no other changes
-- [ ] `realm run inspect` on a completed run shows a compelling, human-readable audit trail
+- [ ] Running the example via MCP (Live mode) produces a run-id and `realm run inspect <run-id>` shows a compelling, human-readable audit trail
 
 ---
 
