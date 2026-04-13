@@ -1,0 +1,47 @@
+name: resume after timeout — distributed tracing article
+params:
+  path: /fake/articles/distributed-tracing.txt
+mocks:
+  articles:
+    read:
+      status: 200
+      data:
+        path: /fake/articles/distributed-tracing.txt
+        content: |
+          Distributed Tracing at Scale
+
+          Distributed tracing solves a specific problem: when a request passes through
+          fifteen services and something is slow, which one is responsible? Without
+          tracing, the answer is "run the same request again and add logging everywhere".
+
+          The operational cost of tracing is not instrumentation — it is sampling.
+          Head-based sampling decides at the first service; tail-based sampling decides
+          after the trace is complete. Most teams start with head-based at 1–5% and add
+          tail-based for error traces only.
+        line_count: 10
+        size_bytes: 440
+agent_responses:
+  summarise:
+    title: Distributed Tracing at Scale
+    summary: >
+      The article explains distributed tracing as a tool for identifying slow services
+      in distributed systems and focuses on the core operational challenge: sampling
+      strategy. It contrasts head-based and tail-based sampling and recommends starting
+      with head-based at low rates, adding tail-based for error traces.
+    word_count: 185
+  tag_content:
+    tags: [distributed-systems, tracing, observability, sampling, opentelemetry]
+agent_errors:
+  tag_content:
+    - provider timed out after 30s
+expected:
+  final_state: completed
+  evidence:
+    - step_id: fetch_content
+      status: success
+    - step_id: summarise
+      status: success
+    - step_id: tag_content
+      status: success
+    - step_id: record_result
+      status: success

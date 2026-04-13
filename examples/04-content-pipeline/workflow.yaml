@@ -1,0 +1,108 @@
+# examples/04-content-pipeline/workflow.yaml
+# Content Enrichment Pipeline — reads an article from disk, summarises it, tags it using
+# the verified summary, then records the result. Demonstrates: persistent state machine +
+# realm run resume. When the provider times out at tag_content, steps 1 and 2 are already
+# completed — realm run resume continues from tag_content without re-running anything.
+id: content-pipeline
+name: Content Enrichment Pipeline
+version: 1
+initial_state: created
+
+params_schema:
+  type: object
+  required: [path]
+  properties:
+    path:
+      type: string
+      description: 'Path to the article text file'
+
+services:
+  articles:
+    adapter: filesystem
+    trust: engine_delivered
+
+steps:
+  fetch_content:
+    description: Load article text from disk
+    execution: auto
+    trust: engine_delivered
+    uses_service: articles
+    operation: read
+    input_map:
+      path: run.params.path
+    allowed_from_states: [created]
+    produces_state: content_fetched
+
+  summarise:
+    description: >
+      Summarise the article. Produces title, summary, and word_count — all validated
+      before tag_content starts. The tagger cannot receive a malformed summary.
+    execution: agent
+    allowed_from_states: [content_fetched]
+    produces_state: summarised
+    prompt: |
+      Summarise the article below.
+
+      Required fields:
+      - title: the article title or a concise descriptive title (5–200 characters)
+      - summary: a 2–5 sentence summary of the article's key points (20–500 characters)
+      - word_count: estimated word count as an integer (must be at least 1)
+
+      Return exactly these three fields. Any missing or invalid field will be rejected
+      before this response is accepted.
+
+      Article:
+      {{ context.resources.fetch_content.content }}
+    input_schema:
+      type: object
+      required: [title, summary, word_count]
+      properties:
+        title:
+          type: string
+          minLength: 5
+          maxLength: 200
+        summary:
+          type: string
+          minLength: 20
+          maxLength: 500
+        word_count:
+          type: integer
+          minimum: 1
+
+  tag_content:
+    description: >
+      Generate tags for the article using the verified summary from summarise.
+      The tagger receives schema-validated data — it cannot receive a bad summary.
+      This is the step that provider timeouts target in the resume-after-timeout fixture.
+    execution: agent
+    allowed_from_states: [summarised]
+    produces_state: tagged
+    prompt: |
+      Generate tags for this article.
+
+      Title: {{ context.resources.summarise.title }}
+      Summary: {{ context.resources.summarise.summary }}
+
+      Required fields:
+      - tags: a list of 1–10 keyword tags (each 2–50 characters, lowercase, no spaces —
+        use hyphens for multi-word tags, e.g. "machine-learning", "distributed-systems")
+
+      Return exactly the tags field. Any tag outside the constraints will be rejected.
+    input_schema:
+      type: object
+      required: [tags]
+      properties:
+        tags:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: string
+            minLength: 2
+            maxLength: 50
+
+  record_result:
+    description: Record the enriched content result
+    execution: auto
+    allowed_from_states: [tagged]
+    produces_state: completed
