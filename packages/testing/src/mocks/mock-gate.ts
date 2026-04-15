@@ -16,7 +16,6 @@ export async function createGateResponder(
   store: RunStore,
   definition: WorkflowDefinition,
   runId: string,
-  snapshotId: string,
   gateResponses: Record<string, string>,
 ): Promise<ResponseEnvelope> {
   const run = await store.get(runId);
@@ -28,6 +27,5 @@ export async function createGateResponder(
     runId,
     gateId: run.pending_gate.gate_id,
     choice,
-    snapshotId,
   });
 }

@@ -11,13 +11,10 @@ const testWorkflow: WorkflowDefinition = {
   id: 'resume-test-wf',
   name: 'Resume Test Workflow',
   version: 1,
-  initial_state: 'created',
   steps: {
     'step-one': {
       description: 'First step',
       execution: 'auto',
-      allowed_from_states: ['created'],
-      produces_state: 'completed',
     },
   },
 };
@@ -36,44 +33,45 @@ describe('resumeRun', () => {
     await workflowStore.register(testWorkflow);
   });
 
-  it('resumes a failed run — state is reset to the step allowed_from_state', async () => {
+  it('removes the step from failed_steps, re-enabling it for execution', async () => {
     const run = await runStore.create({
       workflowId: 'resume-test-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
     // Simulate a failed run
     await runStore.update({
       ...run,
-      state: 'failed',
+      run_phase: 'failed',
+      failed_steps: ['step-one'],
       terminal_state: true,
       terminal_reason: 'Something went wrong',
     });
 
-    const { resetState } = await resumeRun(run.id, { from: 'step-one' }, runStore, workflowStore);
+    await resumeRun(run.id, 'step-one', runStore, workflowStore);
 
-    expect(resetState).toBe('created');
     const updated = await runStore.get(run.id);
-    expect(updated.state).toBe('created');
-    expect(updated.terminal_state).toBe(false);
-    expect(updated.terminal_reason).toBeUndefined();
+    expect(updated.failed_steps).not.toContain('step-one');
   });
 
   it('throws when the run is in a non-resumable state (completed)', async () => {
     const run = await runStore.create({
       workflowId: 'resume-test-wf',
       workflowVersion: 1,
-      initialState: 'completed',
       params: {},
     });
-    await runStore.update({ ...run, state: 'completed', terminal_state: true });
+    await runStore.update({
+      ...run,
+      run_phase: 'completed',
+      terminal_state: true,
+      terminal_reason: 'Workflow completed.',
+    });
 
-    await expect(resumeRun(run.id, { from: 'step-one' }, runStore, workflowStore)).rejects.toThrow(
+    await expect(resumeRun(run.id, 'step-one', runStore, workflowStore)).rejects.toThrow(
       WorkflowError,
     );
 
-    await expect(resumeRun(run.id, { from: 'step-one' }, runStore, workflowStore)).rejects.toThrow(
+    await expect(resumeRun(run.id, 'step-one', runStore, workflowStore)).rejects.toThrow(
       'is not resumable',
     );
   });
@@ -82,17 +80,22 @@ describe('resumeRun', () => {
     const run = await runStore.create({
       workflowId: 'resume-test-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
-    await runStore.update({ ...run, state: 'failed', terminal_state: true });
+    await runStore.update({
+      ...run,
+      run_phase: 'failed',
+      failed_steps: ['step-one'],
+      terminal_state: true,
+      terminal_reason: 'Something went wrong',
+    });
 
     await expect(
-      resumeRun(run.id, { from: 'nonexistent-step' }, runStore, workflowStore),
+      resumeRun(run.id, 'nonexistent-step', runStore, workflowStore),
     ).rejects.toThrow(WorkflowError);
 
     await expect(
-      resumeRun(run.id, { from: 'nonexistent-step' }, runStore, workflowStore),
+      resumeRun(run.id, 'nonexistent-step', runStore, workflowStore),
     ).rejects.toThrow('not found');
   });
 });

@@ -31,7 +31,7 @@ function makeErrorEnvelope(errors: string[]): ResponseEnvelope {
   return {
     command: 'create_workflow',
     run_id: '',
-    snapshot_id: '',
+    run_version: 0,
     status: 'error',
     data: {},
     evidence: [],
@@ -39,7 +39,7 @@ function makeErrorEnvelope(errors: string[]): ResponseEnvelope {
     errors,
     agent_action: 'provide_input',
     context_hint: 'Invalid create_workflow input. Fix the errors and retry.',
-    next_action: null,
+    next_actions: [],
   };
 }
 
@@ -145,14 +145,12 @@ function buildWorkflowDefinition(workflowId: string, args: CreateWorkflowArgs): 
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i]!;
-    const prevState = i === 0 ? 'created' : `${steps[i - 1]!.id}_done`;
-    const nextState = i === steps.length - 1 ? 'completed' : `${step.id}_done`;
+    const prevStepId = i === 0 ? undefined : steps[i - 1]!.id;
 
     const stepDef: WorkflowDefinition['steps'][string] = {
       description: step.description,
       execution: 'agent',
-      allowed_from_states: [prevState],
-      produces_state: nextState,
+      depends_on: prevStepId !== undefined ? [prevStepId] : [],
     };
 
     if (step.input_schema !== undefined) {
@@ -169,7 +167,6 @@ function buildWorkflowDefinition(workflowId: string, args: CreateWorkflowArgs): 
     id: workflowId,
     name: metadata?.name ?? 'Dynamic Workflow',
     version: 1,
-    initial_state: 'created',
     steps: stepsRecord,
   };
 
@@ -237,9 +234,8 @@ export function registerCreateWorkflow(server: McpServer, opts?: HandleRunStores
     async (args) => {
       try {
         const result = await handleCreateWorkflow(args as CreateWorkflowArgs, opts);
-        const { snapshot_id: _snap, ...slimResult } = { ...result, command: 'create_workflow' };
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ ...result, command: 'create_workflow' }, null, 2) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

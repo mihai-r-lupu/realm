@@ -4,9 +4,9 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   JsonWorkflowStore,
   JsonFileStore,
-  StateGuard,
   executeChain,
-  findNextAction,
+  buildNextActions,
+  findEligibleSteps,
   type StepDispatcher,
   type ResponseEnvelope,
   ExtensionRegistry,
@@ -22,8 +22,6 @@ export interface HandleRunStores {
 }
 
 // Fallback dispatcher for agent steps and auto steps without a registry entry.
-// For auto steps that have uses_service or handler, the engine resolves them
-// from the registry instead of calling this dispatcher.
 const passthroughDispatcher: StepDispatcher = async () => ({});
 
 /**
@@ -37,70 +35,41 @@ export async function handleStartRun(
   const workflowStore = stores?.workflowStore ?? new JsonWorkflowStore();
   const runStore = stores?.runStore ?? new JsonFileStore();
   const definition = await workflowStore.get(args.workflow_id);
-  const guard = new StateGuard(definition);
   const params = args.params ?? {};
 
   const run = await runStore.create({
     workflowId: definition.id,
     workflowVersion: definition.version,
-    initialState: definition.initial_state,
     params,
   });
 
-  const nextSteps = guard.getAllowedSteps(definition.initial_state);
-  const firstStep = nextSteps[0];
+  const eligible = findEligibleSteps(definition, run);
+  const firstAutoStep = eligible.find((name) => definition.steps[name]?.execution === 'auto');
 
-  if (firstStep === undefined) {
-    return {
-      command: 'start_run',
-      run_id: run.id,
-      snapshot_id: run.version.toString(),
-      status: 'ok',
-      data: {},
-      evidence: [],
-      warnings: [],
-      errors: [],
-      context_hint: `Run '${run.id}' created. No steps available from state '${definition.initial_state}'.`,
-      next_action: null,
-    };
-  }
-
-  const firstStepDef = definition.steps[firstStep];
-  if (firstStepDef?.execution !== 'auto') {
-    const nextAction = findNextAction(run.state, definition, {
-      evidenceByStep: {},
-      runParams: params,
+  if (firstAutoStep !== undefined) {
+    const result = await executeChain(runStore, definition, {
       runId: run.id,
+      command: firstAutoStep,
+      input: params,
+      dispatcher: passthroughDispatcher,
+      ...(stores?.registry !== undefined ? { registry: stores.registry } : {}),
+      ...(stores?.secrets !== undefined ? { secrets: stores.secrets } : {}),
     });
-    return {
-      command: 'start_run',
-      run_id: run.id,
-      snapshot_id: run.version.toString(),
-      status: 'ok',
-      data: {},
-      evidence: [],
-      warnings: [],
-      errors: [],
-      context_hint: nextAction?.orientation ?? `Run '${run.id}' created in state '${run.state}'.`,
-      next_action: nextAction,
-    };
+    return { ...result, run_id: run.id, data: {}, evidence: [] };
   }
 
-  const result = await executeChain(runStore, guard, definition, {
-    runId: run.id,
-    command: firstStep,
-    input: params,
-    snapshotId: run.version.toString(),
-    dispatcher: passthroughDispatcher,
-    ...(stores?.registry !== undefined ? { registry: stores.registry } : {}),
-    ...(stores?.secrets !== undefined ? { secrets: stores.secrets } : {}),
-  });
-
+  const nextActions = buildNextActions(definition, run);
   return {
-    ...result,
+    command: 'start_run',
     run_id: run.id,
+    run_version: run.version,
+    status: 'ok',
     data: {},
     evidence: [],
+    warnings: [],
+    errors: [],
+    context_hint: `Run '${run.id}' created for workflow '${definition.id}'.`,
+    next_actions: nextActions,
   };
 }
 
@@ -122,10 +91,16 @@ export function registerStartRun(
     async (args) => {
       try {
         const result = await handleStartRun(args, opts);
-        // command is intentionally overridden to 'start_run': MCP callers invoked start_run, not
-        // the first auto step that executeChain happened to execute. Do not revert this override.
-        const { snapshot_id: _snap, ...slimResult } = { ...result, command: 'start_run' };
-        return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
+        // Override command to 'start_run': MCP callers invoked start_run, not
+        // the first auto step that executeChain may have executed.
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ ...result, command: 'start_run' }, null, 2),
+            },
+          ],
+        };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -136,6 +111,7 @@ export function registerStartRun(
                 {
                   command: 'start_run',
                   run_id: '',
+                  run_version: 0,
                   status: 'error',
                   data: {},
                   evidence: [],
@@ -143,7 +119,7 @@ export function registerStartRun(
                   errors: [message],
                   agent_action: 'stop',
                   context_hint: `Error creating run for workflow '${args.workflow_id}'.`,
-                  next_action: null,
+                  next_actions: [],
                 },
                 null,
                 2,

@@ -42,11 +42,30 @@ export interface PendingGate {
   opened_at: string;
 }
 
+/**
+ * Derived phase of a workflow run. Always computed from the four step sets and run state;
+ * never set directly by callers outside the engine.
+ */
+export type RunPhase = 'running' | 'gate_waiting' | 'completed' | 'failed' | 'abandoned';
+
 export interface RunRecord {
   id: string;
   workflow_id: string;
   workflow_version: number;
-  state: string;
+
+  // DAG execution state — replaces the single `state: string` field.
+  completed_steps: string[];
+  in_progress_steps: string[];
+  failed_steps: string[];
+  /** Steps whose trigger_rule can no longer be satisfied; recorded for auditability. */
+  skipped_steps: string[];
+
+  /**
+   * Derived convenience field — set by the engine on every write, read by CLI and get_run_state.
+   * Always computable from the four step sets, terminal_state, and pending_gate.
+   */
+  run_phase: RunPhase;
+
   version: number;
   params: Record<string, unknown>;
   evidence: EvidenceSnapshot[];

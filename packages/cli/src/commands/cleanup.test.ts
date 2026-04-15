@@ -19,7 +19,11 @@ function makeRun(overrides: Partial<RunRecord> & { id?: string }): RunRecord {
     id,
     workflow_id: 'test-wf',
     workflow_version: 1,
-    state: 'created',
+    run_phase: 'running',
+    completed_steps: [],
+    in_progress_steps: [],
+    failed_steps: [],
+    skipped_steps: [],
     params: {},
     evidence: [],
     version: 0,
@@ -57,7 +61,7 @@ describe('cleanupRuns', () => {
     expect(affected[0]?.id).toBe(run.id);
 
     const updated = await store.get(run.id);
-    expect(updated.state).toBe('abandoned');
+    expect(updated.run_phase).toBe('abandoned');
     expect(updated.terminal_state).toBe(true);
     expect(updated.terminal_reason).toBe('Marked abandoned by realm cleanup');
   });
@@ -76,7 +80,7 @@ describe('cleanupRuns', () => {
     expect(affected).toHaveLength(0);
 
     const unchanged = await store.get(run.id);
-    expect(unchanged.state).toBe('created');
+    expect(unchanged.run_phase).toBe('running');
   });
 
   it('dry-run reports affected runs without writing changes', async () => {
@@ -94,7 +98,7 @@ describe('cleanupRuns', () => {
 
     // State should NOT have changed because dryRun is true.
     const unchanged = await store.get(run.id);
-    expect(unchanged.state).toBe('created');
+    expect(unchanged.run_phase).toBe('running');
     expect(unchanged.terminal_state).toBe(false);
   });
 
@@ -103,7 +107,7 @@ describe('cleanupRuns', () => {
     vi.setSystemTime(now);
 
     const oldTime = new Date(now.getTime() - 2 * 86_400_000).toISOString();
-    const terminalRun = makeRun({ updated_at: oldTime, state: 'completed', terminal_state: true });
+    const terminalRun = makeRun({ updated_at: oldTime, run_phase: 'completed', terminal_state: true });
     await injectRun(dir, terminalRun);
 
     const store = new JsonFileStore(dir);
@@ -117,7 +121,7 @@ describe('cleanupRuns', () => {
     vi.setSystemTime(now);
 
     const oldTime = new Date(now.getTime() - 2 * 86_400_000).toISOString();
-    const gateRun = makeRun({ updated_at: oldTime, state: 'gate_waiting' });
+    const gateRun = makeRun({ updated_at: oldTime, run_phase: 'gate_waiting' });
     await injectRun(dir, gateRun);
 
     const store = new JsonFileStore(dir);
@@ -126,7 +130,7 @@ describe('cleanupRuns', () => {
     expect(affected).toHaveLength(0);
 
     const unchanged = await store.get(gateRun.id);
-    expect(unchanged.state).toBe('gate_waiting');
+    expect(unchanged.run_phase).toBe('gate_waiting');
     expect(unchanged.terminal_state).toBe(false);
   });
 });

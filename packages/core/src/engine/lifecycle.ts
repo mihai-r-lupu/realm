@@ -1,27 +1,25 @@
-// Run lifecycle constants — shared between execution-loop.ts and CLI commands.
+// Run phase constants and derived helpers for the DAG execution model.
+// run_phase replaces the old state string for callers that need a single status word.
+import type { RunPhase } from '../types/run-record.js';
 
-/** States from which the run cannot proceed without external intervention. */
-export const TERMINAL_STATES: ReadonlySet<string> = new Set([
-  'completed',
-  'cancelled',
-  'failed',
-  'abandoned',
-]);
+/** Phases that mark a run as finished — no further steps will execute. */
+export const TERMINAL_PHASES = new Set<RunPhase>(['completed', 'failed', 'abandoned']);
 
-/** Terminal states from which a run may be resumed. */
-export const RESUMABLE_STATES: ReadonlySet<string> = new Set(['failed', 'abandoned']);
+/** Phases from which a run can be resumed by removing steps from failed_steps. */
+export const RESUMABLE_PHASES = new Set<RunPhase>(['failed', 'abandoned']);
 
-/**
- * States in which the run is intentionally paused, waiting for external input.
- * These runs are not stuck — they are working as designed.
- * Cleanup must not abandon them without explicit operator opt-in.
- */
-export const WAITING_STATES: ReadonlySet<string> = new Set(['gate_waiting']);
+/** Phases in which a run is waiting for a human gate response. */
+export const WAITING_PHASES = new Set<RunPhase>(['gate_waiting']);
 
-/**
- * Returns whether the given state is terminal.
- * Extracted here so execution-loop.ts and CLI commands share the same definition.
- */
-export function isTerminalState(state: string): boolean {
-  return TERMINAL_STATES.has(state);
+/** Returns true when a run in the given phase will not execute any more steps. */
+export function isTerminalPhase(phase: RunPhase): boolean {
+  return TERMINAL_PHASES.has(phase);
 }
+
+// Legacy aliases — kept for backward compatibility with existing imports.
+// New code should use TERMINAL_PHASES, RESUMABLE_PHASES, WAITING_PHASES, isTerminalPhase.
+export const TERMINAL_STATES = TERMINAL_PHASES;
+export const RESUMABLE_STATES = RESUMABLE_PHASES;
+export const WAITING_STATES = WAITING_PHASES;
+export const isTerminalState = isTerminalPhase;
+

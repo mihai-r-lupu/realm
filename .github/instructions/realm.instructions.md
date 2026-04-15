@@ -36,16 +36,21 @@ immediately.
 
 ### 4. Execute agent steps
 
-Read `next_action.prompt` first — that is your complete task for this step. It is resolved from
-the workflow's step definition at runtime and supersedes any static instructions you may have
-about this workflow. `prompt` is optional; when absent, use `next_action.human_readable` instead
-— it is always present and gives an equivalent agent-facing task description. `context_hint`
-describes what just happened and the current run state — read it on every response, including errors.
+`next_actions` is an array. For linear workflows it contains a single item; for parallel
+batches it contains multiple. Always check the length before deciding how to proceed.
 
-Call the tool named in `next_action.instruction.tool` using `instruction.call_with` as the
-ready-to-use argument template. For ordinary agent steps this is `execute_step`, but for handler
-steps it will be the handler's own tool name — always use the value from the response, never
-hardcode `execute_step`.
+For **each item** in `next_actions`:
+
+Read `prompt` first — that is your complete task for this step. It is resolved from the
+workflow's step definition at runtime and supersedes any static instructions you may have
+about this workflow. `prompt` is optional; when absent, use `human_readable` instead — it is
+always present and gives an equivalent agent-facing task description. `context_hint` describes
+what just happened and the current run state — read it on every response, including errors.
+
+Call the tool named in `instruction.tool` using `instruction.call_with` as the ready-to-use
+argument template. For ordinary agent steps this is `execute_step`, but for handler steps it
+will be the handler's own tool name — always use the value from the response, never hardcode
+`execute_step`.
 
 The `call_with` object is pre-populated with placeholders:
 
@@ -55,18 +60,42 @@ The `call_with` object is pre-populated with placeholders:
 - Scalar fields appear as `0` or `""` — replace with your actual value.
 - Arrays appear as `[]` — populate with your items.
 
-`next_action.orientation` describes the current state and what step comes next (distinct from
-`context_hint`, which describes what just happened).
+`orientation` describes the current state and what step comes next (distinct from `context_hint`,
+which describes what just happened).
 
-If `next_action.expected_timeout` is set, the step has a declared timeout — complete within
-the indicated time (e.g. `"30s"`).
+If `expected_timeout` is set, the step has a declared timeout — complete within the indicated
+time (e.g. `"30s"`).
+
+### 4a. Parallel execution strategy
+
+When `next_actions` contains multiple items, choose a strategy based on step complexity:
+
+- **Inline sequential:** execute all eligible steps yourself, one after another in this session.
+  Use for lightweight steps — no `agent_profile`, no `prompt`, short expected output, no declared
+  `expected_timeout`. Fast and avoids subagent overhead.
+
+- **Subagent fan-out:** spawn one subagent per eligible step for steps that have an `agent_profile`,
+  a substantial `prompt`, or a declared `expected_timeout`. True parallelism. Collect all subagent
+  results before proceeding.
+
+- **Mixed:** execute lightweight steps inline, spawn subagents for heavyweight steps. Valid within
+  the same batch.
+
+### 4b. Gate escalation from subagent
+
+If `execute_step` returns `status: confirm_required` inside a subagent session, do not attempt to
+resolve the gate. Stop execution of your branch. Return the full gate object (`gate_id`, `display`,
+`preview`, `choices`) to the orchestrating agent as your result. The orchestrating agent presents
+`gate.display` to the human, collects their choice from `gate.response_spec.choices`, and calls
+`submit_human_response`. After that resolves, the orchestrating agent determines whether to resume
+the original subagent session or spawn a new one for the remaining steps in that branch.
 
 ### 5. Repeat until done
 
 Repeat from step 4 until:
 
 - `status` is `confirm_required` — a human gate is open; handle it in step 6, then continue.
-- `status` is `ok` and `next_action` is `null` — the workflow has finished. No further steps exist.
+- `status` is `ok` and `next_actions` is empty — the workflow has finished. No further steps exist.
 
 ### 5a. Reading `chained_auto_steps`
 
@@ -76,19 +105,18 @@ ran — only present when the array would be non-empty:
 
 ```json
 "chained_auto_steps": [
-  { "step": "validate_fields", "produced_state": "validated" },
-  { "step": "route_result", "produced_state": "revision_requested", "branched_via": "on_reject" }
+  { "step": "validate_fields", "run_phase": "running" },
+  { "step": "route_result", "run_phase": "running", "branched_via": "on_reject" }
 ]
 ```
 
-`branched_via` is present when a transition fired — `on_error`, an `on_success` route key, or
-`on_<choice>` from a gate response (e.g. `on_approve`, `on_reject`). Use this to understand which
-path the engine took before returning to you.
+`branched_via` is present when a DAG transition fired (e.g. the engine selected a particular
+trigger-rule branch). Use it to understand which path the engine took before returning to you.
 
-### 5b. `status: ok` with warnings — recovery branch taken
+### 5b. `status: ok` with warnings — recovery step executed
 
-**`status: ok` does not guarantee the original step succeeded.** When an `on_error` transition
-fires, the engine demotes the error to a `warnings[]` entry, routes to the recovery branch step,
+**`status: ok` does not guarantee the original step succeeded.** When a step fails and a recovery
+step runs via `trigger_rule: one_failed`, the engine demotes the failure to a `warnings[]` entry
 and returns `status: ok`. Always check `warnings` on `ok` responses — a non-empty array means a
 recovery path was taken, and `context_hint` will describe what happened.
 
@@ -98,12 +126,12 @@ recovery path was taken, and `context_hint` will describe what happened.
 2. Present `gate.display` to the user verbatim. If `gate.display` is absent, construct a prompt
    from `gate.preview` — the step output awaiting human review.
 3. Collect the user's choice from `gate.response_spec.choices`.
-4. Call `submit_human_response` using `next_action.instruction.call_with` with:
+4. Call `submit_human_response` using `next_actions[0].instruction.call_with` with:
    - `gate_id` from `gate.gate_id` (required — distinct from `run_id`)
    - `choice` set to the user's selected value from `gate.response_spec.choices`
 5. After `submit_human_response` returns, check `chained_auto_steps` — the gate response may
-   trigger an `on_<choice>` transition that chains through additional auto steps before returning
-   the next agent step. The final state is always reflected in `next_action`.
+   chain through additional auto steps before returning the next agent step. The final state is
+   always reflected in `next_actions`.
 
 ## Checking Run State
 
@@ -121,14 +149,14 @@ what to do next. Do not parse the `errors` text to decide recovery strategy — 
 | ---------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | `stop`                 | The run is terminal or has failed unrecoverably.       | Do not retry. Report to user.                                                                             |
 | `report_to_user`       | Engine state is inconsistent (e.g. snapshot mismatch). | Surface to user. Do not retry autonomously.                                                               |
-| `provide_input`        | The params you submitted were invalid.                 | Fix the params and retry `execute_step` with the same command. `next_action` shows the correct tool call. |
-| `resolve_precondition` | Wrong step for current state.                          | Follow `next_action` if non-null to call the correct step instead.                                        |
+| `provide_input`        | The params you submitted were invalid.                 | Fix the params and retry `execute_step` with the same command. `next_actions[0]` shows the correct tool call. |
+| `resolve_precondition` | Wrong step for current state.                          | Follow `next_actions[0]` if non-null to call the correct step instead.                                        |
 | `wait_for_human`       | An external service is unavailable (network down, upstream 5xx). The run cannot continue until the dependency recovers. | Show the error to the user and wait for them to confirm the issue is resolved before retrying. |
 
-When `agent_action` is `provide_input` or `resolve_precondition` and `next_action` is non-null,
-follow it exactly as you would after a successful step. When `next_action` is null, surface
-`blocked_reason.suggestion` to the user — it names the failed precondition or explains why no
-valid next step exists.
+When `agent_action` is `provide_input` or `resolve_precondition` and `next_actions` is non-empty,
+follow the first item exactly as you would after a successful step. When `next_actions` is empty,
+surface `blocked_reason.suggestion` to the user — it names the failed precondition or explains why
+no valid next step exists.
 
 ### Precondition failures
 

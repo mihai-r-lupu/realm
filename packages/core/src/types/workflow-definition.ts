@@ -48,24 +48,37 @@ export interface RetryConfig {
   base_delay_ms: number;
 }
 
-/** Target of a simple (flat) transition — on_error and gate on_<choice>. */
-export interface SimpleTransition {
-  step: string;
-  produces_state: string;
-}
-
-/** on_success transition — routes based on a named field in handler output. */
-export interface OnSuccessTransition {
-  field: string;
-  routes: Record<string, SimpleTransition>;
-  default: SimpleTransition;
-}
+/**
+ * Controls when a step becomes eligible based on its dependencies' outcomes.
+ * Default: 'all_success'.
+ */
+export type TriggerRule =
+  | 'all_success'
+  | 'all_failed'
+  | 'all_done'
+  | 'one_failed'
+  | 'one_success'
+  | 'none_failed';
 
 export interface StepDefinition {
   description: string;
   execution: ExecutionMode;
-  allowed_from_states: string[];
-  produces_state: string;
+  /**
+   * Step IDs this step waits for. Empty array or omitted = eligible from run start
+   * (first tier of the DAG).
+   */
+  depends_on?: string[];
+  /**
+   * When to evaluate dependency satisfaction. Default: 'all_success'.
+   */
+  trigger_rule?: TriggerRule;
+  /**
+   * Optional condition expression evaluated against prior step evidence.
+   * Step is ineligible until this expression is truthy.
+   * Uses the same dot-path syntax as input_map.
+   * Example: "context.resources.classifier.category == 'billing'"
+   */
+  when?: string;
   uses_service?: string;
   /**
    * Which adapter method to invoke for this service step.
@@ -99,7 +112,7 @@ export interface StepDefinition {
   /** Plain-English instructions for the agent at this step. */
   instructions?: string;
   /**
-   * Template-resolved task prompt delivered to the agent at step entry via next_action.prompt.
+   * Template-resolved task prompt delivered to the agent at step entry via next_actions[].prompt.
    * Supports {{ context.resources.STEP.FIELD }} and {{ run.params.FIELD }} references.
    * For human_confirmed steps, delivered as gate.prompt when the gate opens.
    */
@@ -112,12 +125,6 @@ export interface StepDefinition {
   use_template?: string;
   /** Gate configuration — choices available to the human reviewer. */
   gate?: { choices?: string[] };
-  /** Conditional routing based on step outcome or gate response. */
-  transitions?: {
-    on_error?: SimpleTransition;
-    on_success?: OnSuccessTransition;
-    [key: string]: SimpleTransition | OnSuccessTransition | undefined;
-  };
   /** Name of the agent profile for this step. Only valid on execution: 'agent' steps. */
   agent_profile?: string;
 }
@@ -126,7 +133,6 @@ export interface WorkflowDefinition {
   id: string;
   name: string;
   version: number;
-  initial_state: string;
   /** JSON Schema describing the params accepted by start_run. */
   params_schema?: JsonSchema;
   /** Optional protocol customizations — overrides generated sections. */
@@ -146,3 +152,9 @@ export interface WorkflowDefinition {
    */
   resolved_profiles?: Record<string, { content: string; content_hash: string }>;
 }
+
+  /**
+   * Which adapter method to invoke for this service step.
+   * Defaults to 'fetch' if omitted.
+   */
+

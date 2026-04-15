@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { executeStep, executeChain } from './execution-loop.js';
-import { StateGuard } from './state-guard.js';
+import { executeStep, executeChain, buildNextActions } from './execution-loop.js';
 import { JsonFileStore } from '../store/json-file-store.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import { ExtensionRegistry } from '../extensions/registry.js';
@@ -12,23 +11,21 @@ import type { StepDispatcher } from './execution-loop.js';
 import type { ServiceAdapter } from '../extensions/service-adapter.js';
 import type { StepHandler, StepHandlerInputs, StepContext } from '../extensions/step-handler.js';
 
+// Two-step workflow: step-one (auto) → step-two (agent).
 const definition: WorkflowDefinition = {
   id: 'test-wf',
   name: 'Test Workflow',
   version: 1,
-  initial_state: 'created',
   steps: {
     'step-one': {
       description: 'First step',
       execution: 'auto',
-      allowed_from_states: ['created'],
-      produces_state: 'step_one_done',
+      depends_on: [],
     },
     'step-two': {
       description: 'Second step',
       execution: 'agent',
-      allowed_from_states: ['step_one_done'],
-      produces_state: 'completed',
+      depends_on: ['step-one'],
     },
   },
 };
@@ -48,28 +45,24 @@ const failDispatcher: StepDispatcher = async () => {
 
 describe('executeStep', () => {
   let store: JsonFileStore;
-  let guard: StateGuard;
   let dir: string;
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), 'realm-exec-test-'));
     store = new JsonFileStore(dir);
-    guard = new StateGuard(definition);
   });
 
-  it('successful step returns status ok and updates run state', async () => {
+  it('successful step returns status ok and updates completed_steps', async () => {
     const run = await store.create({
       workflowId: 'test-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
-    const envelope = await executeStep(store, guard, definition, {
+    const envelope = await executeStep(store, definition, {
       runId: run.id,
       command: 'step-one',
       input: { key: 'value' },
-      snapshotId: '0',
       dispatcher: echoDispatcher,
     });
 
@@ -77,105 +70,86 @@ describe('executeStep', () => {
     expect(envelope.data).toMatchObject({ key: 'value', echoed: true });
     expect(envelope.evidence).toHaveLength(1);
     expect(envelope.evidence[0]?.status).toBe('success');
-    expect(envelope.next_action).not.toBeNull();
-    expect(envelope.next_action?.human_readable).toContain('step-two');
+    // step-two is the next eligible agent step → appears in next_actions
+    expect(envelope.next_actions).toHaveLength(1);
+    expect(envelope.next_actions[0]?.human_readable).toContain('step-two');
     expect(envelope.context_hint).toBeDefined();
     expect(envelope.context_hint).not.toBe('');
 
     const updated = await store.get(run.id);
-    expect(updated.state).toBe('step_one_done');
-  });
-
-  it('snapshot mismatch returns error envelope', async () => {
-    const run = await store.create({
-      workflowId: 'test-wf',
-      workflowVersion: 1,
-      initialState: 'created',
-      params: {},
-    });
-
-    const envelope = await executeStep(store, guard, definition, {
-      runId: run.id,
-      command: 'step-one',
-      input: {},
-      snapshotId: '999',
-      dispatcher: echoDispatcher,
-    });
-
-    expect(envelope.status).toBe('error');
-    expect(envelope.errors[0]).toContain('Snapshot mismatch');
-    expect(envelope.agent_action).toBe('report_to_user');
-    // next_action is populated because run state is known; instruction is null
-    // because the next step (step-one) is auto and needs no agent call.
-    expect(envelope.next_action).not.toBeNull();
-    expect(envelope.next_action?.instruction).toBeNull();
-    expect(envelope.context_hint).toBeDefined();
-    expect(envelope.context_hint).not.toBe('');
+    expect(updated.completed_steps).toContain('step-one');
+    expect(updated.run_phase).toBe('running');
   });
 
   it('blocked state returns blocked envelope with blocked_reason', async () => {
     const run = await store.create({
       workflowId: 'test-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
-    const envelope = await executeStep(store, guard, definition, {
+    // step-two depends on step-one which hasn't run → not eligible
+    const envelope = await executeStep(store, definition, {
       runId: run.id,
       command: 'step-two',
       input: {},
-      snapshotId: '0',
       dispatcher: echoDispatcher,
     });
 
     expect(envelope.status).toBe('blocked');
     expect(envelope.blocked_reason).toBeDefined();
-    expect(envelope.blocked_reason?.current_state).toBe('created');
-    expect(envelope.blocked_reason?.allowed_states).toContain('step_one_done');
     expect(envelope.agent_action).toBe('resolve_precondition');
-    expect(envelope.next_action).not.toBeNull();
-    expect(envelope.next_action?.instruction).toBeNull();
-    expect(envelope.blocked_reason?.suggestion).toContain('next_action');
+    // next_actions contains step-one (auto — instruction is null)
+    expect(envelope.next_actions).toHaveLength(0); // auto step → no instruction → filtered out
+    expect(envelope.blocked_reason?.suggestion).toContain('step');
     expect(envelope.context_hint).toContain('step-two');
-    expect(envelope.context_hint).toContain('created');
   });
 
-  it('blocked state with no valid next step includes explanation in suggestion', async () => {
+  it('blocked state with no eligible steps includes explanation in suggestion', async () => {
+    // Workflow where every step has a depends_on dependency — nothing is eligible initially
+    const blockedDef: WorkflowDefinition = {
+      id: 'blocked-wf',
+      name: 'Blocked Workflow',
+      version: 1,
+      steps: {
+        'only-step': {
+          description: 'A step that depends on a non-existent step',
+          execution: 'agent',
+          depends_on: ['phantom-step'],
+        },
+      },
+    };
+
     const run = await store.create({
-      workflowId: 'test-wf',
+      workflowId: 'blocked-wf',
       workflowVersion: 1,
-      initialState: 'completed',
       params: {},
     });
 
-    const envelope = await executeStep(store, guard, definition, {
+    const envelope = await executeStep(store, blockedDef, {
       runId: run.id,
-      command: 'step-two',
+      command: 'only-step',
       input: {},
-      snapshotId: '0',
       dispatcher: echoDispatcher,
     });
 
     expect(envelope.status).toBe('blocked');
     expect(envelope.agent_action).toBe('resolve_precondition');
-    expect(envelope.next_action).toBeNull();
-    expect(envelope.blocked_reason?.suggestion).toContain('No valid next step');
+    expect(envelope.next_actions).toHaveLength(0);
+    expect(envelope.blocked_reason?.suggestion).toBeDefined();
   });
 
   it('dispatcher error returns error envelope with evidence', async () => {
     const run = await store.create({
       workflowId: 'test-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
-    const envelope = await executeStep(store, guard, definition, {
+    const envelope = await executeStep(store, definition, {
       runId: run.id,
       command: 'step-one',
       input: {},
-      snapshotId: '0',
       dispatcher: failDispatcher,
     });
 
@@ -186,47 +160,49 @@ describe('executeStep', () => {
     expect(envelope.context_hint).toContain('step-one');
   });
 
-  it('completing final step sets terminal_state true', async () => {
+  it('completing final step sets run_phase to completed', async () => {
     const run = await store.create({
       workflowId: 'test-wf',
       workflowVersion: 1,
-      initialState: 'step_one_done',
       params: {},
     });
 
-    const envelope = await executeStep(store, guard, definition, {
+    // Step-one must complete before step-two can run.
+    await executeStep(store, definition, {
+      runId: run.id,
+      command: 'step-one',
+      input: {},
+      dispatcher: echoDispatcher,
+    });
+
+    const envelope = await executeStep(store, definition, {
       runId: run.id,
       command: 'step-two',
       input: {},
-      snapshotId: '0',
       dispatcher: echoDispatcher,
     });
 
     expect(envelope.status).toBe('ok');
-    expect(envelope.next_action).toBeNull();
+    expect(envelope.next_actions).toHaveLength(0);
     expect(envelope.context_hint).toContain('get_run_state');
     expect(envelope.context_hint).toContain(run.id);
 
     const updated = await store.get(run.id);
-    expect(updated.state).toBe('completed');
-    expect(updated.terminal_state).toBe(true);
+    expect(updated.run_phase).toBe('completed');
   });
 
   it('unknown run ID returns error envelope', async () => {
-    const envelope = await executeStep(store, guard, definition, {
+    const envelope = await executeStep(store, definition, {
       runId: 'does-not-exist',
       command: 'step-one',
       input: {},
-      snapshotId: '0',
       dispatcher: echoDispatcher,
     });
 
     expect(envelope.status).toBe('error');
     expect(envelope.errors[0]).toContain('Run not found');
-    // InMemoryStore throws agentAction: 'report_to_user' for missing runs.
-    // Step 1 run-load failure always returns next_action: null (no run state to recover from).
     expect(envelope.agent_action).toBe('report_to_user');
-    expect(envelope.next_action).toBeNull();
+    expect(envelope.next_actions).toHaveLength(0);
   });
 
   it('input schema validation blocks dispatch when input is invalid', async () => {
@@ -236,7 +212,7 @@ describe('executeStep', () => {
       return echoDispatcher(step, input, run, _signal);
     };
 
-    const schemaDefinition = {
+    const schemaDefinition: WorkflowDefinition = {
       ...definition,
       steps: {
         ...definition.steps,
@@ -250,30 +226,27 @@ describe('executeStep', () => {
         },
       },
     };
-    const schemaGuard = new StateGuard(schemaDefinition);
     const run = await store.create({
       workflowId: 'test-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
-    const envelope = await executeStep(store, schemaGuard, schemaDefinition, {
+    const envelope = await executeStep(store, schemaDefinition, {
       runId: run.id,
       command: 'step-one',
       input: {}, // missing required 'name' field
-      snapshotId: '0',
       dispatcher: spy,
     });
 
     expect(envelope.status).toBe('error');
     expect(dispatchCalled).not.toHaveBeenCalled();
     expect(envelope.agent_action).toBe('provide_input');
-    expect(envelope.next_action).not.toBeNull();
+    expect(envelope.next_actions).toHaveLength(0);
   });
 
   it('input schema validation passes through for valid input', async () => {
-    const schemaDefinition = {
+    const schemaDefinition: WorkflowDefinition = {
       ...definition,
       steps: {
         ...definition.steps,
@@ -287,19 +260,16 @@ describe('executeStep', () => {
         },
       },
     };
-    const schemaGuard = new StateGuard(schemaDefinition);
     const run = await store.create({
       workflowId: 'test-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
-    const envelope = await executeStep(store, schemaGuard, schemaDefinition, {
+    const envelope = await executeStep(store, schemaDefinition, {
       runId: run.id,
       command: 'step-one',
       input: { name: 'Alice' },
-      snapshotId: '0',
       dispatcher: echoDispatcher,
     });
 
@@ -315,7 +285,6 @@ describe('executeStep', () => {
       id: 'adapter-wf',
       name: 'Adapter Workflow',
       version: 1,
-      initial_state: 'created',
       services: {
         my_service: { adapter: 'mock_adapter', trust: 'engine_delivered' },
       },
@@ -323,13 +292,11 @@ describe('executeStep', () => {
         fetch_data: {
           description: 'Fetch data from a service',
           execution: 'auto',
-          allowed_from_states: ['created'],
-          produces_state: 'fetched',
+          depends_on: [],
           uses_service: 'my_service',
         },
       },
     };
-    const adapterGuard = new StateGuard(adapterDefinition);
 
     function makeAdapter(data: Record<string, unknown>): ServiceAdapter {
       return {
@@ -348,15 +315,13 @@ describe('executeStep', () => {
       const run = await store.create({
         workflowId: 'adapter-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      const envelope = await executeStep(store, adapterGuard, adapterDefinition, {
+      const envelope = await executeStep(store, adapterDefinition, {
         runId: run.id,
         command: 'fetch_data',
         input: { doc_id: 'abc' },
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
@@ -376,33 +341,28 @@ describe('executeStep', () => {
         id: 'adapter-wf',
         name: 'Adapter Workflow',
         version: 1,
-        initial_state: 'created',
         // no services block
         steps: {
           fetch_data: {
             description: 'Fetch data from a service',
             execution: 'auto',
-            allowed_from_states: ['created'],
-            produces_state: 'fetched',
+            depends_on: [],
             uses_service: 'my_service',
           },
         },
       };
-      const badGuard = new StateGuard(badDefinition);
       const registry = new ExtensionRegistry();
 
       const run = await store.create({
         workflowId: 'adapter-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      const envelope = await executeStep(store, badGuard, badDefinition, {
+      const envelope = await executeStep(store, badDefinition, {
         runId: run.id,
         command: 'fetch_data',
         input: {},
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
@@ -417,15 +377,13 @@ describe('executeStep', () => {
       const run = await store.create({
         workflowId: 'adapter-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      const envelope = await executeStep(store, adapterGuard, adapterDefinition, {
+      const envelope = await executeStep(store, adapterDefinition, {
         runId: run.id,
         command: 'fetch_data',
         input: {},
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
@@ -443,15 +401,13 @@ describe('executeStep', () => {
       const run = await store.create({
         workflowId: 'adapter-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      const envelope = await executeStep(store, adapterGuard, adapterDefinition, {
+      const envelope = await executeStep(store, adapterDefinition, {
         runId: run.id,
         command: 'fetch_data',
         input: {},
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
@@ -468,15 +424,13 @@ describe('executeStep', () => {
       const run = await store.create({
         workflowId: 'adapter-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      await executeStep(store, adapterGuard, adapterDefinition, {
+      await executeStep(store, adapterDefinition, {
         runId: run.id,
         command: 'fetch_data',
         input: {},
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
@@ -505,20 +459,17 @@ describe('executeStep', () => {
           },
         },
       };
-      const g = new StateGuard(def);
 
       const run = await store.create({
         workflowId: 'adapter-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      const envelope = await executeStep(store, g, def, {
+      const envelope = await executeStep(store, def, {
         runId: run.id,
         command: 'fetch_data',
         input: {},
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
@@ -547,20 +498,17 @@ describe('executeStep', () => {
           },
         },
       };
-      const g = new StateGuard(def);
 
       const run = await store.create({
         workflowId: 'adapter-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      const envelope = await executeStep(store, g, def, {
+      const envelope = await executeStep(store, def, {
         runId: run.id,
         command: 'fetch_data',
         input: {},
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
@@ -578,15 +526,13 @@ describe('executeStep', () => {
       const run = await store.create({
         workflowId: 'adapter-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      await executeStep(store, adapterGuard, adapterDefinition, {
+      await executeStep(store, adapterDefinition, {
         runId: run.id,
         command: 'fetch_data',
         input: {},
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
@@ -613,20 +559,17 @@ describe('executeStep', () => {
           },
         },
       };
-      const g = new StateGuard(def);
 
       const run = await store.create({
         workflowId: 'adapter-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      await executeStep(store, g, def, {
+      await executeStep(store, def, {
         runId: run.id,
         command: 'fetch_data',
         input: {},
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
@@ -649,18 +592,15 @@ describe('executeStep', () => {
       id: 'handler-wf',
       name: 'Handler Workflow',
       version: 1,
-      initial_state: 'created',
       steps: {
         validate: {
           description: 'Run custom validation logic',
           execution: 'auto',
-          allowed_from_states: ['created'],
-          produces_state: 'validated',
+          depends_on: [],
           handler: 'my_handler',
         },
       },
     };
-    const handlerGuard = new StateGuard(handlerDefinition);
 
     function makeHandler(data: Record<string, unknown>): StepHandler {
       return {
@@ -679,15 +619,13 @@ describe('executeStep', () => {
       const run = await store.create({
         workflowId: 'handler-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: { source: 'doc-1' },
       });
 
-      const envelope = await executeStep(store, handlerGuard, handlerDefinition, {
+      const envelope = await executeStep(store, handlerDefinition, {
         runId: run.id,
         command: 'validate',
         input: { threshold: 0.9 },
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
@@ -710,15 +648,13 @@ describe('executeStep', () => {
       const run = await store.create({
         workflowId: 'handler-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      const envelope = await executeStep(store, handlerGuard, handlerDefinition, {
+      const envelope = await executeStep(store, handlerDefinition, {
         runId: run.id,
         command: 'validate',
         input: {},
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
@@ -728,14 +664,10 @@ describe('executeStep', () => {
     });
 
     it('passes prior step outputs as context.resources to the handler', async () => {
-      // Two-step workflow: first step uses adapter, second uses handler.
-      // We run only the handler step here and verify resources are populated
-      // by pre-populating the run store's evidence through a first step execution.
       const twoStepDefinition: WorkflowDefinition = {
         id: 'two-step-wf',
         name: 'Two Step Workflow',
         version: 1,
-        initial_state: 'created',
         services: {
           docs: { adapter: 'mock_adapter', trust: 'engine_delivered' },
         },
@@ -743,20 +675,17 @@ describe('executeStep', () => {
           fetch_doc: {
             description: 'Fetch document',
             execution: 'auto',
-            allowed_from_states: ['created'],
-            produces_state: 'fetched',
+            depends_on: [],
             uses_service: 'docs',
           },
           run_validation: {
             description: 'Validate fetched document',
             execution: 'auto',
-            allowed_from_states: ['fetched'],
-            produces_state: 'done',
+            depends_on: ['fetch_doc'],
             handler: 'my_handler',
           },
         },
       };
-      const twoStepGuard = new StateGuard(twoStepDefinition);
 
       const capturedContext: StepContext[] = [];
       const handler: StepHandler = {
@@ -783,27 +712,22 @@ describe('executeStep', () => {
       const run = await store.create({
         workflowId: 'two-step-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
       // Execute the adapter step first so its evidence is stored.
-      await executeStep(store, twoStepGuard, twoStepDefinition, {
+      await executeStep(store, twoStepDefinition, {
         runId: run.id,
         command: 'fetch_doc',
         input: {},
-        snapshotId: '0',
         dispatcher: echoDispatcher,
         registry,
       });
 
-      const updatedRun = await store.get(run.id);
-
-      await executeStep(store, twoStepGuard, twoStepDefinition, {
+      await executeStep(store, twoStepDefinition, {
         runId: run.id,
         command: 'run_validation',
         input: {},
-        snapshotId: updatedRun.version.toString(),
         dispatcher: echoDispatcher,
         registry,
       });
@@ -811,7 +735,6 @@ describe('executeStep', () => {
       expect(capturedContext).toHaveLength(1);
       const ctx = capturedContext[0]!;
       expect(ctx.resources).toBeDefined();
-      // The adapter step's output_summary should be available under 'fetch_doc'.
       expect(ctx.resources!['fetch_doc']).toBeDefined();
     });
   });
@@ -821,50 +744,45 @@ describe('executeStep', () => {
   // ---------------------------------------------------------------------------
 
   describe('step.prompt resolution', () => {
-    it('resolves step.prompt into next_action.prompt after a step completes', async () => {
+    it('resolves step.prompt into next_actions[].prompt after a step completes', async () => {
       const promptDefinition: WorkflowDefinition = {
         id: 'prompt-wf',
         name: 'Prompt Workflow',
         version: 1,
-        initial_state: 'created',
         steps: {
           'step-one': {
             description: 'First step',
             execution: 'auto',
-            allowed_from_states: ['created'],
-            produces_state: 'step_one_done',
+            depends_on: [],
           },
           'step-two': {
             description: 'Second step',
             execution: 'agent',
-            allowed_from_states: ['step_one_done'],
-            produces_state: 'completed',
+            depends_on: ['step-one'],
             prompt: 'Use result: {{ context.resources.step-one.key }}',
           },
         },
       };
-      const promptGuard = new StateGuard(promptDefinition);
 
       const run = await store.create({
         workflowId: 'prompt-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
       const stepOneDispatcher: StepDispatcher = async () => ({ key: 'value-from-step-one' });
 
-      const envelope = await executeStep(store, promptGuard, promptDefinition, {
+      const envelope = await executeStep(store, promptDefinition, {
         runId: run.id,
         command: 'step-one',
         input: {},
-        snapshotId: '0',
         dispatcher: stepOneDispatcher,
       });
 
       expect(envelope.status).toBe('ok');
-      expect(envelope.next_action).toBeDefined();
-      expect(envelope.next_action?.prompt).toBe('Use result: value-from-step-one');
+      const nextAction = envelope.next_actions.find((a) => a.human_readable?.includes('step-two'));
+      expect(nextAction).toBeDefined();
+      expect(nextAction?.prompt).toBe('Use result: value-from-step-one');
     });
 
     it('resolves step.prompt into gate.display when step has trust: human_confirmed', async () => {
@@ -872,52 +790,41 @@ describe('executeStep', () => {
         id: 'gate-prompt-wf',
         name: 'Gate Prompt Workflow',
         version: 1,
-        initial_state: 'created',
         steps: {
           'step-one': {
             description: 'First step',
             execution: 'auto',
-            allowed_from_states: ['created'],
-            produces_state: 'step_one_done',
+            depends_on: [],
           },
           'gate-step': {
             description: 'Gate step',
             execution: 'auto',
             trust: 'human_confirmed',
-            allowed_from_states: ['step_one_done'],
-            produces_state: 'completed',
+            depends_on: ['step-one'],
             prompt: 'Risk: {{ context.resources.step-one.risk }}',
           },
         },
       };
-      const gatePromptGuard = new StateGuard(gatePromptDefinition);
 
-      // Run step-one first so evidence is populated.
       const run = await store.create({
         workflowId: 'gate-prompt-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
       const stepOneDispatcher: StepDispatcher = async () => ({ risk: 'high' });
-
-      await executeStep(store, gatePromptGuard, gatePromptDefinition, {
+      await executeStep(store, gatePromptDefinition, {
         runId: run.id,
         command: 'step-one',
         input: {},
-        snapshotId: '0',
         dispatcher: stepOneDispatcher,
       });
 
-      const updatedRun = await store.get(run.id);
-
       const gateDispatcher: StepDispatcher = async () => ({});
-      const envelope = await executeStep(store, gatePromptGuard, gatePromptDefinition, {
+      const envelope = await executeStep(store, gatePromptDefinition, {
         runId: run.id,
         command: 'gate-step',
         input: {},
-        snapshotId: updatedRun.version.toString(),
         dispatcher: gateDispatcher,
       });
 
@@ -926,134 +833,121 @@ describe('executeStep', () => {
     });
   });
 
-  describe('findNextAction instruction population', () => {
+  // ---------------------------------------------------------------------------
+  // buildNextActions instruction population
+  // ---------------------------------------------------------------------------
+
+  describe('buildNextActions instruction population', () => {
     it('populates instruction with execute_step for an agent step', async () => {
       const agentStepDef: WorkflowDefinition = {
         id: 'agent-instr-wf',
         name: 'Agent Instruction Workflow',
         version: 1,
-        initial_state: 'created',
         steps: {
           'review-code': {
             description: 'Review the code',
             execution: 'agent',
-            allowed_from_states: ['created'],
-            produces_state: 'completed',
+            depends_on: [],
             input_schema: { required: ['findings'], properties: { findings: { type: 'array' } } },
           },
         },
       };
 
-      const { findNextAction } = await import('./execution-loop.js');
-      const result = findNextAction('created', agentStepDef, {
-        evidenceByStep: {},
-        runParams: {},
-        runId: 'test-run-id',
+      const run = await store.create({
+        workflowId: 'agent-instr-wf',
+        workflowVersion: 1,
+        params: {},
       });
 
-      expect(result).not.toBeNull();
-      expect(result!.instruction).not.toBeNull();
-      expect(result!.instruction!.tool).toBe('execute_step');
-      expect((result!.instruction!.params as Record<string, unknown>)['command']).toBe(
-        'review-code',
-      );
-      expect((result!.instruction!.params as Record<string, unknown>)['run_id']).toBe(
-        'test-run-id',
-      );
-      expect(result!.input_schema).toEqual(agentStepDef.steps['review-code']?.input_schema);
-      // instruction.params must NOT contain input_schema
-      expect(
-        (result!.instruction!.params as Record<string, unknown>)['input_schema'],
-      ).toBeUndefined();
-      expect(result!.instruction!.call_with).toBeDefined();
-      expect((result!.instruction!.call_with as Record<string, unknown>)['run_id']).toBe(
-        'test-run-id',
-      );
-      expect((result!.instruction!.call_with as Record<string, unknown>)['command']).toBe(
-        'review-code',
-      );
-      // input_schema is present → params should be a skeleton object, not a string
-      const callWithParams = (result!.instruction!.call_with as Record<string, unknown>)['params'];
+      const actions = buildNextActions(agentStepDef, run);
+      expect(actions).toHaveLength(1);
+      const action = actions[0]!;
+      expect(action.instruction).not.toBeNull();
+      expect(action.instruction!.tool).toBe('execute_step');
+      expect((action.instruction!.params as Record<string, unknown>)['command']).toBe('review-code');
+      expect((action.instruction!.params as Record<string, unknown>)['run_id']).toBe(run.id);
+      expect(action.input_schema).toEqual(agentStepDef.steps['review-code']?.input_schema);
+      expect((action.instruction!.params as Record<string, unknown>)['input_schema']).toBeUndefined();
+      expect(action.instruction!.call_with).toBeDefined();
+      expect((action.instruction!.call_with as Record<string, unknown>)['run_id']).toBe(run.id);
+      expect((action.instruction!.call_with as Record<string, unknown>)['command']).toBe('review-code');
+      // input_schema is present → call_with.params is a skeleton object
+      const callWithParams = (action.instruction!.call_with as Record<string, unknown>)['params'];
       expect(typeof callWithParams).toBe('object');
       expect(callWithParams).not.toBeNull();
     });
 
-    it('returns instruction: null for an auto step without a handler', async () => {
+    it('returns no actions for an auto step without a handler', async () => {
       const autoStepDef: WorkflowDefinition = {
         id: 'auto-instr-wf',
         name: 'Auto Instruction Workflow',
         version: 1,
-        initial_state: 'created',
         steps: {
           'fetch-data': {
             description: 'Fetch data automatically',
             execution: 'auto',
-            allowed_from_states: ['created'],
-            produces_state: 'completed',
+            depends_on: [],
           },
         },
       };
 
-      const { findNextAction } = await import('./execution-loop.js');
-      const result = findNextAction('created', autoStepDef, {
-        evidenceByStep: {},
-        runParams: {},
-        runId: 'test-run-id',
+      const run = await store.create({
+        workflowId: 'auto-instr-wf',
+        workflowVersion: 1,
+        params: {},
       });
 
-      expect(result).not.toBeNull();
-      expect(result!.instruction).toBeNull();
+      // Auto steps without handlers are filtered out of next_actions
+      const actions = buildNextActions(autoStepDef, run);
+      expect(actions).toHaveLength(0);
     });
   });
 
-  describe('confirm_required next_action population', () => {
-    it('confirm_required response has next_action instruction pointing to submit_human_response', async () => {
+  // ---------------------------------------------------------------------------
+  // confirm_required next_actions population
+  // ---------------------------------------------------------------------------
+
+  describe('confirm_required next_actions population', () => {
+    it('confirm_required response has next_actions instruction pointing to submit_human_response', async () => {
       const gateWorkflow: WorkflowDefinition = {
         id: 'gate-nav-wf',
         name: 'Gate Navigation Workflow',
         version: 1,
-        initial_state: 'created',
         steps: {
           gate_step: {
             description: 'Gate step requiring human approval',
             execution: 'auto',
             trust: 'human_confirmed',
-            allowed_from_states: ['created'],
-            produces_state: 'approved',
+            depends_on: [],
           },
         },
       };
-      const gateGuard = new StateGuard(gateWorkflow);
       const run = await store.create({
         workflowId: 'gate-nav-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      const envelope = await executeStep(store, gateGuard, gateWorkflow, {
+      const envelope = await executeStep(store, gateWorkflow, {
         runId: run.id,
         command: 'gate_step',
         input: {},
-        snapshotId: '0',
         dispatcher: echoDispatcher,
       });
 
       expect(envelope.status).toBe('confirm_required');
-      expect(envelope.next_action).not.toBeNull();
-      expect(envelope.next_action!.instruction).not.toBeNull();
-      expect(envelope.next_action!.instruction!.tool).toBe('submit_human_response');
-      expect((envelope.next_action!.instruction!.params as Record<string, unknown>)['run_id']).toBe(
-        run.id,
+      expect(envelope.next_actions).toHaveLength(1);
+      const gateAction = envelope.next_actions[0]!;
+      expect(gateAction.instruction).not.toBeNull();
+      expect(gateAction.instruction!.tool).toBe('submit_human_response');
+      expect((gateAction.instruction!.params as Record<string, unknown>)['run_id']).toBe(run.id);
+      expect((gateAction.instruction!.params as Record<string, unknown>)['gate_id']).toBe(
+        envelope.gate!.gate_id,
       );
-      expect(
-        (envelope.next_action!.instruction!.params as Record<string, unknown>)['gate_id'],
-      ).toBe(envelope.gate!.gate_id);
       expect(envelope.gate!.response_spec).toBeDefined();
       expect(envelope.gate!.response_spec!.choices).toContain('approve');
       expect(envelope.gate!.response_spec!.choices).toContain('reject');
-      expect(envelope.next_action!.instruction!.call_with).toBeDefined();
-      const callWith = envelope.next_action!.instruction!.call_with as Record<string, unknown>;
+      const callWith = gateAction.instruction!.call_with as Record<string, unknown>;
       expect(callWith['run_id']).toBe(run.id);
       expect(callWith['gate_id']).toBe(envelope.gate!.gate_id);
       expect(typeof callWith['choice']).toBe('string');
@@ -1073,33 +967,30 @@ describe('executeStep', () => {
       const run = await store.create({
         workflowId: 'test-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      // Allow the first store.update (pending state) to succeed; throw on the second
-      // (the cleanup write that marks the run as failed after dispatch failure).
-      let updateCount = 0;
+      // Step claiming is now done via store.claimStep (not store.update), so the first
+      // store.update call is the cleanup write that marks the run as failed.
+      // Throw on every store.update call to simulate cleanup failure.
       const originalUpdate = store.update.bind(store);
-      vi.spyOn(store, 'update').mockImplementation(async (record) => {
-        updateCount++;
-        if (updateCount >= 2) throw new Error('store write failed');
-        return originalUpdate(record);
+      vi.spyOn(store, 'update').mockImplementation(async (_record) => {
+        throw new Error('store write failed');
+        return originalUpdate(_record);
       });
 
       try {
-        const envelope = await executeStep(store, guard, definition, {
+        const envelope = await executeStep(store, definition, {
           runId: run.id,
           command: 'step-one',
           input: {},
-          snapshotId: '0',
           dispatcher: failDispatcher,
         });
 
         expect(envelope.status).toBe('error');
         expect(envelope.errors[0]).toContain('step failed');
         expect(envelope.warnings).toHaveLength(1);
-        expect(envelope.warnings[0]).toMatch(/Failed to mark run as failed/);
+        expect(envelope.warnings[0]).toMatch(/Failed to persist step failure/);
       } finally {
         vi.restoreAllMocks();
       }
@@ -1107,51 +998,45 @@ describe('executeStep', () => {
   });
 
   describe('executeChain command override', () => {
-    it('executeChain echoes the submitted command even when chaining into an auto step', async () => {
+    it('executeChain echoes the submitted command even when chaining into an auto gate step', async () => {
       const chainWorkflow: WorkflowDefinition = {
         id: 'chain-cmd-wf',
         name: 'Chain Command Workflow',
         version: 1,
-        initial_state: 'created',
         steps: {
           agent_step: {
             description: 'Agent step',
             execution: 'agent',
-            allowed_from_states: ['created'],
-            produces_state: 'auto_pending',
+            depends_on: [],
           },
-          auto_step: {
-            description: 'Auto step',
+          auto_gate: {
+            description: 'Auto gate step that follows agent_step',
             execution: 'auto',
             trust: 'human_confirmed',
-            allowed_from_states: ['auto_pending'],
-            produces_state: 'completed',
+            depends_on: ['agent_step'],
           },
         },
       };
-      const chainGuard = new StateGuard(chainWorkflow);
 
       const run = await store.create({
         workflowId: 'chain-cmd-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      const envelope = await executeChain(store, chainGuard, chainWorkflow, {
+      const envelope = await executeChain(store, chainWorkflow, {
         runId: run.id,
         command: 'agent_step',
         input: {},
-        snapshotId: run.version.toString(),
         dispatcher: echoDispatcher,
       });
 
-      // The agent submitted 'agent_step'; the chain ran into 'auto_step' (gate).
+      // The agent submitted 'agent_step'; the chain ran into 'auto_gate' (gate).
       // The returned envelope's command must reflect the submitted step.
       expect(envelope.command).toBe('agent_step');
       // Inner step info is preserved via gate.
       expect(envelope.status).toBe('confirm_required');
-      expect(envelope.gate!.step_name).toBe('auto_step');
+      expect(envelope.gate!.step_name).toBe('auto_gate');
     });
   });
 
@@ -1162,13 +1047,11 @@ describe('executeStep', () => {
         id: 'profile-wf',
         name: 'Profile Workflow',
         version: 1,
-        initial_state: 'created',
         steps: {
           profiled_step: {
             description: 'Profiled agent step',
             execution: 'agent',
-            allowed_from_states: ['created'],
-            produces_state: 'done',
+            depends_on: [],
             agent_profile: 'my-profile',
           },
         },
@@ -1176,20 +1059,17 @@ describe('executeStep', () => {
           'my-profile': { content: 'You are a specialist.', content_hash: profileHash },
         },
       };
-      const profileGuard = new StateGuard(profiledWorkflow);
 
       const run = await store.create({
         workflowId: 'profile-wf',
         workflowVersion: 1,
-        initialState: 'created',
         params: {},
       });
 
-      const envelope = await executeStep(store, profileGuard, profiledWorkflow, {
+      const envelope = await executeStep(store, profiledWorkflow, {
         runId: run.id,
         command: 'profiled_step',
         input: { data: 'value' },
-        snapshotId: run.version.toString(),
         dispatcher: echoDispatcher,
       });
 
@@ -1203,15 +1083,21 @@ describe('executeStep', () => {
       const run = await store.create({
         workflowId: 'test-wf',
         workflowVersion: 1,
-        initialState: 'step_one_done',
         params: {},
       });
 
-      const envelope = await executeStep(store, guard, definition, {
+      // First run step-one so step-two is eligible
+      await executeStep(store, definition, {
+        runId: run.id,
+        command: 'step-one',
+        input: {},
+        dispatcher: echoDispatcher,
+      });
+
+      const envelope = await executeStep(store, definition, {
         runId: run.id,
         command: 'step-two',
         input: { data: 'value' },
-        snapshotId: run.version.toString(),
         dispatcher: echoDispatcher,
       });
 

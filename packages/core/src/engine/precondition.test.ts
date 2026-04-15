@@ -9,7 +9,6 @@ import {
   evaluateAllPreconditions,
 } from './precondition.js';
 import { executeStep } from './execution-loop.js';
-import { StateGuard } from './state-guard.js';
 import { JsonFileStore } from '../store/json-file-store.js';
 import type { WorkflowDefinition } from '../types/workflow-definition.js';
 
@@ -63,38 +62,40 @@ describe('executeStep blocks when precondition fails', () => {
       id: 'precond-wf',
       name: 'Precondition Workflow',
       version: 1,
-      initial_state: 'created',
       steps: {
         'step-a': {
           description: 'Produces some output',
           execution: 'auto',
-          allowed_from_states: ['created'],
-          produces_state: 'step_a_done',
+          depends_on: [],
         },
         'step-b': {
           description: 'Requires step-a to have run with count > 0',
           execution: 'auto',
-          allowed_from_states: ['step_a_done'],
-          produces_state: 'completed',
+          depends_on: ['step-a'],
           preconditions: ['step-a.result.count > 0'],
         },
       },
     };
 
     const store = new JsonFileStore(dir);
-    const guard = new StateGuard(preconditionDef);
     const run = await store.create({
       workflowId: 'precond-wf',
       workflowVersion: 1,
-      initialState: 'step_a_done', // skip step-a (count never set → precondition fails)
       params: {},
     });
 
-    const envelope = await executeStep(store, guard, preconditionDef, {
+    // Execute step-a with count: 0 — satisfies depends_on but NOT the precondition.
+    await executeStep(store, preconditionDef, {
+      runId: run.id,
+      command: 'step-a',
+      input: {},
+      dispatcher: async () => ({ result: { count: 0 } }),
+    });
+
+    const envelope = await executeStep(store, preconditionDef, {
       runId: run.id,
       command: 'step-b',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: async () => ({}),
     });
 

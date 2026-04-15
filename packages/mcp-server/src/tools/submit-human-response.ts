@@ -26,7 +26,6 @@ export async function handleSubmitHumanResponse(
     runId: args.run_id,
     gateId: args.gate_id,
     choice: args.choice,
-    snapshotId: run.version.toString(),
   });
 }
 
@@ -43,12 +42,8 @@ export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunS
     async (args) => {
       try {
         const result = await handleSubmitHumanResponse(args, opts);
-        const { snapshot_id: _snap, ...slimResult } = { ...result, data: {}, evidence: [] };
-        return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...result, data: {}, evidence: [] }, null, 2) }] };
       } catch (err) {
-        // submitHumanResponse handles all WorkflowErrors internally and always returns a ResponseEnvelope.
-        // This catch exists only for unexpected infrastructure exceptions (e.g. store driver bug)
-        // where envelope construction is not possible.
         const message = err instanceof Error ? err.message : String(err);
         return {
           content: [
@@ -58,6 +53,7 @@ export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunS
                 {
                   command: 'submit_human_response',
                   run_id: args.run_id,
+                  run_version: 0,
                   status: 'error',
                   data: {},
                   evidence: [],
@@ -65,7 +61,7 @@ export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunS
                   errors: [message],
                   agent_action: 'stop',
                   context_hint: `Error submitting response for run '${args.run_id}'.`,
-                  next_action: null,
+                  next_actions: [],
                 },
                 null,
                 2,
@@ -77,3 +73,4 @@ export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunS
     },
   );
 }
+

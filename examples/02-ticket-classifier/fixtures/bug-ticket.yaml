@@ -21,16 +21,21 @@ mocks:
         line_count: 10
         size_bytes: 320
 agent_responses:
+  identify_ticket:
+    customer_id: CUST-3847
+    product_area: payment gateway
+    product_version: v2.14.1
+    reported_issue: Payment gateway timing out intermittently since 08:15 UTC, causing 504 errors on 30% of checkout attempts.
   classify_ticket:
     category: bug
     priority: critical
-    ticket_title: Payment gateway timing out — 30% of checkouts failing
-    customer_id: CUST-3847
     one_line_summary: Payment gateway 504 errors since 08:15 UTC, affecting 30% of checkout attempts.
 expected:
   final_state: completed
   evidence:
     - step_id: read_ticket
+      status: success
+    - step_id: identify_ticket
       status: success
     - step_id: classify_ticket
       status: success

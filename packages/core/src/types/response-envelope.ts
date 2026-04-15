@@ -26,8 +26,8 @@ export interface NextAction {
 export type RunStatus = 'ok' | 'error' | 'blocked' | 'confirm_required';
 
 export interface BlockedReason {
-  current_state: string;
-  allowed_states: string[];
+  /** Step names currently eligible for execution. */
+  eligible_steps: string[];
   suggestion?: string;
 }
 
@@ -47,15 +47,14 @@ export interface GateInfo {
 export interface ResponseEnvelope {
   command: string;
   run_id: string;
-  /** Opaque version token for optimistic concurrency. Pass back as snapshotId in your next call. For auditing only — do not parse. */
-  snapshot_id: string;
+  /** Integer version of the run record at time of response. For observability only — not required as input to any tool. */
+  run_version: number;
   /**
    * Chain progress status.
-   * - 'ok': the chain made forward progress; follow next_action for what to do next.
-   *   Does NOT imply the original requested step succeeded — a branched recovery path
-   *   also returns 'ok' with a warning carrying the original error.
+   * - 'ok': the chain made forward progress; follow next_actions for what to do next.
+   *   Does NOT imply the original requested step succeeded — a recovery path also returns 'ok' with a warning.
    * - 'error': unrecoverable failure; agent_action tells you how to respond.
-   * - 'blocked': wrong step for current state; next_action redirects.
+   * - 'blocked': wrong step for current state; next_actions redirects.
    * - 'confirm_required': a human gate is open; gate carries the display content.
    */
   status: RunStatus;
@@ -67,13 +66,15 @@ export interface ResponseEnvelope {
   agent_action?: AgentAction;
   /** Current state orientation. Always populated — describes what just happened and what state the run is in. */
   context_hint: string;
-  next_action: NextAction | null;
+  /** Steps available for execution. Empty array means terminal or blocked — check status and run_phase. */
+  next_actions: NextAction[];
   blocked_reason?: BlockedReason;
   gate?: GateInfo;
   /**
-   * Names and produced states of auto steps that ran silently as part of an executeChain call.
+   * Names and run_phase values of auto steps that ran silently as part of an executeChain call.
    * Only present when at least one auto step was chained. Useful for debugging and orientation
    * after start_run or after an agent step that triggers subsequent auto steps.
    */
-  chained_auto_steps?: Array<{ step: string; produced_state: string; branched_via?: string }>;
+  chained_auto_steps?: Array<{ step: string; run_phase: string; branched_via?: string }>;
 }
+

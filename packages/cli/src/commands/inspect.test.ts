@@ -29,7 +29,11 @@ function makeRun(evidence: EvidenceSnapshot[] = [], overrides: Partial<RunRecord
     id: 'run_test1',
     workflow_id: 'test-workflow',
     workflow_version: 1,
-    state: 'completed',
+    run_phase: 'completed',
+    completed_steps: [],
+    in_progress_steps: [],
+    failed_steps: [],
+    skipped_steps: [],
     version: 1,
     params: {},
     evidence,
@@ -70,13 +74,10 @@ const basicDef: WorkflowDefinition = {
   id: 'test-workflow',
   name: 'Test Workflow',
   version: 1,
-  initial_state: 'created',
   steps: {
     step_one: {
       description: 'First step',
       execution: 'agent',
-      allowed_from_states: ['created'],
-      produces_state: 'completed',
     },
   },
 };

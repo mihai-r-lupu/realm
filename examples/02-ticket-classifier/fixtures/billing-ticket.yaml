@@ -19,16 +19,21 @@ mocks:
         line_count: 9
         size_bytes: 280
 agent_responses:
+  identify_ticket:
+    customer_id: CUST-1122
+    product_area: billing
+    product_version: unknown
+    reported_issue: Customer was charged twice for the March invoice and is requesting a $499.00 refund.
   classify_ticket:
     category: billing
     priority: high
-    ticket_title: Double charge on March invoice — refund requested
-    customer_id: CUST-1122
     one_line_summary: Customer billed twice for March; requesting $499.00 refund for the duplicate charge.
 expected:
   final_state: completed
   evidence:
     - step_id: read_ticket
+      status: success
+    - step_id: identify_ticket
       status: success
     - step_id: classify_ticket
       status: success

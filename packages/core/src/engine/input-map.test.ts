@@ -4,7 +4,6 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { executeStep } from './execution-loop.js';
-import { StateGuard } from './state-guard.js';
 import { JsonFileStore } from '../store/json-file-store.js';
 import type { WorkflowDefinition } from '../types/workflow-definition.js';
 import type { StepDispatcher } from './execution-loop.js';
@@ -26,14 +25,12 @@ describe('input_map', () => {
       id: 'imap-wf',
       name: 'InputMap Workflow',
       version: 1,
-      initial_state: 'created',
       services: { svc: { adapter: 'mock', trust: 'engine_delivered' } },
       steps: {
         fetch: {
           description: 'Fetch without input_map',
           execution: 'auto',
-          allowed_from_states: ['created'],
-          produces_state: 'done',
+          depends_on: [],
           uses_service: 'svc',
         },
       },
@@ -43,19 +40,16 @@ describe('input_map', () => {
     const registry = new ExtensionRegistry();
     registry.register('adapter', 'mock', adapter);
     const store = new JsonFileStore(dir);
-    const guard = new StateGuard(def);
     const run = await store.create({
       workflowId: 'imap-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
-    await executeStep(store, guard, def, {
+    await executeStep(store, def, {
       runId: run.id,
       command: 'fetch',
       input: { doc_id: 'xyz' },
-      snapshotId: run.version.toString(),
       dispatcher: noOpDispatcher,
       registry,
     });
@@ -73,20 +67,17 @@ describe('input_map', () => {
       id: 'imap-wf',
       name: 'InputMap Workflow',
       version: 1,
-      initial_state: 'created',
       services: { svc: { adapter: 'mock', trust: 'engine_delivered' } },
       steps: {
         setup: {
           description: 'Agent step that produces state',
           execution: 'agent',
-          allowed_from_states: ['created'],
-          produces_state: 'ready',
+          depends_on: [],
         },
         'call-api': {
           description: 'Auto step using run.params via input_map',
           execution: 'auto',
-          allowed_from_states: ['ready'],
-          produces_state: 'done',
+          depends_on: ['setup'],
           uses_service: 'svc',
           input_map: { repo: 'run.params.repo' },
         },
@@ -97,31 +88,27 @@ describe('input_map', () => {
     const registry = new ExtensionRegistry();
     registry.register('adapter', 'mock', adapter);
     const store = new JsonFileStore(dir);
-    const guard = new StateGuard(def);
 
     // Start run with params.repo = 'acme/api'
     const run = await store.create({
       workflowId: 'imap-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: { repo: 'acme/api' },
     });
 
     // Execute the agent step first to advance state to 'ready'
-    await executeStep(store, guard, def, {
+    await executeStep(store, def, {
       runId: run.id,
       command: 'setup',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: noOpDispatcher,
     });
 
     const updatedRun = await store.get(run.id);
-    await executeStep(store, guard, def, {
+    await executeStep(store, def, {
       runId: updatedRun.id,
       command: 'call-api',
       input: {},
-      snapshotId: updatedRun.version.toString(),
       dispatcher: noOpDispatcher,
       registry,
     });
@@ -139,21 +126,18 @@ describe('input_map', () => {
       id: 'imap-wf',
       name: 'InputMap Workflow',
       version: 1,
-      initial_state: 'created',
       services: { svc: { adapter: 'mock', trust: 'engine_delivered' } },
       steps: {
         step1: {
           description: 'Handler step that outputs pr_number',
           execution: 'auto',
           handler: 'make-pr',
-          allowed_from_states: ['created'],
-          produces_state: 'step1_done',
+          depends_on: [],
         },
         step2: {
           description: 'Adapter step using context.resources',
           execution: 'auto',
-          allowed_from_states: ['step1_done'],
-          produces_state: 'done',
+          depends_on: ['step1'],
           uses_service: 'svc',
           input_map: { number: 'context.resources.step1.pr_number' },
         },
@@ -173,31 +157,27 @@ describe('input_map', () => {
     registry.register('adapter', 'mock', adapter);
     registry.register('handler', 'make-pr', handler);
     const store = new JsonFileStore(dir);
-    const guard = new StateGuard(def);
 
     const run = await store.create({
       workflowId: 'imap-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
     // Execute step1 (handler produces pr_number: 42 in evidence)
-    await executeStep(store, guard, def, {
+    await executeStep(store, def, {
       runId: run.id,
       command: 'step1',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: noOpDispatcher,
       registry,
     });
 
     const afterStep1 = await store.get(run.id);
-    await executeStep(store, guard, def, {
+    await executeStep(store, def, {
       runId: afterStep1.id,
       command: 'step2',
       input: {},
-      snapshotId: afterStep1.version.toString(),
       dispatcher: noOpDispatcher,
       registry,
     });
@@ -210,14 +190,12 @@ describe('input_map', () => {
       id: 'imap-wf',
       name: 'InputMap Workflow',
       version: 1,
-      initial_state: 'created',
       services: { svc: { adapter: 'mock', trust: 'engine_delivered' } },
       steps: {
         fetch: {
           description: 'Step with bad path in input_map',
           execution: 'auto',
-          allowed_from_states: ['created'],
-          produces_state: 'done',
+          depends_on: [],
           uses_service: 'svc',
           input_map: { x: 'run.params.nonexistent' },
         },
@@ -228,19 +206,16 @@ describe('input_map', () => {
     const registry = new ExtensionRegistry();
     registry.register('adapter', 'mock', adapter);
     const store = new JsonFileStore(dir);
-    const guard = new StateGuard(def);
     const run = await store.create({
       workflowId: 'imap-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
-    await executeStep(store, guard, def, {
+    await executeStep(store, def, {
       runId: run.id,
       command: 'fetch',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: noOpDispatcher,
       registry,
     });

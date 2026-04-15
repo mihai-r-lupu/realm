@@ -3,13 +3,12 @@
 # a structured review with severity, summary, breaking_changes, and
 # action_required, then records the result.
 #
-# Demonstrates: workflow states as verification gates, agent step input_schema
+# Demonstrates: depends_on chains, agent step input_schema
 # enforcement, and how prose rules in a skill file become structural constraints.
 # No custom handlers, no TypeScript, no build step.
 id: code-reviewer
 name: Code Reviewer
 version: 1
-initial_state: created
 
 params_schema:
   type: object
@@ -28,21 +27,19 @@ steps:
   read_diff:
     description: Load the diff file from disk
     execution: auto
+    depends_on: []
     trust: engine_delivered
     uses_service: diffs
     operation: read
     input_map:
       path: run.params.path
-    allowed_from_states: [created]
-    produces_state: diff_loaded
 
   review_changes:
     description: >
       Review the diff and produce a structured assessment. All fields are required
       and validated by the engine before this step can complete.
     execution: agent
-    allowed_from_states: [diff_loaded]
-    produces_state: reviewed
+    depends_on: [read_diff]
     prompt: |
       Review the following code diff and produce a structured assessment.
 
@@ -72,5 +69,4 @@ steps:
   record_review:
     description: Record the structured code review
     execution: auto
-    allowed_from_states: [reviewed]
-    produces_state: completed
+    depends_on: [review_changes]

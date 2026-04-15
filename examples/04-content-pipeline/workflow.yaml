@@ -6,7 +6,6 @@
 id: content-pipeline
 name: Content Enrichment Pipeline
 version: 1
-initial_state: created
 
 params_schema:
   type: object
@@ -25,21 +24,19 @@ steps:
   fetch_content:
     description: Load article text from disk
     execution: auto
+    depends_on: []
     trust: engine_delivered
     uses_service: articles
     operation: read
     input_map:
       path: run.params.path
-    allowed_from_states: [created]
-    produces_state: content_fetched
 
   summarise:
     description: >
       Summarise the article. Produces title, summary, and word_count — all validated
       before tag_content starts. The tagger cannot receive a malformed summary.
     execution: agent
-    allowed_from_states: [content_fetched]
-    produces_state: summarised
+    depends_on: [fetch_content]
     prompt: |
       Summarise the article below.
 
@@ -75,8 +72,7 @@ steps:
       The tagger receives schema-validated data — it cannot receive a bad summary.
       This is the step that provider timeouts target in the resume-after-timeout fixture.
     execution: agent
-    allowed_from_states: [summarised]
-    produces_state: tagged
+    depends_on: [summarise]
     prompt: |
       Generate tags for this article.
 
@@ -104,5 +100,4 @@ steps:
   record_result:
     description: Record the enriched content result
     execution: auto
-    allowed_from_states: [tagged]
-    produces_state: completed
+    depends_on: [tag_content]

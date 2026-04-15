@@ -4,7 +4,6 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { executeChain } from './execution-loop.js';
-import { StateGuard } from './state-guard.js';
 import { JsonFileStore } from '../store/json-file-store.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import type { WorkflowDefinition } from '../types/workflow-definition.js';
@@ -15,25 +14,21 @@ const threeAutoStepsDef: WorkflowDefinition = {
   id: 'chain-wf',
   name: 'Chain Workflow',
   version: 1,
-  initial_state: 'created',
   steps: {
     'step-a': {
       description: 'First auto step',
       execution: 'auto',
-      allowed_from_states: ['created'],
-      produces_state: 'state_a',
+      depends_on: [],
     },
     'step-b': {
       description: 'Second auto step',
       execution: 'auto',
-      allowed_from_states: ['state_a'],
-      produces_state: 'state_b',
+      depends_on: ['step-a'],
     },
     'step-c': {
       description: 'Third auto step',
       execution: 'auto',
-      allowed_from_states: ['state_b'],
-      produces_state: 'completed',
+      depends_on: ['step-b'],
     },
   },
 };
@@ -43,19 +38,16 @@ const stopAtAgentDef: WorkflowDefinition = {
   id: 'stop-agent-wf',
   name: 'Stop At Agent Workflow',
   version: 1,
-  initial_state: 'created',
   steps: {
     'step-a': {
       description: 'Auto step',
       execution: 'auto',
-      allowed_from_states: ['created'],
-      produces_state: 'state_a',
+      depends_on: [],
     },
     'step-b': {
       description: 'Agent step — chain stops here',
       execution: 'agent',
-      allowed_from_states: ['state_a'],
-      produces_state: 'completed',
+      depends_on: ['step-a'],
     },
   },
 };
@@ -65,20 +57,17 @@ const stopAtGateDef: WorkflowDefinition = {
   id: 'stop-gate-wf',
   name: 'Stop At Gate Workflow',
   version: 1,
-  initial_state: 'created',
   steps: {
     'step-a': {
       description: 'Auto step without gate',
       execution: 'auto',
-      allowed_from_states: ['created'],
-      produces_state: 'state_a',
+      depends_on: [],
     },
     'step-b': {
       description: 'Auto step with human confirmation gate',
       execution: 'auto',
       trust: 'human_confirmed',
-      allowed_from_states: ['state_a'],
-      produces_state: 'completed',
+      depends_on: ['step-a'],
     },
   },
 };
@@ -88,19 +77,16 @@ const failsDef: WorkflowDefinition = {
   id: 'fail-wf',
   name: 'Fail Workflow',
   version: 1,
-  initial_state: 'created',
   steps: {
     'step-a': {
       description: 'Auto step that fails',
       execution: 'auto',
-      allowed_from_states: ['created'],
-      produces_state: 'state_a',
+      depends_on: [],
     },
     'step-b': {
       description: 'Second auto step',
       execution: 'auto',
-      allowed_from_states: ['state_a'],
-      produces_state: 'completed',
+      depends_on: ['step-a'],
     },
   },
 };
@@ -116,46 +102,39 @@ describe('executeChain', () => {
 
   it('auto-chains 3 auto steps in one call — run ends at completed', async () => {
     const store = new JsonFileStore(dir);
-    const guard = new StateGuard(threeAutoStepsDef);
     const run = await store.create({
       workflowId: 'chain-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
-    const envelope = await executeChain(store, guard, threeAutoStepsDef, {
+    const envelope = await executeChain(store, threeAutoStepsDef, {
       runId: run.id,
       command: 'step-a',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: echoDispatcher,
     });
 
     expect(envelope.status).toBe('ok');
 
     const updated = await store.get(run.id);
-    expect(updated.state).toBe('completed');
-    expect(updated.terminal_state).toBe(true);
+    expect(updated.run_phase).toBe('completed');
     // Evidence for all 3 steps is persisted in the run.
     expect(updated.evidence).toHaveLength(3);
   });
 
   it('stops at an agent step — step-b is NOT executed', async () => {
     const store = new JsonFileStore(dir);
-    const guard = new StateGuard(stopAtAgentDef);
     const run = await store.create({
       workflowId: 'stop-agent-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
-    const envelope = await executeChain(store, guard, stopAtAgentDef, {
+    const envelope = await executeChain(store, stopAtAgentDef, {
       runId: run.id,
       command: 'step-a',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: echoDispatcher,
     });
 
@@ -163,25 +142,24 @@ describe('executeChain', () => {
     expect(envelope.status).toBe('ok');
 
     const updated = await store.get(run.id);
-    // Run is at state_a — step-b (agent) was NOT auto-executed.
-    expect(updated.state).toBe('state_a');
+    // step-a completed; step-b (agent) was NOT auto-executed — run is still running.
+    expect(updated.run_phase).toBe('running');
+    expect(updated.completed_steps).toContain('step-a');
+    expect(updated.completed_steps).not.toContain('step-b');
   });
 
   it('chains into trust: human_confirmed — step-b opens gate and returns confirm_required', async () => {
     const store = new JsonFileStore(dir);
-    const guard = new StateGuard(stopAtGateDef);
     const run = await store.create({
       workflowId: 'stop-gate-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
-    const envelope = await executeChain(store, guard, stopAtGateDef, {
+    const envelope = await executeChain(store, stopAtGateDef, {
       runId: run.id,
       command: 'step-a',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: echoDispatcher,
     });
 
@@ -189,16 +167,14 @@ describe('executeChain', () => {
     expect(envelope.status).toBe('confirm_required');
 
     const updated = await store.get(run.id);
-    expect(updated.state).toBe('gate_waiting');
+    expect(updated.run_phase).toBe('gate_waiting');
   });
 
   it('stops and returns error when a step fails — run is marked failed', async () => {
     const store = new JsonFileStore(dir);
-    const guard = new StateGuard(failsDef);
     const run = await store.create({
       workflowId: 'fail-wf',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
 
@@ -211,17 +187,16 @@ describe('executeChain', () => {
       });
     };
 
-    const envelope = await executeChain(store, guard, failsDef, {
+    const envelope = await executeChain(store, failsDef, {
       runId: run.id,
       command: 'step-a',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: failDispatcher,
     });
 
     expect(envelope.status).toBe('error');
 
     const updated = await store.get(run.id);
-    expect(updated.state).toBe('failed');
+    expect(updated.run_phase).toBe('failed');
   });
 });

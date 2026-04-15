@@ -7,8 +7,10 @@ import { homedir } from 'node:os';
 import { v4 as uuidv4 } from 'uuid';
 import lockfile from 'proper-lockfile';
 import type { RunRecord } from '../types/run-record.js';
+import type { WorkflowDefinition } from '../types/workflow-definition.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import type { RunStore, CreateRunOptions } from './store-interface.js';
+import { findEligibleSteps, deriveRunPhase } from '../engine/eligibility.js';
 
 const DEFAULT_RUNS_DIR = join(homedir(), '.realm', 'runs');
 
@@ -34,7 +36,11 @@ export class JsonFileStore implements RunStore {
       id: uuidv4(),
       workflow_id: options.workflowId,
       workflow_version: options.workflowVersion,
-      state: options.initialState,
+      completed_steps: [],
+      in_progress_steps: [],
+      failed_steps: [],
+      skipped_steps: [],
+      run_phase: 'running',
       version: 0,
       params: options.params,
       evidence: [],
@@ -58,14 +64,30 @@ export class JsonFileStore implements RunStore {
       });
     }
     const raw = await readFile(path, 'utf8');
-    return JSON.parse(raw) as RunRecord;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+    // Legacy format detection: runs written before Phase 35 have `state` but no `completed_steps`.
+    if ('state' in parsed && !('completed_steps' in parsed)) {
+      throw new WorkflowError(
+        'This run was created with an older version of Realm that used a state-machine model. ' +
+          'Delete ~/.realm/runs/ and start fresh.',
+        {
+          code: 'STATE_LEGACY_FORMAT',
+          category: 'STATE',
+          agentAction: 'report_to_user',
+          retryable: false,
+          details: { runId },
+        },
+      );
+    }
+
+    return parsed as unknown as RunRecord;
   }
 
   async update(record: RunRecord): Promise<RunRecord> {
     await this.ensureDir();
     const path = this.filePath(record.id);
 
-    // Ensure the file exists before locking (proper-lockfile requires the file to exist)
     if (!existsSync(path)) {
       throw new WorkflowError(`Run not found: ${record.id}`, {
         code: 'STATE_RUN_NOT_FOUND',
@@ -93,11 +115,84 @@ export class JsonFileStore implements RunStore {
 
       const updated: RunRecord = {
         ...record,
+        run_phase: deriveRunPhase(record),
         version: record.version + 1,
         updated_at: new Date().toISOString(),
       };
       await writeFile(path, JSON.stringify(updated, null, 2), 'utf8');
       return updated;
+    } finally {
+      await release();
+    }
+  }
+
+  async claimStep(
+    runId: string,
+    stepName: string,
+    definition: WorkflowDefinition,
+  ): Promise<RunRecord> {
+    await this.ensureDir();
+    const path = this.filePath(runId);
+
+    if (!existsSync(path)) {
+      throw new WorkflowError(`Run not found: ${runId}`, {
+        code: 'STATE_RUN_NOT_FOUND',
+        category: 'STATE',
+        agentAction: 'report_to_user',
+        retryable: false,
+        details: { runId },
+      });
+    }
+
+    const release = await lockfile.lock(path, { retries: { retries: 3, minTimeout: 50 } });
+    try {
+      // Re-read the freshest version under lock.
+      const raw = await readFile(path, 'utf8');
+      const run = JSON.parse(raw) as RunRecord;
+
+      // Guard: step must not already be claimed.
+      if (
+        run.in_progress_steps.includes(stepName) ||
+        run.completed_steps.includes(stepName) ||
+        run.failed_steps.includes(stepName) ||
+        run.skipped_steps.includes(stepName)
+      ) {
+        throw new WorkflowError(
+          `Step '${stepName}' is already claimed or completed on run '${runId}'.`,
+          {
+            code: 'STATE_STEP_ALREADY_CLAIMED',
+            category: 'STATE',
+            agentAction: 'resolve_precondition',
+            retryable: false,
+            details: { runId, stepName },
+          },
+        );
+      }
+
+      // Guard: step must still be eligible under the current run state.
+      const eligible = findEligibleSteps(definition, run);
+      if (!eligible.includes(stepName)) {
+        throw new WorkflowError(
+          `Step '${stepName}' is not eligible for execution on run '${runId}'.`,
+          {
+            code: 'STATE_STEP_NOT_ELIGIBLE',
+            category: 'STATE',
+            agentAction: 'resolve_precondition',
+            retryable: false,
+            details: { runId, stepName, eligible },
+          },
+        );
+      }
+
+      const claimed: RunRecord = {
+        ...run,
+        in_progress_steps: [...run.in_progress_steps, stepName],
+        run_phase: deriveRunPhase(run),
+        version: run.version + 1,
+        updated_at: new Date().toISOString(),
+      };
+      await writeFile(path, JSON.stringify(claimed, null, 2), 'utf8');
+      return claimed;
     } finally {
       await release();
     }
@@ -121,3 +216,4 @@ export class JsonFileStore implements RunStore {
     return records;
   }
 }
+

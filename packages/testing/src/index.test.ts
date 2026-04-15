@@ -58,7 +58,11 @@ function makeRun(overrides: Partial<RunRecord> = {}): RunRecord {
     id: 'run-1',
     workflow_id: 'wf-1',
     workflow_version: 1,
-    state: 'completed',
+    run_phase: 'completed',
+    completed_steps: [],
+    in_progress_steps: [],
+    failed_steps: [],
+    skipped_steps: [],
     version: 1,
     params: {},
     evidence: [],
@@ -79,11 +83,10 @@ describe('InMemoryStore', () => {
     const record = await store.create({
       workflowId: 'wf-1',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
     expect(record.version).toBe(0);
-    expect(record.state).toBe('created');
+    expect(record.run_phase).toBe('running');
     expect(record.workflow_id).toBe('wf-1');
   });
 
@@ -92,7 +95,6 @@ describe('InMemoryStore', () => {
     const created = await store.create({
       workflowId: 'wf-1',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
     const fetched = await store.get(created.id);
@@ -111,12 +113,11 @@ describe('InMemoryStore', () => {
     const record = await store.create({
       workflowId: 'wf-1',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
-    const updated = await store.update({ ...record, state: 'done' });
+    const updated = await store.update({ ...record, completed_steps: ['step-one'] });
     expect(updated.version).toBe(1);
-    expect(updated.state).toBe('done');
+    expect(updated.completed_steps).toContain('step-one');
   });
 
   it('update() throws WorkflowError(STATE_SNAPSHOT_MISMATCH) on version mismatch', async () => {
@@ -124,7 +125,6 @@ describe('InMemoryStore', () => {
     const record = await store.create({
       workflowId: 'wf-1',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
     const stale = { ...record, version: 99 };
@@ -138,13 +138,11 @@ describe('InMemoryStore', () => {
     await store.create({
       workflowId: 'wf-a',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
     await store.create({
       workflowId: 'wf-b',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
     const result = await store.list('wf-a');
@@ -157,13 +155,11 @@ describe('InMemoryStore', () => {
     await store.create({
       workflowId: 'wf-a',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
     await store.create({
       workflowId: 'wf-b',
       workflowVersion: 1,
-      initialState: 'created',
       params: {},
     });
     const all = await store.list();
@@ -329,13 +325,13 @@ describe('MockServiceRecorder', () => {
 // ---------------------------------------------------------------------------
 
 describe('assertFinalState', () => {
-  it('does not throw when state matches', () => {
-    const run = makeRun({ state: 'completed' });
+  it('does not throw when phase matches', () => {
+    const run = makeRun({ run_phase: 'completed' });
     expect(() => assertFinalState(run, 'completed')).not.toThrow();
   });
 
-  it('throws when state does not match', () => {
-    const run = makeRun({ state: 'failed' });
+  it('throws when phase does not match', () => {
+    const run = makeRun({ run_phase: 'failed' });
     expect(() => assertFinalState(run, 'completed')).toThrow(/assertFinalState/);
   });
 });
@@ -490,7 +486,7 @@ const DISPATCHER_DEFINITION: WorkflowDefinition = {
 };
 
 function makeMinimalRun(): RunRecord {
-  return makeRun({ id: 'test-run', state: 'created', terminal_state: false });
+  return makeRun({ id: 'test-run', run_phase: 'running', terminal_state: false });
 }
 
 describe('createAgentDispatcher', () => {

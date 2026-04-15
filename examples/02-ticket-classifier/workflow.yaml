@@ -1,15 +1,14 @@
 # examples/02-ticket-classifier/workflow.yaml
-# Support Ticket Classifier — reads a raw support ticket from disk,
-# classifies it into a structured record using a tightly-typed schema,
-# and records the result.
+# Support Ticket Classifier — reads a raw support ticket from disk, extracts
+# ticket identity in one step, then classifies using the verified identity in
+# a second step.
 #
-# Demonstrates: agent step input_schema enforcement, enum and pattern validation,
-# schema-driven rejection with provide_input. No custom handlers or build step —
-# schema validation is a first-class engine primitive.
+# Demonstrates: chained agent steps where step 2 reads step 1's validated output
+# via context.resources. The classifier cannot receive bad extraction data —
+# identify_ticket's schema is enforced before classify_ticket starts.
 id: ticket-classifier
 name: Support Ticket Classifier
 version: 1
-initial_state: created
 
 params_schema:
   type: object
@@ -28,40 +27,78 @@ steps:
   read_ticket:
     description: Load the support ticket from disk
     execution: auto
+    depends_on: []
     trust: engine_delivered
     uses_service: tickets
     operation: read
     input_map:
       path: run.params.path
-    allowed_from_states: [created]
-    produces_state: ticket_loaded
 
-  classify_ticket:
+  identify_ticket:
     description: >
-      Classify the ticket into a structured record. Output must match the
-      declared schema exactly — the engine rejects any response that does not.
+      Extract structured identity fields from the raw ticket text. Output is
+      validated before classify_ticket starts — the classifier cannot receive
+      incomplete or malformed extraction data.
     execution: agent
-    allowed_from_states: [ticket_loaded]
-    produces_state: classified
+    depends_on: [read_ticket]
     prompt: |
-      Classify the support ticket below into a structured record.
+      Extract identity fields from the support ticket below.
 
       Required fields:
-      - category: one of bug | feature_request | billing | account | other
-      - priority: one of low | medium | high | critical
-      - ticket_title: a one-line summary, 5–120 characters
-      - customer_id: the customer ID from the ticket, format CUST-NNNN
-      - one_line_summary: one sentence describing the core issue (min 10 chars)
+      - customer_id: the customer ID, format CUST-NNNN
+      - product_area: the product or service area this ticket concerns
+        (e.g. "billing", "payment gateway", "account management", "API")
+      - product_version: the software version mentioned, or "unknown" if not stated
+      - reported_issue: one sentence describing the problem as reported
+        (10–300 characters)
 
-      Return exactly these five fields. Any field missing, mistyped, or using
-      a value outside the allowed enums will be rejected before your response
-      is accepted.
+      Return exactly these four fields. Any field missing or using an invalid
+      format will be rejected before this response is accepted.
 
       Ticket:
       {{ context.resources.read_ticket.content }}
     input_schema:
       type: object
-      required: [category, priority, ticket_title, customer_id, one_line_summary]
+      required: [customer_id, product_area, product_version, reported_issue]
+      properties:
+        customer_id:
+          type: string
+          pattern: '^CUST-[0-9]{4}$'
+        product_area:
+          type: string
+          minLength: 2
+          maxLength: 80
+        product_version:
+          type: string
+          minLength: 1
+          maxLength: 40
+        reported_issue:
+          type: string
+          minLength: 10
+          maxLength: 300
+
+  classify_ticket:
+    description: >
+      Classify the ticket using the identity extracted by identify_ticket.
+      The classifier receives verified, schema-validated data — the product area
+      and reported issue are already confirmed before this step starts.
+    execution: agent
+    depends_on: [identify_ticket]
+    prompt: |
+      Classify this {{ context.resources.identify_ticket.product_area }} support ticket.
+
+      Reported issue: {{ context.resources.identify_ticket.reported_issue }}
+
+      Required fields:
+      - category: one of bug | feature_request | billing | account | other
+      - priority: one of low | medium | high | critical
+      - one_line_summary: one sentence for the support queue (min 10 chars)
+
+      Return exactly these three fields. Any value outside the allowed enums
+      will be rejected before your response is accepted.
+    input_schema:
+      type: object
+      required: [category, priority, one_line_summary]
       properties:
         category:
           type: string
@@ -69,13 +106,6 @@ steps:
         priority:
           type: string
           enum: [low, medium, high, critical]
-        ticket_title:
-          type: string
-          minLength: 5
-          maxLength: 120
-        customer_id:
-          type: string
-          pattern: '^CUST-[0-9]{4}$'
         one_line_summary:
           type: string
           minLength: 10
@@ -83,5 +113,4 @@ steps:
   record_ticket:
     description: Record the classified ticket
     execution: auto
-    allowed_from_states: [classified]
-    produces_state: completed
+    depends_on: [classify_ticket]
