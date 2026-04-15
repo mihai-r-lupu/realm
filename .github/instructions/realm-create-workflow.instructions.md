@@ -8,12 +8,12 @@ This file teaches you how to define and track autonomous multi-step plans throug
 Realm's execution engine using the `create_workflow` MCP tool.
 
 If you have read `realm.instructions.md`, you already know the step loop: `execute_step`
-advances a run, each response has `next_action`, and `agent_action` tells you how to recover
+advances a run, each response has `next_actions`, and `agent_action` tells you how to recover
 from errors. This file covers the `create_workflow` entry point, which replaces `start_run`
 when no registered workflow matches your task.
 
 If you have not read `realm.instructions.md`, the essential context is: Realm is a workflow
-execution engine. Runs proceed step-by-step. Each step response carries `next_action`, which
+execution engine. Runs proceed step-by-step. Each step response carries `next_actions`, which
 gives you the exact tool call for the next step. Read `realm.instructions.md` alongside this
 file for the full step-loop protocol.
 
@@ -76,7 +76,8 @@ Each step:
 | `id`              | Yes      | Unique identifier. Snake_case verb-noun. No spaces.                 |
 | `description`     | Yes      | What a correct output looks like (acceptance criterion).            |
 | `input_schema`    | No       | JSON Schema for the fields this step's output must include.         |
-| `depends_on`      | No       | At most one step ID this step logically follows (engine is linear). |
+| `depends_on`      | No       | Array of step IDs this step depends on. Controls execution ordering. |
+| `trigger_rule`    | No       | When to evaluate dependency satisfaction. Default: `all_success`. See `realm.instructions.md` for all variants. |
 | `timeout_seconds` | No       | Positive integer. If omitted, no timeout is enforced.               |
 
 ## Step Design Guidelines
@@ -103,18 +104,18 @@ Define fields only for data that later steps or the user will consume. Do not sc
 intermediate thought. One or two fields is normal. More than five suggests the step is doing
 too much.
 
-### 5. `depends_on` is advisory — but validated
+### 5. `depends_on` controls execution ordering
 
-The engine always runs steps in array order. Setting `depends_on` expresses logical
-dependencies for clarity but does not change execution order. Omit it when array order makes
-the sequence obvious.
+Setting `depends_on` declares which earlier steps must complete before this step becomes
+eligible. The engine evaluates `trigger_rule` against the listed dependencies at eligibility
+check time — the default rule `all_success` requires all deps to be in `completed_steps`.
 
-`depends_on` accepts **at most one** step ID — this engine is linear. Listing more than one
-causes `create_workflow` to return `agent_action: 'provide_input'`.
+Omit `depends_on` when a step can start immediately at run creation (first tier of the DAG).
+For simple sequential workflows, each step lists the previous step as its single dependency.
 
-The referenced ID must refer to a step that appears **earlier** in the `steps` array (no
-forward references). Violating this also causes `agent_action: 'provide_input'` — fix the
-array order or remove the invalid reference.
+The referenced IDs must refer to steps that appear **earlier** in the `steps` array (no
+forward references). Violating this causes `agent_action: 'provide_input'` at `create_workflow`
+call time — fix the array order or remove the invalid reference.
 
 ## Efficiency Guidelines
 
@@ -185,35 +186,37 @@ can reasonably be represented in a `params` field — in which case, store the f
 ## After Calling create_workflow
 
 The response is a `ResponseEnvelope` in the same shape as a `start_run` response. The run has
-already started — check `next_action` immediately and proceed to `execute_step`:
+already started — check `next_actions` immediately and proceed to `execute_step`:
 
 ```json
 {
   "status": "ok",
   "run_id": "<assigned-run-id>",
   "data": { "workflow_id": "acme-proposal-a1b2c3" },
-  "next_action": {
-    "prompt": "Your task for the first step...",
-    "instruction": {
-      "tool": "execute_step",
-      "call_with": {
-        "run_id": "<assigned-run-id>",
-        "command": "research_company",
-        "params": {}
+  "next_actions": [
+    {
+      "prompt": "Your task for the first step...",
+      "instruction": {
+        "tool": "execute_step",
+        "call_with": {
+          "run_id": "<assigned-run-id>",
+          "command": "research_company",
+          "params": {}
+        }
       }
     }
-  }
+  ]
 }
 ```
 
 Call `execute_step` using `instruction.call_with` as the template — fill in your step output
-in `params` (shaped to `next_action.input_schema` if present). The engine does not require a
-`snapshot_id` argument — it reads the current version from the store automatically.
+in `params` (shaped to `next_actions[0].input_schema` if present). The engine does not require
+a `snapshot_id` argument — it reads the current version from the store automatically.
 
-The step loop from this point is identical to Mode 1: read `next_action.prompt`, do the work,
-call `execute_step` with your output in `params`, and repeat. Stop when `status` is
+The step loop from this point is identical to Mode 1: read `next_actions[0].prompt`, do the
+work, call `execute_step` with your output in `params`, and repeat. Stop when `status` is
 `confirm_required` (human gate — see `realm.instructions.md` step 6) or when `status` is `ok`
-and `next_action` is `null` (workflow finished). Error responses carry `agent_action` — handle
+and `next_actions` is empty (workflow finished). Error responses carry `agent_action` — handle
 them as described in `realm.instructions.md`.
 
 ## Constraints
@@ -226,6 +229,5 @@ them as described in `realm.instructions.md`.
 - All steps in a dynamic workflow are `execution: agent` — the engine always returns them to
   you for execution. `handler:` and `uses_service:` are not available on dynamic steps; use
   a YAML-registered workflow if you need auto steps, service adapters, or handlers.
-- `depends_on` accepts at most one ID. Listing more than one causes `provide_input`.
-- `depends_on` references must point to steps earlier in the array. Forward references cause
-  a `provide_input` error at `create_workflow` call time.
+- `depends_on` references must point to steps earlier in the `steps` array. Forward references
+  cause a `provide_input` error at `create_workflow` call time.

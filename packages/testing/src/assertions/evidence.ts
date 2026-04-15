@@ -1,11 +1,14 @@
 // Evidence assertion helpers — throw Error on failure (framework-agnostic).
-import type { RunRecord, EvidenceSnapshot } from '@sensigo/realm';
+import type { RunRecord, EvidenceSnapshot, RunPhase } from '@sensigo/realm';
 
-/** Throws if run.state !== expectedState. */
-export function assertFinalState(run: RunRecord, expectedState: string): void {
-  if (run.state !== expectedState) {
+/**
+ * Throws if run.run_phase !== expectedPhase.
+ * Use to verify the workflow reached the expected terminal phase.
+ */
+export function assertFinalState(run: RunRecord, expectedPhase: RunPhase | string): void {
+  if (run.run_phase !== expectedPhase) {
     throw new Error(
-      `assertFinalState: expected '${expectedState}' but run is in state '${run.state}'`,
+      `assertFinalState: expected phase '${expectedPhase}' but run is in phase '${run.run_phase}'`,
     );
   }
 }

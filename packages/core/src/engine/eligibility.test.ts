@@ -1,0 +1,404 @@
+// Unit tests for findEligibleSteps, triggerRuleSatisfied, evaluateWhenCondition,
+// and deriveRunPhase — the DAG eligibility predicates.
+import { describe, it, expect, beforeEach } from 'vitest';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  findEligibleSteps,
+  triggerRuleSatisfied,
+  evaluateWhenCondition,
+  deriveRunPhase,
+} from './eligibility.js';
+import { JsonFileStore } from '../store/json-file-store.js';
+import type { WorkflowDefinition, StepDefinition } from '../types/workflow-definition.js';
+import type { RunRecord, PendingGate } from '../types/run-record.js';
+
+function makeRun(overrides: Partial<RunRecord> = {}): RunRecord {
+  return {
+    id: 'run-1',
+    workflow_id: 'test-wf',
+    workflow_version: 1,
+    completed_steps: [],
+    in_progress_steps: [],
+    failed_steps: [],
+    skipped_steps: [],
+    run_phase: 'running',
+    version: 0,
+    params: {},
+    evidence: [],
+    created_at: '2024-01-01T00:00:00.000Z',
+    updated_at: '2024-01-01T00:00:00.000Z',
+    terminal_state: false,
+    ...overrides,
+  };
+}
+
+function makeStep(overrides: Partial<StepDefinition> = {}): StepDefinition {
+  return { description: 'Test step', execution: 'agent', ...overrides };
+}
+
+function makeWorkflow(steps: Record<string, Partial<StepDefinition>>): WorkflowDefinition {
+  return {
+    id: 'test-wf',
+    name: 'Test Workflow',
+    version: 1,
+    steps: Object.fromEntries(
+      Object.entries(steps).map(([name, overrides]) => [name, makeStep(overrides)]),
+    ),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// deriveRunPhase
+// ---------------------------------------------------------------------------
+
+describe('deriveRunPhase', () => {
+  it('returns gate_waiting when pending_gate is set', () => {
+    const gate: PendingGate = {
+      gate_id: 'g1',
+      step_name: 'step-a',
+      choices: ['approve'],
+      opened_at: new Date().toISOString(),
+      preview: {},
+    };
+    expect(deriveRunPhase({ pending_gate: gate, terminal_state: false, failed_steps: [], terminal_reason: undefined })).toBe('gate_waiting');
+  });
+
+  it('returns running when not terminal', () => {
+    expect(deriveRunPhase({ pending_gate: undefined, terminal_state: false, failed_steps: [], terminal_reason: undefined })).toBe('running');
+  });
+
+  it('returns completed when terminal_reason is Workflow completed.', () => {
+    expect(deriveRunPhase({ pending_gate: undefined, terminal_state: true, failed_steps: [], terminal_reason: 'Workflow completed.' })).toBe('completed');
+  });
+
+  it('returns completed even when failed_steps is non-empty if terminal_reason is Workflow completed. (recovery workflow)', () => {
+    expect(deriveRunPhase({ pending_gate: undefined, terminal_state: true, failed_steps: ['main_step'], terminal_reason: 'Workflow completed.' })).toBe('completed');
+  });
+
+  it('returns failed when terminal and failed_steps is non-empty without Workflow completed. reason', () => {
+    expect(deriveRunPhase({ pending_gate: undefined, terminal_state: true, failed_steps: ['step-a'], terminal_reason: "Step 'step-a' failed: error" })).toBe('failed');
+  });
+
+  it('returns abandoned when terminal, no failed steps, and reason is not Workflow completed.', () => {
+    expect(deriveRunPhase({ pending_gate: undefined, terminal_state: true, failed_steps: [], terminal_reason: 'Marked abandoned by realm cleanup' })).toBe('abandoned');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// trigger_rule variants
+// ---------------------------------------------------------------------------
+
+describe('triggerRuleSatisfied', () => {
+  it('all_success (default): eligible when all deps are completed and none failed', () => {
+    const step = makeStep({ depends_on: ['a', 'b'] });
+    const run = makeRun({ completed_steps: ['a', 'b'] });
+    expect(triggerRuleSatisfied(step, run)).toBe(true);
+  });
+
+  it('all_success: not eligible when any dep is in failed_steps', () => {
+    const step = makeStep({ depends_on: ['a', 'b'] });
+    const run = makeRun({ completed_steps: ['a'], failed_steps: ['b'] });
+    expect(triggerRuleSatisfied(step, run)).toBe(false);
+  });
+
+  it('all_success: not eligible when a dep is still pending', () => {
+    const step = makeStep({ depends_on: ['a', 'b'] });
+    const run = makeRun({ completed_steps: ['a'] }); // b neither completed nor failed
+    expect(triggerRuleSatisfied(step, run)).toBe(false);
+  });
+
+  it('all_failed: eligible when all deps are in failed_steps', () => {
+    const step = makeStep({ depends_on: ['a', 'b'], trigger_rule: 'all_failed' });
+    const run = makeRun({ failed_steps: ['a', 'b'] });
+    expect(triggerRuleSatisfied(step, run)).toBe(true);
+  });
+
+  it('all_failed: not eligible when only one dep failed', () => {
+    const step = makeStep({ depends_on: ['a', 'b'], trigger_rule: 'all_failed' });
+    const run = makeRun({ completed_steps: ['a'], failed_steps: ['b'] });
+    expect(triggerRuleSatisfied(step, run)).toBe(false);
+  });
+
+  it('all_done: eligible when all deps are completed or failed', () => {
+    const step = makeStep({ depends_on: ['a', 'b'], trigger_rule: 'all_done' });
+    const run = makeRun({ completed_steps: ['a'], failed_steps: ['b'] });
+    expect(triggerRuleSatisfied(step, run)).toBe(true);
+  });
+
+  it('all_done: not eligible when a dep is still pending', () => {
+    const step = makeStep({ depends_on: ['a', 'b'], trigger_rule: 'all_done' });
+    const run = makeRun({ completed_steps: ['a'] }); // b still pending
+    expect(triggerRuleSatisfied(step, run)).toBe(false);
+  });
+
+  it('one_failed: eligible when at least one dep is in failed_steps', () => {
+    const step = makeStep({ depends_on: ['a', 'b'], trigger_rule: 'one_failed' });
+    const run = makeRun({ completed_steps: ['a'], failed_steps: ['b'] });
+    expect(triggerRuleSatisfied(step, run)).toBe(true);
+  });
+
+  it('one_failed: not eligible when no dep has failed', () => {
+    const step = makeStep({ depends_on: ['a', 'b'], trigger_rule: 'one_failed' });
+    const run = makeRun({ completed_steps: ['a'] }); // b still pending, none failed
+    expect(triggerRuleSatisfied(step, run)).toBe(false);
+  });
+
+  it('one_success: eligible when at least one dep is in completed_steps', () => {
+    const step = makeStep({ depends_on: ['a', 'b'], trigger_rule: 'one_success' });
+    const run = makeRun({ completed_steps: ['a'], failed_steps: ['b'] });
+    expect(triggerRuleSatisfied(step, run)).toBe(true);
+  });
+
+  it('one_success: not eligible when no dep has completed', () => {
+    const step = makeStep({ depends_on: ['a', 'b'], trigger_rule: 'one_success' });
+    const run = makeRun({ failed_steps: ['a'] }); // none completed
+    expect(triggerRuleSatisfied(step, run)).toBe(false);
+  });
+
+  it('none_failed: eligible when all deps are completed or skipped and none failed', () => {
+    const step = makeStep({ depends_on: ['a', 'b'], trigger_rule: 'none_failed' });
+    const run = makeRun({ completed_steps: ['a'], skipped_steps: ['b'] });
+    expect(triggerRuleSatisfied(step, run)).toBe(true);
+  });
+
+  it('none_failed: not eligible when any dep is in failed_steps', () => {
+    const step = makeStep({ depends_on: ['a', 'b'], trigger_rule: 'none_failed' });
+    const run = makeRun({ completed_steps: ['a'], failed_steps: ['b'] });
+    expect(triggerRuleSatisfied(step, run)).toBe(false);
+  });
+
+  it('step with no depends_on is always eligible at the trigger-rule level', () => {
+    const step = makeStep({ depends_on: [] });
+    expect(triggerRuleSatisfied(step, makeRun())).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// when-condition evaluation
+// ---------------------------------------------------------------------------
+
+describe('evaluateWhenCondition', () => {
+  it('equality: truthy when step output matches expected string', () => {
+    const evidence = { classify: { category: 'billing' } };
+    expect(evaluateWhenCondition("classify.category == 'billing'", evidence)).toBe(true);
+  });
+
+  it('equality: falsy when step output does not match', () => {
+    const evidence = { classify: { category: 'technical' } };
+    expect(evaluateWhenCondition("classify.category == 'billing'", evidence)).toBe(false);
+  });
+
+  it('numeric comparison: truthy when value exceeds threshold', () => {
+    const evidence = { classify: { confidence: 0.9 } };
+    expect(evaluateWhenCondition('classify.confidence > 0.8', evidence)).toBe(true);
+  });
+
+  it('numeric comparison: falsy when value is below threshold', () => {
+    const evidence = { classify: { confidence: 0.5 } };
+    expect(evaluateWhenCondition('classify.confidence > 0.8', evidence)).toBe(false);
+  });
+
+  it('inequality operator', () => {
+    const evidence = { step_a: { status: 'error' } };
+    expect(evaluateWhenCondition("step_a.status != 'success'", evidence)).toBe(true);
+    expect(evaluateWhenCondition("step_a.status != 'error'", evidence)).toBe(false);
+  });
+
+  it('returns false when path is missing from evidence', () => {
+    const evidence = { classify: {} };
+    expect(evaluateWhenCondition("classify.missing_field == 'billing'", evidence)).toBe(false);
+  });
+
+  it('unquoted string rhs treated as bareword for equality', () => {
+    const evidence = { step_a: { confidence: 'high' } };
+    expect(evaluateWhenCondition('step_a.confidence == high', evidence)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findEligibleSteps — gate serialization
+// ---------------------------------------------------------------------------
+
+describe('findEligibleSteps — gate serialization', () => {
+  it('returns empty array when a gate is open, even if steps would otherwise be eligible', () => {
+    const definition = makeWorkflow({ 'step-a': {} });
+    const run = makeRun({
+      pending_gate: {
+        gate_id: 'gate-1',
+        step_name: 'step-a',
+        choices: ['approve'],
+        opened_at: new Date().toISOString(),
+        preview: {},
+      },
+    });
+    expect(findEligibleSteps(definition, run)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findEligibleSteps — fan-out: multiple eligible steps
+// ---------------------------------------------------------------------------
+
+describe('findEligibleSteps — fan-out', () => {
+  it('returns all root steps when none have depends_on and none are settled', () => {
+    const definition = makeWorkflow({
+      'step-a': { depends_on: [] },
+      'step-b': { depends_on: [] },
+      'step-c': { depends_on: [] },
+    });
+    const result = findEligibleSteps(definition, makeRun());
+    expect(result).toHaveLength(3);
+    expect(result).toContain('step-a');
+    expect(result).toContain('step-b');
+    expect(result).toContain('step-c');
+  });
+
+  it('returns parallel fan-out steps when their shared upstream dep is completed', () => {
+    const definition = makeWorkflow({
+      'step-a': { depends_on: [] },
+      'step-b': { depends_on: ['step-a'] },
+      'step-c': { depends_on: ['step-a'] },
+    });
+    const run = makeRun({ completed_steps: ['step-a'] });
+    const result = findEligibleSteps(definition, run);
+    expect(result).toHaveLength(2);
+    expect(result).toContain('step-b');
+    expect(result).toContain('step-c');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findEligibleSteps — convergence
+// ---------------------------------------------------------------------------
+
+describe('findEligibleSteps — convergence', () => {
+  it('convergence step is not eligible until all upstream deps are completed', () => {
+    const definition = makeWorkflow({
+      'step-a': { depends_on: [] },
+      'step-b': { depends_on: [] },
+      'step-c': { depends_on: ['step-a', 'step-b'] },
+    });
+
+    // Only step-a done — step-c not yet eligible.
+    const partial = makeRun({ completed_steps: ['step-a'] });
+    const result1 = findEligibleSteps(definition, partial);
+    expect(result1).not.toContain('step-c');
+    expect(result1).toContain('step-b'); // step-b still eligible
+
+    // Both done — step-c is now eligible.
+    const full = makeRun({ completed_steps: ['step-a', 'step-b'] });
+    const result2 = findEligibleSteps(definition, full);
+    expect(result2).toContain('step-c');
+    expect(result2).not.toContain('step-a'); // already completed
+    expect(result2).not.toContain('step-b'); // already completed
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findEligibleSteps — skip propagation
+// ---------------------------------------------------------------------------
+
+describe('findEligibleSteps — skip propagation', () => {
+  it('downstream step with all_success is not eligible when its dep fails', () => {
+    const definition = makeWorkflow({
+      'main-step': { depends_on: [] },
+      'success-path': { depends_on: ['main-step'], trigger_rule: 'all_success' },
+    });
+    const run = makeRun({ failed_steps: ['main-step'] });
+    const result = findEligibleSteps(definition, run);
+    expect(result).not.toContain('success-path');
+  });
+
+  it('recovery step with one_failed IS eligible when its dep fails', () => {
+    const definition = makeWorkflow({
+      'main-step': { depends_on: [] },
+      'recovery-step': { depends_on: ['main-step'], trigger_rule: 'one_failed' },
+    });
+    const run = makeRun({ failed_steps: ['main-step'] });
+    const result = findEligibleSteps(definition, run);
+    expect(result).toContain('recovery-step');
+  });
+
+  it('when-condition prevents step eligibility when evidence does not match', () => {
+    const definition = makeWorkflow({
+      'classify': { depends_on: [] },
+      'billing-handler': {
+        depends_on: ['classify'],
+        when: "classify.category == 'billing'",
+      },
+      'tech-handler': {
+        depends_on: ['classify'],
+        when: "classify.category == 'technical'",
+      },
+    });
+    const run = makeRun({
+      completed_steps: ['classify'],
+      evidence: [
+        {
+          step_id: 'classify',
+          started_at: '',
+          completed_at: '',
+          duration_ms: 0,
+          input_summary: {},
+          output_summary: { category: 'billing' },
+          status: 'success',
+          evidence_hash: 'abc',
+        },
+      ],
+    });
+    const result = findEligibleSteps(definition, run);
+    expect(result).toContain('billing-handler');
+    expect(result).not.toContain('tech-handler');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// claimStep — double-claim prevention
+// ---------------------------------------------------------------------------
+
+describe('claimStep — double-claim prevention', () => {
+  let runDir: string;
+
+  beforeEach(async () => {
+    runDir = await mkdtemp(join(tmpdir(), 'realm-eligibility-'));
+  });
+
+  it('first claimStep adds the step to in_progress_steps', async () => {
+    const store = new JsonFileStore(runDir);
+    const definition = makeWorkflow({ 'step-a': { depends_on: [] } });
+    const run = await store.create({ workflowId: 'test-wf', workflowVersion: 1, params: {} });
+
+    const claimed = await store.claimStep(run.id, 'step-a', definition);
+    expect(claimed.in_progress_steps).toContain('step-a');
+  });
+
+  it('second claimStep on the same step throws STATE_STEP_ALREADY_CLAIMED', async () => {
+    const store = new JsonFileStore(runDir);
+    const definition = makeWorkflow({ 'step-a': { depends_on: [] } });
+    const run = await store.create({ workflowId: 'test-wf', workflowVersion: 1, params: {} });
+
+    await store.claimStep(run.id, 'step-a', definition);
+
+    await expect(store.claimStep(run.id, 'step-a', definition)).rejects.toThrow(
+      /already claimed|already|in.?progress/i,
+    );
+  });
+
+  it('claimStep on a completed step throws', async () => {
+    const store = new JsonFileStore(runDir);
+    const definition = makeWorkflow({ 'step-a': { depends_on: [] } });
+    const run = await store.create({ workflowId: 'test-wf', workflowVersion: 1, params: {} });
+    const claimed = await store.claimStep(run.id, 'step-a', definition);
+
+    // Move step-a to completed_steps.
+    await store.update({
+      ...claimed,
+      in_progress_steps: [],
+      completed_steps: ['step-a'],
+    });
+
+    await expect(store.claimStep(run.id, 'step-a', definition)).rejects.toThrow();
+  });
+});

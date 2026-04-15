@@ -25,7 +25,6 @@ export async function respondToGate(
     runId,
     gateId: options.gate,
     choice: options.choice,
-    snapshotId: run.version.toString(),
   });
 
   if (result.status !== 'ok') {
@@ -38,7 +37,7 @@ export async function respondToGate(
   }
 
   const updatedRun = await runStore.get(runId);
-  return { choice: options.choice, newState: updatedRun.state };
+  return { choice: options.choice, newState: updatedRun.run_phase };
 }
 
 export const respondCommand = new Command('respond')

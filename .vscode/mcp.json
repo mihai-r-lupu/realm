@@ -3,7 +3,26 @@
     "realm": {
       "type": "stdio",
       "command": "realm",
-      "args": ["mcp"],
+      "args": [
+        "mcp"
+      ],
+      "autoStart": true,
+      "autoApprove": [
+        "list_workflows",
+        "get_workflow_protocol",
+        "start_run",
+        "execute_step",
+        "submit_human_response",
+        "get_run_state",
+        "create_workflow"
+      ]
+    },
+    "realm-humanizer": {
+      "type": "stdio",
+      "command": "/home/mihai/code/realm/.private/poc-humanizer/node_modules/.bin/tsx",
+      "args": [
+        "/home/mihai/code/realm/.private/poc-humanizer/server.ts"
+      ],
       "autoStart": true,
       "autoApprove": [
         "list_workflows",

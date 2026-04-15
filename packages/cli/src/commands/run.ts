@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import {
   loadWorkflowFromFile,
   JsonFileStore,
-  StateGuard,
+  findEligibleSteps,
   executeChain,
   submitHumanResponse,
 } from '@sensigo/realm';
@@ -40,21 +40,18 @@ export const runCommand = new Command('run')
       process.exit(1);
     }
 
-    // 3. Create store, state guard, and initial run record
+    // 3. Create store and initial run record
     const store = new JsonFileStore();
-    const guard = new StateGuard(definition);
 
     const initialRecord = await store.create({
       workflowId: definition.id,
       workflowVersion: definition.version,
-      initialState: definition.initial_state,
       params,
     });
     const runId = initialRecord.id;
 
     console.log(`\nRealm — ${definition.name} v${definition.version}`);
-    console.log(`Run ID: ${runId}`);
-    console.log(`Initial state: ${definition.initial_state}\n`);
+    console.log(`Run ID: ${runId}\n`);
 
     // 4. Set up readline
     const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -64,15 +61,37 @@ export const runCommand = new Command('run')
 
     try {
       while (!run.terminal_state) {
-        const allowedSteps = guard.getAllowedSteps(run.state);
+        // Handle open gate
+        if (run.pending_gate !== undefined) {
+          const g = run.pending_gate;
+          console.log(`  ⏸  Gate: ${g.step_name} | gate_id: ${g.gate_id}`);
+          console.log(`  Preview: ${JSON.stringify(g.preview, null, 2)}`);
+          const raw = await rl.question(`  Choice [${g.choices.join('/')}]: `);
+          const choice = raw.trim();
+          const respondResult = await submitHumanResponse(store, definition, {
+            runId,
+            gateId: g.gate_id,
+            choice,
+          });
+          if (respondResult.status === 'ok') {
+            run = await store.get(runId);
+            console.log(`  ✓ → ${run.run_phase}\n`);
+          } else {
+            console.error(`  ✗ ${respondResult.errors.join(', ')}\n`);
+            break;
+          }
+          continue;
+        }
 
-        if (allowedSteps.length === 0) {
-          console.error(`\nNo steps available from state '${run.state}'. Workflow stalled.`);
+        const eligibleSteps = findEligibleSteps(definition, run);
+
+        if (eligibleSteps.length === 0) {
+          console.error(`\nNo eligible steps in phase '${run.run_phase}'. Workflow stalled.`);
           break;
         }
 
-        // Take the first allowed step (linear workflow for Phase 1a)
-        const stepName = allowedSteps[0]!;
+        // Take the first eligible step (linear workflow for dev mode)
+        const stepName = eligibleSteps[0]!;
         const stepDef: StepDefinition = definition.steps[stepName]!;
 
         console.log(`→ [${stepDef.execution}] ${stepName}: ${stepDef.description}`);
@@ -97,11 +116,10 @@ export const runCommand = new Command('run')
 
         const dispatcher: StepDispatcher = async () => userOutput;
 
-        const result = await executeChain(store, guard, definition, {
+        const result = await executeChain(store, definition, {
           runId,
           command: stepName,
           input: userOutput,
-          snapshotId: run.version.toString(),
           dispatcher,
         });
 
@@ -110,28 +128,11 @@ export const runCommand = new Command('run')
           const ev = result.evidence[0];
           const hash = ev !== undefined ? ev.evidence_hash.slice(0, 8) : 'n/a';
           const dur = ev !== undefined ? `${ev.duration_ms}ms` : 'n/a';
-          console.log(`  ✓ → ${run.state} | hash: ${hash}... | ${dur}\n`);
+          console.log(`  ✓ → ${run.run_phase} | hash: ${hash}... | ${dur}\n`);
         } else if (result.status === 'confirm_required' && result.gate !== undefined) {
-          const g = result.gate;
-          console.log(`  ⏸  Gate: ${g.step_name} | gate_id: ${g.gate_id}`);
-          console.log(`  Preview: ${JSON.stringify(g.preview, null, 2)}`);
-          const raw = await rl.question(`  Choice [${g.choices.join('/')}]: `);
-          const choice = raw.trim();
-          run = await store.get(runId); // reload to get current version after gate open
-          const respondResult = await submitHumanResponse(store, definition, {
-            runId,
-            gateId: g.gate_id,
-            choice,
-            snapshotId: run.version.toString(),
-          });
-          if (respondResult.status === 'ok') {
-            run = await store.get(runId);
-            console.log(`  ✓ → ${run.state}\n`);
-          } else {
-            console.error(`  ✗ ${respondResult.errors.join(', ')}\n`);
-            break;
-          }
-          continue; // back to top of while loop
+          // Gate opened as part of this step — it will be handled at loop top.
+          run = await store.get(runId);
+          console.log(`  Gate opened for '${result.gate.step_name}'.\n`);
         } else {
           console.error(`  ✗ ${result.status}: ${result.errors.join(', ')}\n`);
           break;
@@ -139,9 +140,10 @@ export const runCommand = new Command('run')
       }
 
       if (run.terminal_state) {
-        console.log(`Run complete. Final state: ${run.state}`);
+        console.log(`Run complete. Phase: ${run.run_phase}`);
       }
     } finally {
       rl.close();
     }
   });
+

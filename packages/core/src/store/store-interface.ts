@@ -1,10 +1,10 @@
 // Interface for run record persistence — implemented by JsonFileStore (local) and future Postgres store.
 import type { RunRecord } from '../types/run-record.js';
+import type { WorkflowDefinition } from '../types/workflow-definition.js';
 
 export interface CreateRunOptions {
   workflowId: string;
   workflowVersion: number;
-  initialState: string;
   params: Record<string, unknown>;
 }
 
@@ -24,4 +24,17 @@ export interface RunStore {
 
   /** List all run records, optionally filtered by workflowId. */
   list(workflowId?: string): Promise<RunRecord[]>;
+
+  /**
+   * Atomically marks a step as in_progress. Under file lock:
+   * 1. Re-reads the current record (ignores caller's version).
+   * 2. Checks the step is not already in in_progress_steps, completed_steps,
+   *    failed_steps, or skipped_steps. If it is, throws STATE_STEP_ALREADY_CLAIMED.
+   * 3. Re-evaluates trigger rule and when-condition. If no longer satisfied,
+   *    throws STATE_STEP_NOT_ELIGIBLE.
+   * 4. Adds step to in_progress_steps, increments version, writes.
+   * Returns the updated record.
+   */
+  claimStep(runId: string, stepName: string, definition: WorkflowDefinition): Promise<RunRecord>;
 }
+

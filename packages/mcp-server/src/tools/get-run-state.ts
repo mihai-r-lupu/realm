@@ -1,7 +1,7 @@
 // get-run-state tool — returns the current state summary of a run.
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { JsonFileStore } from '@sensigo/realm';
+import { JsonFileStore, type RunPhase } from '@sensigo/realm';
 
 export interface HandleRunStateStores {
   runStore?: JsonFileStore;
@@ -10,9 +10,12 @@ export interface HandleRunStateStores {
 export interface RunStateSummary {
   run_id: string;
   workflow_id: string;
-  state: string;
+  run_phase: RunPhase;
   terminal_state: boolean;
-  terminal_reason: string | undefined;
+  completed_steps: string[];
+  in_progress_steps: string[];
+  failed_steps: string[];
+  skipped_steps: string[];
   pending_gate: import('@sensigo/realm').PendingGate | undefined;
   evidence_count: number;
   last_step: string | null;
@@ -35,9 +38,12 @@ export async function handleGetRunState(
   return {
     run_id: run.id,
     workflow_id: run.workflow_id,
-    state: run.state,
+    run_phase: run.run_phase,
     terminal_state: run.terminal_state,
-    terminal_reason: run.terminal_reason,
+    completed_steps: run.completed_steps,
+    in_progress_steps: run.in_progress_steps,
+    failed_steps: run.failed_steps,
+    skipped_steps: run.skipped_steps,
     pending_gate: run.pending_gate,
     evidence_count: run.evidence.length,
     last_step: run.evidence.at(-1)?.step_id ?? null,
@@ -74,7 +80,7 @@ export function registerGetRunState(server: McpServer, opts?: HandleRunStateStor
                   errors: [message],
                   agent_action: 'stop',
                   context_hint: `Error retrieving state for run '${args.run_id}'.`,
-                  next_action: null,
+                  next_actions: [],
                 },
                 null,
                 2,
@@ -86,3 +92,5 @@ export function registerGetRunState(server: McpServer, opts?: HandleRunStateStor
     },
   );
 }
+
+

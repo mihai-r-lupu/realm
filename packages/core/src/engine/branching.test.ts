@@ -1,10 +1,11 @@
-// Tests for conditional branching — on_error transitions and gate-response transitions.
+// Tests for DAG-based branching: trigger_rule variants, when-condition routing,
+// fan-out eligibility, and gate-response flow.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { executeChain, submitHumanResponse } from './execution-loop.js';
-import { StateGuard } from './state-guard.js';
+import { executeStep, executeChain, submitHumanResponse } from './execution-loop.js';
+import { findEligibleSteps } from './eligibility.js';
 import { JsonFileStore } from '../store/json-file-store.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import { ExtensionRegistry } from '../extensions/registry.js';
@@ -24,13 +25,13 @@ class FailingHandler implements StepHandler {
     throw new WorkflowError('Handler deliberately failed', {
       code: 'ENGINE_HANDLER_FAILED',
       category: 'ENGINE',
-      agentAction: 'provide_input',
+      agentAction: 'stop',
       retryable: false,
     });
   }
 }
 
-/** A handler that returns { confidence: value } for on_success routing tests. */
+/** Handler that returns { confidence: value } for when-condition routing tests. */
 class ConfidenceHandler implements StepHandler {
   constructor(private readonly value: string) {}
   readonly id = 'confidence_handler';
@@ -39,243 +40,181 @@ class ConfidenceHandler implements StepHandler {
   }
 }
 
-/** Workflow: auto failing step → on_error → agent recovery step */
-function makeOnErrorToAgentWorkflow(): WorkflowDefinition {
-  return {
-    id: 'on-error-agent-wf',
-    name: 'On Error to Agent',
-    version: 1,
-    initial_state: 'started',
-    steps: {
-      validate: {
-        description: 'Auto step with handler that fails',
-        execution: 'auto',
-        handler: 'always_fail',
-        allowed_from_states: ['started'],
-        produces_state: 'validated',
-        transitions: {
-          on_error: { step: 'recover', produces_state: 'recovery_needed' },
-        },
-      },
-      recover: {
-        description: 'Agent recovery step',
-        execution: 'agent',
-        allowed_from_states: ['recovery_needed'],
-        produces_state: 'completed',
-      },
-    },
-  };
-}
-
-/** Workflow: auto failing step → on_error → auto recovery step → completed */
-function makeOnErrorToAutoWorkflow(): WorkflowDefinition {
-  return {
-    id: 'on-error-auto-wf',
-    name: 'On Error to Auto',
-    version: 1,
-    initial_state: 'started',
-    steps: {
-      validate: {
-        description: 'Auto step with handler that fails',
-        execution: 'auto',
-        handler: 'always_fail',
-        allowed_from_states: ['started'],
-        produces_state: 'validated',
-        transitions: {
-          on_error: { step: 'auto_recover', produces_state: 'recovery_needed' },
-        },
-      },
-      auto_recover: {
-        description: 'Auto recovery step (no handler — uses dispatcher)',
-        execution: 'auto',
-        allowed_from_states: ['recovery_needed'],
-        produces_state: 'completed',
-      },
-    },
-  };
-}
-
-/** Workflow: auto failing step without transition */
-function makeNoTransitionWorkflow(): WorkflowDefinition {
-  return {
-    id: 'no-transition-wf',
-    name: 'No Transition',
-    version: 1,
-    initial_state: 'started',
-    steps: {
-      validate: {
-        description: 'Auto step with handler that fails, no on_error',
-        execution: 'auto',
-        handler: 'always_fail',
-        allowed_from_states: ['started'],
-        produces_state: 'validated',
-      },
-    },
-  };
-}
-
-/** Workflow: auto gate step → on_reject → agent step */
-function makeGateTransitionWorkflow(): WorkflowDefinition {
-  return {
-    id: 'gate-transition-wf',
-    name: 'Gate Transition',
-    version: 1,
-    initial_state: 'started',
-    steps: {
-      confirm: {
-        description: 'Human gate with on_reject transition',
-        execution: 'auto',
-        trust: 'human_confirmed',
-        allowed_from_states: ['started'],
-        produces_state: 'approved',
-        gate: { choices: ['approve', 'reject'] },
-        transitions: {
-          on_reject: { step: 'revise', produces_state: 'revision_needed' },
-        },
-      },
-      revise: {
-        description: 'Agent revision step',
-        execution: 'agent',
-        allowed_from_states: ['revision_needed'],
-        produces_state: 'started',
-      },
-    },
-  };
-}
-
 const passthroughDispatcher: StepDispatcher = async () => ({});
 
-describe('on_error branching', () => {
+// ---------------------------------------------------------------------------
+// trigger_rule: all_failed — recovery after step failure
+// ---------------------------------------------------------------------------
+
+/**
+ * Workflow: step-a (fails) → step-recover (trigger_rule: all_failed, agent)
+ * After step-a fails, step-recover is eligible; step-continue is NOT eligible.
+ */
+function makeRecoveryWorkflow(): WorkflowDefinition {
+  return {
+    id: 'recovery-wf',
+    name: 'Recovery Workflow',
+    version: 1,
+    steps: {
+      validate: {
+        description: 'Auto step that fails',
+        execution: 'auto',
+        handler: 'always_fail',
+        depends_on: [],
+      },
+      recover: {
+        description: 'Agent recovery step — only eligible when validate fails',
+        execution: 'agent',
+        depends_on: ['validate'],
+        trigger_rule: 'all_failed',
+      },
+      continue_work: {
+        description: 'Normal continuation step — only eligible when validate succeeds',
+        execution: 'agent',
+        depends_on: ['validate'],
+      },
+    },
+  };
+}
+
+/** Workflow with no recovery step — failure is terminal. */
+function makeNoRecoveryWorkflow(): WorkflowDefinition {
+  return {
+    id: 'no-recovery-wf',
+    name: 'No Recovery Workflow',
+    version: 1,
+    steps: {
+      validate: {
+        description: 'Auto step with no recovery path',
+        execution: 'auto',
+        handler: 'always_fail',
+        depends_on: [],
+      },
+    },
+  };
+}
+
+/** Workflow: step-a (fails) → step-recover (auto, trigger_rule: all_failed) → completed */
+function makeAutoRecoveryWorkflow(): WorkflowDefinition {
+  return {
+    id: 'auto-recovery-wf',
+    name: 'Auto Recovery Workflow',
+    version: 1,
+    steps: {
+      validate: {
+        description: 'Auto step that fails',
+        execution: 'auto',
+        handler: 'always_fail',
+        depends_on: [],
+      },
+      auto_recover: {
+        description: 'Auto recovery step — runs without agent input',
+        execution: 'auto',
+        depends_on: ['validate'],
+        trigger_rule: 'all_failed',
+      },
+    },
+  };
+}
+
+describe('trigger_rule: all_failed — recovery after step failure', () => {
   let dir: string;
   let store: JsonFileStore;
 
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'realm-branch-test-'));
+    dir = await mkdtemp(join(tmpdir(), 'realm-branch-'));
     store = new JsonFileStore(dir);
   });
 
-  it('step fails with on_error → agent recovery: status ok, next_action at recovery step, warning in envelope', async () => {
-    const definition = makeOnErrorToAgentWorkflow();
-    const guard = new StateGuard(definition);
+  it('step fails → recovery step is eligible, normal continuation is NOT', async () => {
+    const definition = makeRecoveryWorkflow();
     const registry = new ExtensionRegistry();
     registry.register('handler', 'always_fail', new FailingHandler());
 
     const run = await store.create({
       workflowId: definition.id,
       workflowVersion: 1,
-      initialState: 'started',
       params: {},
     });
 
-    const result = await executeChain(store, guard, definition, {
+    const result = await executeStep(store, definition, {
       runId: run.id,
       command: 'validate',
       input: {},
-      snapshotId: run.version.toString(),
-      dispatcher: passthroughDispatcher,
-      registry,
-    });
-
-    expect(result.status).toBe('ok');
-    expect(result.next_action).not.toBeNull();
-    expect(result.next_action?.instruction?.tool).toBe('execute_step');
-    expect((result.next_action?.instruction?.params as Record<string, unknown>)?.['command']).toBe(
-      'recover',
-    );
-    expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toContain('validate');
-    expect(result.warnings[0]).toContain('on_error');
-
-    const updatedRun = await store.get(run.id);
-    expect(updatedRun.state).toBe('recovery_needed');
-    expect(updatedRun.terminal_state).toBe(false);
-  });
-
-  it('step fails without on_error transition → original error returned', async () => {
-    const definition = makeNoTransitionWorkflow();
-    const guard = new StateGuard(definition);
-    const registry = new ExtensionRegistry();
-    registry.register('handler', 'always_fail', new FailingHandler());
-
-    const run = await store.create({
-      workflowId: definition.id,
-      workflowVersion: 1,
-      initialState: 'started',
-      params: {},
-    });
-
-    const result = await executeChain(store, guard, definition, {
-      runId: run.id,
-      command: 'validate',
-      input: {},
-      snapshotId: run.version.toString(),
       dispatcher: passthroughDispatcher,
       registry,
     });
 
     expect(result.status).toBe('error');
-    expect(result.errors).toHaveLength(1);
-    expect(result.warnings).toHaveLength(0);
-  });
-
-  it('step fails with on_error → auto recovery: chain continues through auto step', async () => {
-    const definition = makeOnErrorToAutoWorkflow();
-    const guard = new StateGuard(definition);
-    const registry = new ExtensionRegistry();
-    registry.register('handler', 'always_fail', new FailingHandler());
-
-    const run = await store.create({
-      workflowId: definition.id,
-      workflowVersion: 1,
-      initialState: 'started',
-      params: {},
-    });
-
-    const result = await executeChain(store, guard, definition, {
-      runId: run.id,
-      command: 'validate',
-      input: {},
-      snapshotId: run.version.toString(),
-      dispatcher: passthroughDispatcher,
-      registry,
-    });
-
-    // The auto recovery step ran and completed — terminal state
-    expect(result.status).toBe('ok');
-    expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toContain('on_error');
 
     const updatedRun = await store.get(run.id);
-    expect(updatedRun.state).toBe('completed');
+    expect(updatedRun.failed_steps).toContain('validate');
+    expect(updatedRun.run_phase).toBe('running'); // recovery step still eligible
+
+    const eligible = findEligibleSteps(definition, updatedRun);
+    expect(eligible).toContain('recover');
+    expect(eligible).not.toContain('continue_work');
   });
 
-  it('chained_auto_steps entries for branch hops include branched_via', async () => {
-    const definition = makeOnErrorToAgentWorkflow();
-    const guard = new StateGuard(definition);
+  it('step fails without recovery path → run is terminal (failed)', async () => {
+    const definition = makeNoRecoveryWorkflow();
     const registry = new ExtensionRegistry();
     registry.register('handler', 'always_fail', new FailingHandler());
 
     const run = await store.create({
       workflowId: definition.id,
       workflowVersion: 1,
-      initialState: 'started',
       params: {},
     });
 
-    const result = await executeChain(store, guard, definition, {
+    const result = await executeStep(store, definition, {
       runId: run.id,
       command: 'validate',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: passthroughDispatcher,
       registry,
     });
 
-    expect(result.chained_auto_steps).toBeDefined();
-    expect(result.chained_auto_steps).toHaveLength(1);
-    expect(result.chained_auto_steps![0]!.step).toBe('validate');
-    expect(result.chained_auto_steps![0]!.produced_state).toBe('recovery_needed');
-    expect(result.chained_auto_steps![0]!.branched_via).toBe('on_error');
+    expect(result.status).toBe('error');
+    const updatedRun = await store.get(run.id);
+    expect(updatedRun.run_phase).toBe('failed');
+    expect(updatedRun.terminal_state).toBe(true);
+  });
+
+  it('step fails → auto recovery step is eligible and can be chained explicitly', async () => {
+    const definition = makeAutoRecoveryWorkflow();
+    const registry = new ExtensionRegistry();
+    registry.register('handler', 'always_fail', new FailingHandler());
+
+    const run = await store.create({
+      workflowId: definition.id,
+      workflowVersion: 1,
+      params: {},
+    });
+
+    // step: validate fails
+    const failResult = await executeChain(store, definition, {
+      runId: run.id,
+      command: 'validate',
+      input: {},
+      dispatcher: passthroughDispatcher,
+      registry,
+    });
+    expect(failResult.status).toBe('error');
+
+    // auto_recover is now eligible — can chain into it explicitly
+    const recoveryResult = await executeChain(store, definition, {
+      runId: run.id,
+      command: 'auto_recover',
+      input: {},
+      dispatcher: passthroughDispatcher,
+      registry,
+    });
+    expect(recoveryResult.status).toBe('ok');
+
+    const finalRun = await store.get(run.id);
+    expect(finalRun.run_phase).toBe('completed');
+    expect(finalRun.completed_steps).toContain('auto_recover');
   });
 
   it('cleanup', async () => {
@@ -283,192 +222,100 @@ describe('on_error branching', () => {
   });
 });
 
-describe('on_success branching', () => {
+// ---------------------------------------------------------------------------
+// when — conditional routing based on prior step output
+// ---------------------------------------------------------------------------
+
+/**
+ * Workflow with when-condition routing:
+ *   step-a → step-high (when: "step_a.confidence == high")
+ *          → step-low  (when: "step_a.confidence == low")
+ */
+function makeWhenRoutingWorkflow(): WorkflowDefinition {
+  return {
+    id: 'when-routing-wf',
+    name: 'When Routing Workflow',
+    version: 1,
+    steps: {
+      step_a: {
+        description: 'Auto step that outputs confidence level',
+        execution: 'auto',
+        handler: 'confidence_handler',
+        depends_on: [],
+      },
+      step_high: {
+        description: 'Runs only when confidence is high',
+        execution: 'agent',
+        depends_on: ['step_a'],
+        when: 'step_a.confidence == high',
+      },
+      step_low: {
+        description: 'Runs only when confidence is low',
+        execution: 'agent',
+        depends_on: ['step_a'],
+        when: 'step_a.confidence == low',
+      },
+    },
+  };
+}
+
+describe('when condition routing', () => {
   let dir: string;
   let store: JsonFileStore;
 
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'realm-on-success-test-'));
+    dir = await mkdtemp(join(tmpdir(), 'realm-when-'));
     store = new JsonFileStore(dir);
   });
 
-  function makeOnSuccessWorkflow(): WorkflowDefinition {
-    return {
-      id: 'on-success-wf',
-      name: 'On Success Workflow',
-      version: 1,
-      initial_state: 'started',
-      steps: {
-        check_identity: {
-          description: 'Check identity confidence',
-          execution: 'auto',
-          handler: 'confidence_handler',
-          allowed_from_states: ['started'],
-          produces_state: 'identity_checked',
-          transitions: {
-            on_success: {
-              field: 'confidence',
-              routes: {
-                high: { step: 'extract', produces_state: 'identity_confirmed' },
-                low: { step: 'manual_confirm', produces_state: 'identity_uncertain' },
-              },
-              default: { step: 'manual_confirm', produces_state: 'identity_uncertain' },
-            },
-          },
-        },
-        extract: {
-          description: 'Extract description (auto)',
-          execution: 'auto',
-          allowed_from_states: ['identity_confirmed'],
-          produces_state: 'extracted',
-        },
-        manual_confirm: {
-          description: 'Manual confirmation step',
-          execution: 'agent',
-          allowed_from_states: ['identity_uncertain'],
-          produces_state: 'confirmed',
-        },
-      },
-    };
-  }
-
-  it('on_success high confidence routes to extract step', async () => {
-    const definition = makeOnSuccessWorkflow();
-    const guard = new StateGuard(definition);
+  it('confidence=high → step_high eligible, step_low NOT eligible', async () => {
+    const definition = makeWhenRoutingWorkflow();
     const registry = new ExtensionRegistry();
     registry.register('handler', 'confidence_handler', new ConfidenceHandler('high'));
 
     const run = await store.create({
       workflowId: definition.id,
       workflowVersion: 1,
-      initialState: 'started',
       params: {},
     });
 
-    const result = await executeChain(store, guard, definition, {
+    await executeStep(store, definition, {
       runId: run.id,
-      command: 'check_identity',
+      command: 'step_a',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: passthroughDispatcher,
       registry,
     });
 
-    expect(result.status).toBe('ok');
-    // extract is auto — chain runs through it to terminal state
     const updatedRun = await store.get(run.id);
-    expect(updatedRun.state).toBe('extracted');
-    expect(result.chained_auto_steps).toBeDefined();
-    expect(result.chained_auto_steps![0]!.step).toBe('check_identity');
-    expect(result.chained_auto_steps![0]!.produced_state).toBe('identity_confirmed');
-    expect(result.chained_auto_steps![0]!.branched_via).toBe('on_success');
+    const eligible = findEligibleSteps(definition, updatedRun);
+    expect(eligible).toContain('step_high');
+    expect(eligible).not.toContain('step_low');
   });
 
-  it('on_success low confidence routes to manual_confirm (agent) step', async () => {
-    const definition = makeOnSuccessWorkflow();
-    const guard = new StateGuard(definition);
+  it('confidence=low → step_low eligible, step_high NOT eligible', async () => {
+    const definition = makeWhenRoutingWorkflow();
     const registry = new ExtensionRegistry();
     registry.register('handler', 'confidence_handler', new ConfidenceHandler('low'));
 
     const run = await store.create({
       workflowId: definition.id,
       workflowVersion: 1,
-      initialState: 'started',
       params: {},
     });
 
-    const result = await executeChain(store, guard, definition, {
+    await executeStep(store, definition, {
       runId: run.id,
-      command: 'check_identity',
+      command: 'step_a',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: passthroughDispatcher,
       registry,
     });
 
-    expect(result.status).toBe('ok');
     const updatedRun = await store.get(run.id);
-    expect(updatedRun.state).toBe('identity_uncertain');
-    expect(result.next_action?.instruction?.tool).toBe('execute_step');
-    expect((result.next_action?.instruction?.params as Record<string, unknown>)?.['command']).toBe(
-      'manual_confirm',
-    );
-    expect(result.chained_auto_steps).toBeDefined();
-    expect(result.chained_auto_steps![0]!.produced_state).toBe('identity_uncertain');
-    expect(result.chained_auto_steps![0]!.branched_via).toBe('on_success');
-  });
-
-  it('on_success unknown value uses default route', async () => {
-    const definition = makeOnSuccessWorkflow();
-    const guard = new StateGuard(definition);
-    const registry = new ExtensionRegistry();
-    registry.register('handler', 'confidence_handler', new ConfidenceHandler('unknown_value'));
-
-    const run = await store.create({
-      workflowId: definition.id,
-      workflowVersion: 1,
-      initialState: 'started',
-      params: {},
-    });
-
-    const result = await executeChain(store, guard, definition, {
-      runId: run.id,
-      command: 'check_identity',
-      input: {},
-      snapshotId: run.version.toString(),
-      dispatcher: passthroughDispatcher,
-      registry,
-    });
-
-    expect(result.status).toBe('ok');
-    const updatedRun = await store.get(run.id);
-    expect(updatedRun.state).toBe('identity_uncertain');
-    expect(result.chained_auto_steps![0]!.branched_via).toBe('on_success');
-    expect(result.chained_auto_steps![0]!.produced_state).toBe('identity_uncertain');
-  });
-
-  it('step without on_success uses top-level produces_state (backward compat)', async () => {
-    const definition: WorkflowDefinition = {
-      id: 'no-on-success-wf',
-      name: 'No On Success',
-      version: 1,
-      initial_state: 'started',
-      steps: {
-        check_identity: {
-          description: 'Check (no on_success)',
-          execution: 'auto',
-          handler: 'confidence_handler',
-          allowed_from_states: ['started'],
-          produces_state: 'identity_checked',
-        },
-      },
-    };
-    const guard = new StateGuard(definition);
-    const registry = new ExtensionRegistry();
-    registry.register('handler', 'confidence_handler', new ConfidenceHandler('high'));
-
-    const run = await store.create({
-      workflowId: definition.id,
-      workflowVersion: 1,
-      initialState: 'started',
-      params: {},
-    });
-
-    const result = await executeChain(store, guard, definition, {
-      runId: run.id,
-      command: 'check_identity',
-      input: {},
-      snapshotId: run.version.toString(),
-      dispatcher: passthroughDispatcher,
-      registry,
-    });
-
-    expect(result.status).toBe('ok');
-    const updatedRun = await store.get(run.id);
-    expect(updatedRun.state).toBe('identity_checked');
-    if (result.chained_auto_steps !== undefined) {
-      expect(result.chained_auto_steps.every((s) => s.branched_via === undefined)).toBe(true);
-    }
+    const eligible = findEligibleSteps(definition, updatedRun);
+    expect(eligible).toContain('step_low');
+    expect(eligible).not.toContain('step_high');
   });
 
   it('cleanup', async () => {
@@ -476,95 +323,158 @@ describe('on_success branching', () => {
   });
 });
 
-describe('gate-response transition', () => {
+// ---------------------------------------------------------------------------
+// fan-out: multiple steps eligible from same parent
+// ---------------------------------------------------------------------------
+
+describe('fan-out: multiple steps eligible simultaneously', () => {
   let dir: string;
   let store: JsonFileStore;
 
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'realm-gate-branch-test-'));
+    dir = await mkdtemp(join(tmpdir(), 'realm-fanout-'));
     store = new JsonFileStore(dir);
   });
 
-  it('on_reject transition: submit reject routes to target step, next_action points there', async () => {
-    const definition = makeGateTransitionWorkflow();
-    const guard = new StateGuard(definition);
-
-    const run = await store.create({
+  it('after step-a completes, both step-b and step-c are eligible', async () => {
+    const definition: WorkflowDefinition = {
+      id: 'fanout-wf',
+      name: 'Fan-out Workflow',
+      version: 1,
+      steps: {
+        'step-a': { description: 'Root', execution: 'auto', depends_on: [] },
+        'step-b': { description: 'Branch 1', execution: 'agent', depends_on: ['step-a'] },
+        'step-c': { description: 'Branch 2', execution: 'agent', depends_on: ['step-a'] },
+      },
+    };
+    const store2 = new JsonFileStore(dir);
+    const run = await store2.create({
       workflowId: definition.id,
       workflowVersion: 1,
-      initialState: 'started',
       params: {},
     });
 
-    // Open the gate
-    const gateResult = await executeChain(store, guard, definition, {
+    await executeStep(store2, definition, {
       runId: run.id,
-      command: 'confirm',
+      command: 'step-a',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: passthroughDispatcher,
     });
 
-    expect(gateResult.status).toBe('confirm_required');
-    const gateId = gateResult.gate!.gate_id;
-    const gateRun = await store.get(run.id);
-
-    // Submit reject choice
-    const rejectResult = await submitHumanResponse(store, definition, {
-      runId: run.id,
-      gateId,
-      choice: 'reject',
-      snapshotId: gateRun.version.toString(),
-    });
-
-    expect(rejectResult.status).toBe('ok');
-    expect(rejectResult.next_action).not.toBeNull();
-    expect(rejectResult.next_action?.instruction?.tool).toBe('execute_step');
-    expect(
-      (rejectResult.next_action?.instruction?.params as Record<string, unknown>)?.['command'],
-    ).toBe('revise');
-    expect(rejectResult.chained_auto_steps).toBeDefined();
-    expect(rejectResult.chained_auto_steps![0]!.branched_via).toBe('on_reject');
-    expect(rejectResult.chained_auto_steps![0]!.produced_state).toBe('revision_needed');
-
-    const updatedRun = await store.get(run.id);
-    expect(updatedRun.state).toBe('revision_needed');
+    const updatedRun = await store2.get(run.id);
+    const eligible = findEligibleSteps(definition, updatedRun);
+    expect(eligible).toContain('step-b');
+    expect(eligible).toContain('step-c');
+    expect(eligible).toHaveLength(2);
   });
 
-  it('approve with no transition: normal flow to produces_state', async () => {
-    const definition = makeGateTransitionWorkflow();
-    const guard = new StateGuard(definition);
+  it('cleanup', async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+});
 
+// ---------------------------------------------------------------------------
+// gate response — submitHumanResponse advances the run
+// ---------------------------------------------------------------------------
+
+const autoGateDef: WorkflowDefinition = {
+  id: 'gate-advance-wf',
+  name: 'Gate Advance Workflow',
+  version: 1,
+  steps: {
+    confirm: {
+      description: 'Human gate — approve or reject',
+      execution: 'auto',
+      trust: 'human_confirmed',
+      depends_on: [],
+      gate: { choices: ['approve', 'reject'] },
+    },
+    'post-approve': {
+      description: 'Runs after approval',
+      execution: 'agent',
+      depends_on: ['confirm'],
+    },
+  },
+};
+
+describe('gate-response flow', () => {
+  let dir: string;
+  let store: JsonFileStore;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'realm-gate-'));
+    store = new JsonFileStore(dir);
+  });
+
+  it('approve advances run — confirm moves to completed_steps, post-approve is eligible', async () => {
     const run = await store.create({
-      workflowId: definition.id,
+      workflowId: autoGateDef.id,
       workflowVersion: 1,
-      initialState: 'started',
       params: {},
     });
 
-    const gateResult = await executeChain(store, guard, definition, {
+    const gateResult = await executeChain(store, autoGateDef, {
       runId: run.id,
       command: 'confirm',
       input: {},
-      snapshotId: run.version.toString(),
       dispatcher: passthroughDispatcher,
     });
-
     expect(gateResult.status).toBe('confirm_required');
     const gateId = gateResult.gate!.gate_id;
-    const gateRun = await store.get(run.id);
 
-    const approveResult = await submitHumanResponse(store, definition, {
+    const approveResult = await submitHumanResponse(store, autoGateDef, {
       runId: run.id,
       gateId,
       choice: 'approve',
-      snapshotId: gateRun.version.toString(),
     });
 
     expect(approveResult.status).toBe('ok');
-    expect(approveResult.chained_auto_steps).toBeUndefined();
     const finalRun = await store.get(run.id);
-    expect(finalRun.state).toBe('approved');
+    expect(finalRun.completed_steps).toContain('confirm');
+    expect(finalRun.pending_gate).toBeUndefined();
+    expect(findEligibleSteps(autoGateDef, finalRun)).toContain('post-approve');
+  });
+
+  it('reject on only-step gate — run completes after reject with no reject handler', async () => {
+    const singleGateDef: WorkflowDefinition = {
+      id: 'single-gate-wf',
+      name: 'Single Gate Workflow',
+      version: 1,
+      steps: {
+        confirm: {
+          description: 'Single gate step',
+          execution: 'auto',
+          trust: 'human_confirmed',
+          depends_on: [],
+          gate: { choices: ['approve', 'reject'] },
+        },
+      },
+    };
+
+    const run = await store.create({
+      workflowId: singleGateDef.id,
+      workflowVersion: 1,
+      params: {},
+    });
+
+    const gateResult = await executeChain(store, singleGateDef, {
+      runId: run.id,
+      command: 'confirm',
+      input: {},
+      dispatcher: passthroughDispatcher,
+    });
+    expect(gateResult.status).toBe('confirm_required');
+
+    const rejectResult = await submitHumanResponse(store, singleGateDef, {
+      runId: run.id,
+      gateId: gateResult.gate!.gate_id,
+      choice: 'reject',
+    });
+
+    expect(rejectResult.status).toBe('ok');
+    const finalRun = await store.get(run.id);
+    expect(finalRun.completed_steps).toContain('confirm');
+    expect(finalRun.run_phase).toBe('completed');
   });
 
   it('cleanup', async () => {

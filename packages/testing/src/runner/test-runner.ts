@@ -1,7 +1,7 @@
 // Test runner — drives a workflow to completion per fixture and reports results.
 import {
   loadWorkflowFromFile,
-  StateGuard,
+  findEligibleSteps,
   ExtensionRegistry,
   createDefaultRegistry,
   executeChain,
@@ -42,7 +42,6 @@ export interface RunFixtureTestsOptions {
 async function runSingleFixture(
   fixture: TestFixture,
   definition: WorkflowDefinition,
-  guard: StateGuard,
   options: RunFixtureTestsOptions,
 ): Promise<TestResult> {
   try {
@@ -70,7 +69,6 @@ async function runSingleFixture(
     const run = await store.create({
       workflowId: definition.id,
       workflowVersion: definition.version,
-      initialState: definition.initial_state,
       params: fixture.params,
     });
     const runId = run.id;
@@ -90,16 +88,35 @@ async function runSingleFixture(
         };
       }
 
-      const allowedSteps = guard.getAllowedSteps(currentRun.state);
-      if (allowedSteps.length === 0) {
+      const eligibleSteps = findEligibleSteps(definition, currentRun);
+      if (eligibleSteps.length === 0 && currentRun.pending_gate === undefined) {
         return {
           name: fixture.name,
           passed: false,
-          error: `Workflow stalled: no steps allowed from state '${currentRun.state}'`,
+          error: `Workflow stalled: no eligible steps in phase '${currentRun.run_phase}'`,
         };
       }
 
-      const nextStep = allowedSteps[0]!;
+      // If a gate is open, respond to it and continue.
+      if (currentRun.pending_gate !== undefined) {
+        const gateResult = await createGateResponder(
+          store,
+          definition,
+          runId,
+          fixture.gate_responses ?? {},
+        );
+        if (gateResult.status === 'error') {
+          return {
+            name: fixture.name,
+            passed: false,
+            error: gateResult.errors[0] ?? 'Unknown gate response error',
+          };
+        }
+        currentRun = await store.get(runId);
+        continue;
+      }
+
+      const nextStep = eligibleSteps[0]!;
       const stepDef = definition.steps[nextStep];
       // Agent steps need the fixture's pre-built response as the input so the
       // engine's input_schema validation passes before the dispatcher runs.
@@ -109,28 +126,29 @@ async function runSingleFixture(
         stepDef?.execution === 'agent'
           ? ((fixture.agent_responses[nextStep] ?? {}) as Record<string, unknown>)
           : {};
-      const envelope = await executeChain(store, guard, definition, {
+      const envelope = await executeChain(store, definition, {
         runId,
         command: nextStep,
         input: stepInput,
-        snapshotId: currentRun.version.toString(),
         dispatcher,
         registry: fixtureRegistry,
       });
 
       if (envelope.status === 'error') {
         // If this step has mock errors configured and we haven't exhausted them yet,
-        // simulate `realm run resume --from <step>`: reset the run to the step's
-        // allowed_from_state and continue the loop instead of failing the test.
+        // simulate `realm run resume --from <step>`: remove the step from failed_steps
+        // to make it eligible again, then continue the loop.
         const mockErrors = fixture.agent_errors?.[nextStep];
         const resumesDone = stepResumeCount[nextStep] ?? 0;
         if (mockErrors !== undefined && resumesDone < mockErrors.length) {
           stepResumeCount[nextStep] = resumesDone + 1;
-          const stepDef = definition.steps[nextStep]!;
-          const resetState = stepDef.allowed_from_states[0]!;
           const failedRun = await store.get(runId);
           const { terminal_reason: _tr, ...rest } = failedRun;
-          await store.update({ ...rest, state: resetState, terminal_state: false });
+          await store.update({
+            ...rest,
+            failed_steps: rest.failed_steps.filter((s) => s !== nextStep),
+            terminal_state: false,
+          });
           currentRun = await store.get(runId);
           continue;
         }
@@ -141,27 +159,10 @@ async function runSingleFixture(
         };
       }
 
-      if (envelope.status === 'confirm_required') {
-        const gateResult = await createGateResponder(
-          store,
-          definition,
-          runId,
-          envelope.snapshot_id,
-          fixture.gate_responses ?? {},
-        );
-        if (gateResult.status === 'error') {
-          return {
-            name: fixture.name,
-            passed: false,
-            error: gateResult.errors[0] ?? 'Unknown gate response error',
-          };
-        }
-      }
-
       currentRun = await store.get(runId);
     }
 
-    // Assert final state.
+    // Assert final phase.
     assertFinalState(currentRun, fixture.expected.final_state);
 
     // Assert expected evidence entries if provided.
@@ -206,10 +207,10 @@ export async function runFixtureTests(options: RunFixtureTestsOptions): Promise<
         : options.workflowPath;
 
   const definition = loadWorkflowFromFile(workflowFilePath);
-  const guard = new StateGuard(definition);
   const fixtures = loadFixturesFromDir(options.fixturesPath);
 
-  return Promise.all(
-    fixtures.map((fixture) => runSingleFixture(fixture, definition, guard, options)),
-  );
+  return Promise.all(fixtures.map((fixture) => runSingleFixture(fixture, definition, options)));
 }
+
+
+/** Result of a single fixture test run. */

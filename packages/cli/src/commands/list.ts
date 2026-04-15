@@ -3,14 +3,12 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import type { RunStore, RunRecord } from '@sensigo/realm';
 
-/** Returns a chalk-coloured state label. */
+/** Returns a chalk-coloured phase label. */
 function colorState(run: RunRecord): string {
-  if (!run.terminal_state) {
-    if (run.state === 'gate_waiting') return chalk.cyan(run.state);
-    return chalk.yellow(run.state);
-  }
-  if (run.state === 'completed') return chalk.green(run.state);
-  return chalk.red(run.state);
+  if (run.run_phase === 'completed') return chalk.green(run.run_phase);
+  if (run.run_phase === 'failed' || run.run_phase === 'abandoned') return chalk.red(run.run_phase);
+  if (run.run_phase === 'gate_waiting') return chalk.cyan(run.run_phase);
+  return chalk.yellow(run.run_phase);
 }
 
 /**

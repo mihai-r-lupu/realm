@@ -28,7 +28,7 @@ describe('handleCreateWorkflow', () => {
     );
     expect(result.status).toBe('ok');
     expect(result.run_id).not.toBe('');
-    expect(result.next_action?.instruction?.call_with.command).toBe('research');
+    expect(result.next_actions[0]?.instruction?.call_with.command).toBe('research');
   });
 
   it('happy path — multi-step: ok, first step in next_action, 3 steps in store', async () => {
@@ -41,7 +41,7 @@ describe('handleCreateWorkflow', () => {
     };
     const result = await handleCreateWorkflow(args, stores);
     expect(result.status).toBe('ok');
-    expect(result.next_action?.instruction?.call_with.command).toBe('plan');
+    expect(result.next_actions[0]?.instruction?.call_with.command).toBe('plan');
 
     const def = await stores.workflowStore.get(result.data['workflow_id'] as string);
     expect(Object.keys(def.steps)).toHaveLength(3);
@@ -83,7 +83,7 @@ describe('handleCreateWorkflow', () => {
     expect(result.status).toBe('ok');
     const def = await stores.workflowStore.get(result.data['workflow_id'] as string);
     expect(def.steps['step-schema']?.input_schema).toEqual(schema);
-    expect(result.next_action?.input_schema).toEqual(schema);
+    expect(result.next_actions[0]?.input_schema).toEqual(schema);
   });
 
   it('validation — empty steps array returns error with provide_input', async () => {
@@ -208,34 +208,34 @@ describe('end-to-end — create_workflow + execute_step walk to completion', () 
     );
 
     expect(createResult.status).toBe('ok');
-    expect(createResult.next_action?.instruction?.call_with.command).toBe('step_one');
+    expect(createResult.next_actions[0]?.instruction?.call_with.command).toBe('step_one');
 
     const step1Result = await handleExecuteStep(
       {
         run_id: createResult.run_id,
-        command: createResult.next_action!.instruction!.call_with.command as string,
+        command: createResult.next_actions[0]!.instruction!.call_with.command as string,
         params: { output: 'first output' },
       },
       stores,
     );
 
     expect(step1Result.status).toBe('ok');
-    expect(step1Result.next_action?.instruction?.call_with.command).toBe('step_two');
+    expect(step1Result.next_actions[0]?.instruction?.call_with.command).toBe('step_two');
 
     const step2Result = await handleExecuteStep(
       {
         run_id: step1Result.run_id,
-        command: step1Result.next_action!.instruction!.call_with.command as string,
+        command: step1Result.next_actions[0]!.instruction!.call_with.command as string,
         params: { output: 'second output' },
       },
       stores,
     );
 
     expect(step2Result.status).toBe('ok');
-    expect(step2Result.next_action).toBeNull();
+    expect(step2Result.next_actions.length).toBe(0);
 
     // Verify the run itself reached the terminal state.
     const finalRun = await stores.runStore.get(step2Result.run_id);
-    expect(finalRun.state).toBe('completed');
+    expect(finalRun.run_phase).toBe('completed');
   });
 });

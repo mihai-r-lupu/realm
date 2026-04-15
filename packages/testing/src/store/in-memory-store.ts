@@ -1,9 +1,12 @@
 // InMemoryStore — in-memory implementation of RunStore for use in tests.
 import {
   WorkflowError,
+  findEligibleSteps,
+  deriveRunPhase,
   type RunStore,
   type RunRecord,
   type CreateRunOptions,
+  type WorkflowDefinition,
 } from '@sensigo/realm';
 
 /** In-memory implementation of RunStore. Uses a Map keyed by run ID. No I/O, no locking. */
@@ -16,7 +19,11 @@ export class InMemoryStore implements RunStore {
       id: crypto.randomUUID(),
       workflow_id: options.workflowId,
       workflow_version: options.workflowVersion,
-      state: options.initialState,
+      completed_steps: [],
+      in_progress_steps: [],
+      failed_steps: [],
+      skipped_steps: [],
+      run_phase: 'running',
       version: 0,
       params: options.params,
       evidence: [],
@@ -51,17 +58,59 @@ export class InMemoryStore implements RunStore {
         retryable: false,
       });
     }
-    if (record.version !== existing.version) {
-      throw new WorkflowError('Snapshot version mismatch', {
+    if (existing.version !== record.version) {
+      throw new WorkflowError('Version conflict — run was modified by another process', {
         code: 'STATE_SNAPSHOT_MISMATCH',
         category: 'STATE',
         agentAction: 'report_to_user',
         retryable: true,
+        details: { runId: record.id, expected: record.version, actual: existing.version },
       });
     }
     const updated: RunRecord = {
       ...record,
+      run_phase: deriveRunPhase(record),
       version: record.version + 1,
+      updated_at: new Date().toISOString(),
+    };
+    this.runs.set(updated.id, updated);
+    return updated;
+  }
+
+  async claimStep(
+    runId: string,
+    stepName: string,
+    definition: WorkflowDefinition,
+  ): Promise<RunRecord> {
+    const run = await this.get(runId);
+    const alreadyDone = [
+      ...run.completed_steps,
+      ...run.in_progress_steps,
+      ...run.failed_steps,
+      ...run.skipped_steps,
+    ];
+    if (alreadyDone.includes(stepName)) {
+      throw new WorkflowError(`Step '${stepName}' is already claimed or done`, {
+        code: 'STATE_STEP_ALREADY_CLAIMED',
+        category: 'STATE',
+        agentAction: 'resolve_precondition',
+        retryable: false,
+      });
+    }
+    const eligible = findEligibleSteps(definition, run);
+    if (!eligible.includes(stepName)) {
+      throw new WorkflowError(`Step '${stepName}' is not eligible`, {
+        code: 'STATE_STEP_NOT_ELIGIBLE',
+        category: 'STATE',
+        agentAction: 'resolve_precondition',
+        retryable: false,
+      });
+    }
+    const updated: RunRecord = {
+      ...run,
+      in_progress_steps: [...run.in_progress_steps, stepName],
+      run_phase: 'running',
+      version: run.version + 1,
       updated_at: new Date().toISOString(),
     };
     this.runs.set(updated.id, updated);

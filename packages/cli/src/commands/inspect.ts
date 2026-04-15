@@ -61,20 +61,24 @@ export async function inspectRun(
     definitionMissing = true;
   }
 
-  // Color the state label based on terminal outcome.
-  let stateLabel: string;
-  if (run.terminal_state && run.state === 'completed') {
-    stateLabel = chalk.green(`${run.state}  \u2713`);
-  } else if (run.terminal_state && (run.state === 'failed' || run.state === 'abandoned')) {
-    stateLabel = chalk.red(run.state);
+  // Color the phase label.
+  let phaseLabel: string;
+  if (run.run_phase === 'completed') {
+    phaseLabel = chalk.green(`${run.run_phase}  \u2713`);
+  } else if (run.run_phase === 'failed' || run.run_phase === 'abandoned') {
+    phaseLabel = chalk.red(run.run_phase);
   } else {
-    stateLabel = chalk.yellow(run.state);
+    phaseLabel = chalk.yellow(run.run_phase);
   }
 
   const lines: string[] = [];
   lines.push(`Run: ${run.id}`);
   lines.push(`Workflow: ${workflowLabel}`);
-  lines.push(`State: ${stateLabel}`);
+  lines.push(`Phase: ${phaseLabel}`);
+  lines.push(`Completed: ${run.completed_steps.join(', ') || '(none)'}`);
+  lines.push(`In Progress: ${run.in_progress_steps.join(', ') || '(none)'}`);
+  lines.push(`Failed: ${run.failed_steps.join(', ') || '(none)'}`);
+  lines.push(`Skipped: ${run.skipped_steps.join(', ') || '(none)'}`);
   lines.push(`Created: ${run.created_at}`);
   lines.push(`Updated: ${run.updated_at}`);
 

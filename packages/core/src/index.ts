@@ -5,12 +5,21 @@ export * from './types/workflow-error.js';
 export * from './types/workflow-definition.js';
 export * from './store/store-interface.js';
 export { JsonFileStore } from './store/json-file-store.js';
-export { StateGuard } from './engine/state-guard.js';
 export { executeStep } from './engine/execution-loop.js';
 export type { StepDispatcher, ExecuteStepOptions } from './engine/execution-loop.js';
-export { findNextAction, submitHumanResponse, executeChain } from './engine/execution-loop.js';
+export { submitHumanResponse, executeChain, buildNextActions } from './engine/execution-loop.js';
 export type { SubmitGateOptions, ExecuteChainOptions } from './engine/execution-loop.js';
 export {
+  findEligibleSteps,
+  isWorkflowComplete,
+  deriveRunPhase,
+  buildEvidenceByStep,
+} from './engine/eligibility.js';
+export {
+  TERMINAL_PHASES,
+  RESUMABLE_PHASES,
+  WAITING_PHASES,
+  isTerminalPhase,
   TERMINAL_STATES,
   RESUMABLE_STATES,
   WAITING_STATES,

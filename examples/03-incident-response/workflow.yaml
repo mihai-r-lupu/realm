@@ -6,7 +6,6 @@
 id: incident-response
 name: Incident First-Response
 version: 1
-initial_state: created
 
 params_schema:
   type: object
@@ -25,20 +24,18 @@ steps:
   read_alert:
     description: Load alert data from disk
     execution: auto
+    depends_on: []
     trust: engine_delivered
     uses_service: alerts
     operation: read
     input_map:
       path: run.params.path
-    allowed_from_states: [created]
-    produces_state: alert_loaded
 
   analyze_cause:
     description: Identify root cause, severity, and impacted services from the alert
     execution: agent
+    depends_on: [read_alert]
     agent_profile: incident-analyzer
-    allowed_from_states: [alert_loaded]
-    produces_state: cause_analyzed
     prompt: |
       You are an on-call engineer performing incident triage.
 
@@ -76,9 +73,8 @@ steps:
   draft_response:
     description: Draft the oncall channel message based on the triage analysis
     execution: agent
+    depends_on: [analyze_cause]
     agent_profile: response-drafter
-    allowed_from_states: [cause_analyzed]
-    produces_state: response_drafted
     prompt: |
       Draft an oncall incident message based on the triage analysis below.
 
@@ -111,9 +107,8 @@ steps:
   confirm_and_send:
     description: Present the analysis and draft to the oncall engineer for approval
     execution: auto
+    depends_on: [draft_response]
     trust: human_confirmed
-    allowed_from_states: [response_drafted]
-    produces_state: completed
     input_schema:
       type: object
       properties:

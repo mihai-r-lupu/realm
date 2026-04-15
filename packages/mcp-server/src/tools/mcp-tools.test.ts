@@ -19,13 +19,11 @@ function makeSimpleDef(): WorkflowDefinition {
     id: 'simple-wf',
     name: 'Simple Workflow',
     version: 1,
-    initial_state: 'created',
     steps: {
       'step-a': {
         description: 'Auto step',
         execution: 'auto',
-        allowed_from_states: ['created'],
-        produces_state: 'completed',
+        depends_on: [],
       },
     },
   };
@@ -37,38 +35,34 @@ function makeAgentDef(): WorkflowDefinition {
     id: 'agent-wf',
     name: 'Agent Workflow',
     version: 1,
-    initial_state: 'created',
     steps: {
       'step-auto': {
         description: 'Auto step',
         execution: 'auto',
-        allowed_from_states: ['created'],
-        produces_state: 'state_a',
+        depends_on: [],
       },
       'step-agent': {
         description: 'Agent step',
         execution: 'agent',
-        allowed_from_states: ['state_a'],
-        produces_state: 'completed',
+        depends_on: ['step-auto'],
       },
     },
   };
 }
 
-/** Workflow with a human gate: auto → waiting → completed */
+/** Workflow with a human gate: auto → gate → completed */
 function makeGateDef(): WorkflowDefinition {
   return {
     id: 'gate-wf',
     name: 'Gate Workflow',
     version: 1,
-    initial_state: 'created',
     steps: {
       'step-gate': {
         description: 'Gate step',
         execution: 'auto',
         trust: 'human_confirmed',
-        allowed_from_states: ['created'],
-        produces_state: 'approved',
+        depends_on: [],
+        gate: { choices: ['approve', 'reject'] },
       },
     },
   };
@@ -119,10 +113,10 @@ describe('mcp tool handlers', () => {
     expect(result.data).toEqual({});
     expect(result.context_hint).toBeDefined();
     expect(result.context_hint).not.toBe('');
-    expect(result.chained_auto_steps).toEqual([{ step: 'step-a', produced_state: 'completed' }]);
+    expect(result.chained_auto_steps).toEqual([{ step: 'step-a', run_phase: 'completed' }]);
 
     const run = await runStore.get(result.run_id);
-    expect(run.state).toBe('completed');
+    expect(run.run_phase).toBe('completed');
   });
 
   it('handleExecuteStep advances an agent step', async () => {
@@ -138,12 +132,12 @@ describe('mcp tool handlers', () => {
     expect(startResult.status).toBe('ok');
     // The auto step ran silently during start_run — it must be reported.
     expect(startResult.chained_auto_steps).toEqual([
-      { step: 'step-auto', produced_state: 'state_a' },
+      { step: 'step-auto', run_phase: 'running' },
     ]);
 
-    // Run is now at state_a waiting for the agent step.
+    // Run is now waiting for the agent step.
     const midRun = await runStore.get(startResult.run_id);
-    expect(midRun.state).toBe('state_a');
+    expect(midRun.run_phase).toBe('running');
 
     // Agent executes the step.
     const result = await handleExecuteStep(
@@ -153,7 +147,7 @@ describe('mcp tool handlers', () => {
 
     expect(result.status).toBe('ok');
     const finalRun = await runStore.get(startResult.run_id);
-    expect(finalRun.state).toBe('completed');
+    expect(finalRun.run_phase).toBe('completed');
   });
 
   it('handleSubmitHumanResponse advances a gate-waiting run', async () => {
@@ -179,7 +173,7 @@ describe('mcp tool handlers', () => {
 
     expect(result.status).toBe('ok');
     const finalRun = await runStore.get(startResult.run_id);
-    expect(finalRun.state).toBe('approved');
+    expect(finalRun.run_phase).toBe('completed');
     // Suppress unused-variable warning for gateRun
     void gateRun;
   });
@@ -233,7 +227,8 @@ describe('mcp tool handlers', () => {
     const parsed = JSON.parse(result.content[0]!.text) as Record<string, unknown>;
     expect(parsed['status']).toBe('error');
     expect(parsed['agent_action']).toBe('stop');
-    expect(parsed['next_action']).toBeNull();
+    expect(Array.isArray(parsed['next_actions'])).toBe(true);
+    expect((parsed['next_actions'] as unknown[]).length).toBe(0);
     expect((parsed['errors'] as string[])[0]).toContain('unexpected failure');
     expect(parsed['run_id']).toBe('test-run');
     expect(parsed['command']).toBe('review_security');
@@ -252,34 +247,28 @@ describe('mcp tool handlers', () => {
     const state = await handleGetRunState({ run_id: startResult.run_id }, { runStore });
 
     expect(state.run_id).toBe(startResult.run_id);
-    expect(state.state).toBe('completed');
+    expect(state.run_phase).toBe('completed');
     expect(state.terminal_state).toBe(true);
     expect(typeof state.evidence_count).toBe('number');
   });
 
-  it('gate on_reject transition: submit_human_response routes to target step', async () => {
+  it('gate on_reject: submit_human_response with reject makes next step eligible', async () => {
     const gateTransitionDef: WorkflowDefinition = {
       id: 'gate-trans-wf',
       name: 'Gate Transition Workflow',
       version: 1,
-      initial_state: 'created',
       steps: {
         review: {
-          description: 'Human gate with on_reject',
+          description: 'Human gate',
           execution: 'auto',
           trust: 'human_confirmed',
-          allowed_from_states: ['created'],
-          produces_state: 'approved',
+          depends_on: [],
           gate: { choices: ['approve', 'reject'] },
-          transitions: {
-            on_reject: { step: 'revise', produces_state: 'revision_needed' },
-          },
         },
         revise: {
-          description: 'Agent revision step',
+          description: 'Agent revision step — eligible after review completes',
           execution: 'agent',
-          allowed_from_states: ['revision_needed'],
-          produces_state: 'completed',
+          depends_on: ['review'],
         },
       },
     };
@@ -294,7 +283,6 @@ describe('mcp tool handlers', () => {
     );
     expect(startResult.status).toBe('confirm_required');
     const gateId = startResult.gate!.gate_id;
-    const gateRun = await runStore.get(startResult.run_id);
 
     // Submit reject
     const rejectResult = await handleSubmitHumanResponse(
@@ -303,18 +291,17 @@ describe('mcp tool handlers', () => {
     );
 
     expect(rejectResult.status).toBe('ok');
-    expect(rejectResult.next_action).not.toBeNull();
-    expect(
-      (rejectResult.next_action!.instruction!.params as Record<string, unknown>)['command'],
-    ).toBe('revise');
-    expect(rejectResult.chained_auto_steps).toBeDefined();
-    expect(rejectResult.chained_auto_steps![0]!.branched_via).toBe('on_reject');
+    // After rejection, revise step is eligible (depends_on: [review], review now completed).
+    expect(rejectResult.next_actions.length).toBeGreaterThan(0);
+    const reviseAction = rejectResult.next_actions.find(
+      (a) => (a.instruction?.call_with as Record<string, unknown>)?.['command'] === 'revise',
+    );
+    expect(reviseAction).toBeDefined();
 
     const finalRun = await runStore.get(startResult.run_id);
-    expect(finalRun.state).toBe('revision_needed');
-
-    // Suppress unused-variable warning
-    void gateRun;
+    // Run is still in progress — revise step has not yet executed.
+    expect(finalRun.run_phase).toBe('running');
+    expect(finalRun.completed_steps).toContain('review');
   });
 
   it('handleStartRun resolves a filesystem auto step using the default built-in registry', async () => {
@@ -326,7 +313,6 @@ describe('mcp tool handlers', () => {
       id: 'filesystem-auto-wf',
       name: 'Filesystem Auto Workflow',
       version: 1,
-      initial_state: 'created',
       services: {
         source: { adapter: 'filesystem', trust: 'engine_delivered' },
       },
@@ -336,8 +322,7 @@ describe('mcp tool handlers', () => {
           execution: 'auto',
           uses_service: 'source',
           operation: 'read',
-          allowed_from_states: ['created'],
-          produces_state: 'completed',
+          depends_on: [],
         },
       },
     };
@@ -356,9 +341,9 @@ describe('mcp tool handlers', () => {
     expect(result.status).toBe('ok');
     expect(result.chained_auto_steps).toHaveLength(1);
     expect(result.chained_auto_steps![0]!.step).toBe('read_file');
-    expect(result.chained_auto_steps![0]!.produced_state).toBe('completed');
+    expect(result.chained_auto_steps![0]!.run_phase).toBe('completed');
 
     const run = await runStore.get(result.run_id);
-    expect(run.state).toBe('completed');
+    expect(run.run_phase).toBe('completed');
   });
 });

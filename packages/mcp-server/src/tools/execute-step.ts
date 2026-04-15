@@ -1,21 +1,23 @@
-// execute-step tool — calls executeChain for an agent step with the agent's params as output.
+// execute-step tool — executes a named step in a workflow run.
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   JsonWorkflowStore,
   JsonFileStore,
-  StateGuard,
   executeChain,
   type StepDispatcher,
   type ResponseEnvelope,
 } from '@sensigo/realm';
 import type { HandleRunStores } from './start-run.js';
 
+// For agent steps, the agent's params represent their work output. The dispatcher
+// passes them through as the step output recorded in evidence.
+const makeParamsDispatcher = (params: Record<string, unknown>): StepDispatcher =>
+  async () => params;
+
 /**
  * Business logic for the execute_step tool.
- * For agent steps: the agent's params ARE the step output — the result of their work.
- * For auto steps: params is typically {} and the step is handled by the engine.
- * The dispatcher passes params through as the step output in both cases.
+ * Validates eligibility, claims the step, and records the agent's params as step output.
  */
 export async function handleExecuteStep(
   args: { run_id: string; command: string; params?: Record<string, unknown> },
@@ -25,41 +27,33 @@ export async function handleExecuteStep(
   const runStore = stores?.runStore ?? new JsonFileStore();
   const run = await runStore.get(args.run_id);
   const definition = await workflowStore.get(run.workflow_id);
-  const guard = new StateGuard(definition);
   const params = args.params ?? {};
 
-  // For agent steps, the agent's params represent their work output.
-  // For auto steps, params is ignored and the engine handles execution.
-  const dispatcher: StepDispatcher = async () => params;
-
-  return executeChain(runStore, guard, definition, {
+  return executeChain(runStore, definition, {
     runId: args.run_id,
     command: args.command,
     input: params,
-    snapshotId: run.version.toString(),
-    dispatcher,
+    dispatcher: makeParamsDispatcher(params),
     ...(stores?.registry !== undefined ? { registry: stores.registry } : {}),
     ...(stores?.secrets !== undefined ? { secrets: stores.secrets } : {}),
   });
 }
 
 /**
- * MCP tool handler for execute_step.
- * Calls handleExecuteStep and serialises the result for MCP transport,
- * stripping the data payload to avoid oversized responses.
+ * MCP-layer wrapper around handleExecuteStep.
+ * Returns the tool content format used by the MCP server (content array with text JSON).
+ * Exported for direct testing of the MCP response shape.
  */
 export async function handleExecuteStepTool(
   args: { run_id: string; command: string; params?: Record<string, unknown> },
-  opts?: HandleRunStores,
+  stores?: HandleRunStores,
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
   try {
-    const result = await handleExecuteStep(args, opts);
-    const { snapshot_id: _snap, ...slimResult } = { ...result, data: {}, evidence: [] };
-    return { content: [{ type: 'text' as const, text: JSON.stringify(slimResult, null, 2) }] };
+    const result = await handleExecuteStep(args, stores);
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify({ ...result, data: {}, evidence: [] }, null, 2) }],
+    };
   } catch (err) {
-    // executeChain handles all WorkflowErrors internally and always returns a ResponseEnvelope.
-    // This catch exists only for unexpected infrastructure exceptions (e.g. store driver bug)
-    // where envelope construction is not possible.
     const message = err instanceof Error ? err.message : String(err);
     return {
       content: [
@@ -69,7 +63,7 @@ export async function handleExecuteStepTool(
             {
               command: args.command,
               run_id: args.run_id,
-
+              run_version: 0,
               status: 'error',
               data: {},
               evidence: [],
@@ -77,7 +71,7 @@ export async function handleExecuteStepTool(
               errors: [message],
               agent_action: 'stop',
               context_hint: `Error executing step '${args.command}' for run '${args.run_id}'.`,
-              next_action: null,
+              next_actions: [],
             },
             null,
             2,
@@ -104,6 +98,8 @@ export function registerExecuteStep(
       command: z.string(),
       params: z.record(z.unknown()).optional().default({}),
     },
-    async (args) => handleExecuteStepTool(args, opts),
+    async (args) => {
+      return handleExecuteStepTool(args, opts);
+    },
   );
 }

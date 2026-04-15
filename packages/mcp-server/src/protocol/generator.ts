@@ -1,12 +1,6 @@
 // Protocol generator — produces the full agent briefing from a WorkflowDefinition.
 // This is what an AI agent reads before starting a workflow run.
-import type {
-  WorkflowDefinition,
-  JsonSchema,
-  SimpleTransition,
-  OnSuccessTransition,
-} from '@sensigo/realm';
-import { TERMINAL_STATES } from '@sensigo/realm';
+import type { WorkflowDefinition, JsonSchema } from '@sensigo/realm';
 
 export interface ProtocolStepGate {
   choices: string[];
@@ -23,12 +17,8 @@ export interface ProtocolStep {
   instructions?: string;
   /** Present when the step may open a human gate. */
   possible_gate?: ProtocolStepGate;
-  /** Conditional routing paths from this step, keyed by transition name (e.g. 'on_error', 'on_reject'). */
-  transitions?: {
-    on_error?: SimpleTransition;
-    on_success?: OnSuccessTransition;
-    [key: string]: SimpleTransition | OnSuccessTransition | undefined;
-  };
+  /** Step IDs this step depends on before it becomes eligible. */
+  depends_on?: string[];
   /** Specialist profile instructions for the agent at this step. Present when the step
    *  declares agent_profile and the profile was resolved at register time. */
   agent_profile_instructions?: string;
@@ -90,19 +80,18 @@ export function generateProtocol(definition: WorkflowDefinition): WorkflowProtoc
     } else if (step.execution === 'agent' && !hasGate) {
       agent_involvement = `YOU execute this step. Call execute_step with command '${id}' and the required params.`;
 
-      // If this step's produced state leads immediately into an auto+gate step,
-      // warn the agent upfront — they will receive confirm_required, not ok.
-      if (!TERMINAL_STATES.has(step.produces_state)) {
-        const immediateNext = Object.entries(definition.steps).find(
-          ([, s]) =>
-            s.execution === 'auto' &&
-            (s.trust === 'human_confirmed' || s.trust === 'human_reviewed') &&
-            Array.isArray(s.allowed_from_states) &&
-            s.allowed_from_states.includes(step.produces_state),
-        );
-        if (immediateNext) {
-          agent_involvement += ` After you submit, you will receive status: confirm_required directly in response to this call — the engine runs '${immediateNext[0]}' automatically before returning.`;
-        }
+      // If an immediate downstream auto+gate step depends only on this step, warn the
+      // agent that they will receive confirm_required rather than ok after submitting.
+      const immediateGateStep = Object.entries(definition.steps).find(
+        ([, s]) =>
+          s.execution === 'auto' &&
+          (s.trust === 'human_confirmed' || s.trust === 'human_reviewed') &&
+          Array.isArray(s.depends_on) &&
+          s.depends_on.length === 1 &&
+          s.depends_on[0] === id,
+      );
+      if (immediateGateStep !== undefined) {
+        agent_involvement += ` After you submit, you will receive status: confirm_required directly in response to this call — the engine runs '${immediateGateStep[0]}' automatically before returning.`;
       }
 
       agentStepCount++;
@@ -129,8 +118,8 @@ export function generateProtocol(definition: WorkflowDefinition): WorkflowProtoc
     if (possible_gate !== undefined) {
       protocolStep.possible_gate = possible_gate;
     }
-    if (step.transitions !== undefined) {
-      protocolStep.transitions = step.transitions;
+    if (step.depends_on !== undefined && step.depends_on.length > 0) {
+      protocolStep.depends_on = step.depends_on;
     }
     const profile = step.agent_profile;
     if (profile !== undefined && definition.resolved_profiles?.[profile] !== undefined) {
