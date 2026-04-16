@@ -211,7 +211,7 @@ already started — check `next_actions` immediately and proceed to `execute_ste
 
 Call `execute_step` using `instruction.call_with` as the template — fill in your step output
 in `params` (shaped to `next_actions[0].input_schema` if present). The engine does not require
-a `snapshot_id` argument — it reads the current version from the store automatically.
+a `run_version` argument — it reads the current version from the store automatically.
 
 The step loop from this point is identical to Mode 1: read `next_actions[0].prompt`, do the
 work, call `execute_step` with your output in `params`, and repeat. Stop when `status` is
