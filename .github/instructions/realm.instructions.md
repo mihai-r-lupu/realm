@@ -106,7 +106,7 @@ ran — only present when the array would be non-empty:
 ```json
 "chained_auto_steps": [
   { "step": "validate_fields", "run_phase": "running" },
-  { "step": "route_result", "run_phase": "running", "branched_via": "on_reject" }
+  { "step": "route_result", "run_phase": "running", "branched_via": "one_failed" }
 ]
 ```
 
@@ -148,9 +148,9 @@ what to do next. Do not parse the `errors` text to decide recovery strategy — 
 | `agent_action`         | Meaning                                                | What to do                                                                                                |
 | ---------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | `stop`                 | The run is terminal or has failed unrecoverably.       | Do not retry. Report to user.                                                                             |
-| `report_to_user`       | Engine state is inconsistent (e.g. snapshot mismatch). | Surface to user. Do not retry autonomously.                                                               |
+| `report_to_user`       | Engine state is inconsistent (e.g. version conflict).  | Surface to user. Do not retry autonomously.                                                               |
 | `provide_input`        | The params you submitted were invalid.                 | Fix the params and retry `execute_step` with the same command. `next_actions[0]` shows the correct tool call. |
-| `resolve_precondition` | Wrong step for current state.                          | Follow `next_actions[0]` if non-null to call the correct step instead.                                        |
+| `resolve_precondition` | Step not eligible for the current run state.           | Follow `next_actions[0]` if non-empty to call an eligible step instead.                                       |
 | `wait_for_human`       | An external service is unavailable (network down, upstream 5xx). The run cannot continue until the dependency recovers. | Show the error to the user and wait for them to confirm the issue is resolved before retrying. |
 
 When `agent_action` is `provide_input` or `resolve_precondition` and `next_actions` is non-empty,
@@ -161,5 +161,5 @@ no valid next step exists.
 ### Precondition failures
 
 When a step's preconditions are not met, the response is `status: blocked`, `agent_action: stop`,
-`next_action: null`. The `blocked_reason.suggestion` field names which precondition expression
+`next_actions` is empty. The `blocked_reason.suggestion` field names which precondition expression
 failed and its resolved value. You cannot recover autonomously — report to the user.
