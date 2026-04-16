@@ -24,8 +24,8 @@ Creates `my-workflow/` containing `workflow.yaml`, `schema.json`, `.env.example`
 
 ### `realm workflow validate <path>`
 
-Validates a workflow YAML without registering it. Reports schema errors, duplicate state names,
-unreachable states, and invalid transition targets.
+Validates a workflow YAML without registering it. Reports schema errors, duplicate step IDs,
+and invalid `depends_on` references.
 
 ```bash
 realm workflow validate ./my-workflow
@@ -72,7 +72,7 @@ the watcher — fix the file and save again to recover.
 ### `realm workflow run <path>`
 
 Runs a workflow interactively in development mode. For each agent step, prompts for JSON output.
-For human gates, prompts for approval. Use this to exercise the full state machine without an
+For human gates, prompts for approval. Use this to exercise the full workflow without an
 AI agent.
 
 ```bash
@@ -122,7 +122,7 @@ realm run list
 realm run list --workflow <workflow-id>   # filter by workflow
 ```
 
-Output per run: `run-id  workflow-id vN  state  timestamp  N step(s)`
+Output per run: `run-id  workflow-id vN  run_phase  timestamp  N step(s)`
 
 `N step(s)` is the count of distinct steps that produced evidence (retried steps count once;
 gate responses are excluded). This is the same count shown in
@@ -146,7 +146,7 @@ realm run inspect abc12345-0000-0000-0000-000000000000
 ```
 Run: abc12345-0000-0000-0000-000000000000
 Workflow: incident-response v3
-State: completed  ✓
+Phase: completed  ✓
 
 Created: 2026-01-15T10:30:00.000Z
 Updated: 2026-01-15T10:30:42.000Z
@@ -183,7 +183,7 @@ increase when a gate is responded to.
 
 | Field                          | What it tells you                                                                                                                                                                             |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **State**                      | Current state name. Terminal runs show `✓` (completed) or no suffix (failed/abandoned).                                                                                                       |
+| **Phase**                      | Current run phase (`run_phase`). Terminal runs show `✓` (completed) or no suffix (failed/abandoned).                                                                                          |
 | **Evidence (N steps)**         | Number of distinct steps that produced evidence. Steps with multiple attempts are counted once. Human gate steps are counted once regardless of whether the gate has been responded to.       |
 | **Step number**                | Execution order, 1-based.                                                                                                                                                                     |
 | **Step name**                  | The `id` of the step in your workflow YAML.                                                                                                                                                   |

@@ -110,9 +110,7 @@ import { WorkflowError } from '@sensigo/realm/internal';
 throw new WorkflowError(...);
 ```
 
-The engine catches any thrown error and wraps it as `ENGINE_HANDLER_FAILED`. If `on_error`
-is declared on the step, the engine demotes the error to a warning and routes to the branch
-step. If not, the run fails.
+The engine catches any thrown error and wraps it as `ENGINE_HANDLER_FAILED`. If a recovery step with `trigger_rule: one_failed` depends on this step, the engine will invoke the recovery step. Otherwise, the run fails.
 
 **Return `{ data: { ... } }` for all business-logic non-errors.** A validation result of
 "no matches found" is not an error — it is an outcome the workflow should handle. Return it
@@ -122,7 +120,7 @@ as data.
 // ✓ Correct — let the workflow decide what to do with matched: false
 return { data: { matched: false, value: null, pattern } };
 
-// ✗ Wrong — throwing on a business outcome forces the workflow to use on_error for routing
+// ✗ Wrong — throwing on a business outcome prevents downstream steps from handling it gracefully
 throw new Error('no match found');
 ```
 
@@ -153,14 +151,15 @@ steps:
     description: 'Validate that required fields are present.'
     execution: auto
     handler: check_required_fields
-    allowed_from_states: [fields_extracted]
-    produces_state: validated
+    depends_on: [extract_fields]
     config:
       required_keys: [name, date, summary]
-    transitions:
-      on_error:
-        step: extract_fields
-        produces_state: revision_requested
+
+  handle_validation_error:
+    description: 'Recovery step when validation fails.'
+    execution: agent
+    depends_on: [validate_output]
+    trigger_rule: one_failed
 ```
 
 ```typescript
@@ -430,16 +429,11 @@ validate_quotes:
   description: 'Verify that extracted quotes appear verbatim in the source document.'
   execution: auto
   handler: validate_verbatim_quotes
-  allowed_from_states: [quotes_extracted]
-  produces_state: quotes_validated
+  depends_on: [extract_quotes]
   config:
     source_step: fetch_document
     source_field: text
     quote_field: verbatim_quote
-  transitions:
-    on_error:
-      step: extract_quotes
-      produces_state: revision_requested
 ```
 
 ---
@@ -468,7 +462,7 @@ guard to verify that a fetched resource belongs to the expected entity before pr
 | `mode`    | string         | The mode used, echoed back for auditability.           |
 
 This handler **never throws on mismatch** — `matched: false` is a valid outcome that the
-workflow handles via preconditions or transitions, not via `on_error`.
+workflow handles via preconditions on downstream steps.
 
 #### Example
 
@@ -477,15 +471,12 @@ verify_repo:
   description: 'Verify the fetched diff belongs to the expected repository.'
   execution: auto
   handler: validate_field_match
-  allowed_from_states: [diff_fetched]
-  produces_state: repo_verified
+  depends_on: [fetch_diff]
   config:
     source_step: fetch_diff
     source_field: repo_full_name
     pattern: 'myorg/.*'
     mode: regex
-  preconditions:
-    - 'verify_repo.result.matched == true'
 ```
 
 ---
