@@ -48,14 +48,12 @@ Open `workflow.yaml`. The key fields are:
 id: extraction-demo # unique identifier used in all CLI commands
 name: 'Extraction Demo'
 version: 1
-initial_state: created # every run starts here
 
 steps:
   step_one:
     description: '...'
     execution: agent # the AI agent executes this step
-    allowed_from_states: [created]
-    produces_state: step_one_done
+    depends_on: []   # no dependencies — starts immediately
     input_schema: # the engine validates agent output against this schema
       type: object
       required: [result]
@@ -64,9 +62,9 @@ steps:
           type: string
 
   finalize:
+    description: '...'
     execution: auto # engine executes this automatically
-    allowed_from_states: [step_one_done]
-    produces_state: completed
+    depends_on: [step_one]
 ```
 
 `execution: agent` — the step waits for the AI agent (or `realm workflow run` in dev mode) to call `execute_step`.  
@@ -84,7 +82,7 @@ realm workflow validate ./                # parse and validate the YAML
 realm workflow register ./                # store the workflow definition locally
 ```
 
-`realm workflow validate` catches schema errors, duplicate step IDs, and invalid state transitions before you run anything.
+`realm workflow validate` catches schema errors, duplicate step IDs, and invalid `depends_on` references before you run anything.
 
 **Development tip — auto-register on save:** instead of running `realm workflow register` after every edit, use `realm workflow watch`:
 
@@ -113,7 +111,7 @@ Enter agent output (JSON): {"result": "the document text"}
 Step: finalize — Human reviews and approves
 Approve? [y/n]: y
 
-Run completed. Final state: completed
+Run completed. Phase: completed
 Run ID: abc123
 ```
 
@@ -185,11 +183,11 @@ services:
 
 steps:
   read_file:
+    description: Read the input file
     execution: auto
+    depends_on: []
     uses_service: filesystem
     operation: read
-    allowed_from_states: [created]
-    produces_state: file_loaded
 ```
 
 The file path is taken from the run's `params` — declare it in `params_schema` and pass it when
@@ -224,10 +222,10 @@ services:
 
 steps:
   fetch_document:
+    description: Fetch the document from Google Docs
     execution: auto
+    depends_on: []
     uses_service: source
-    allowed_from_states: [created]
-    produces_state: document_ready
 ```
 
 When `trust: engine_delivered` is set, the agent cannot see or alter the service response — the engine injects it directly into the step's evidence.
@@ -269,8 +267,7 @@ steps:
     description: 'Security team reviews the identified findings.'
     execution: auto
     trust: human_confirmed
-    allowed_from_states: [findings_ready]
-    produces_state: findings_approved
+    depends_on: [analyze_findings]
     prompt: |
       The following findings have been identified. Reply with 'approve' to accept or 'reject' to flag for re-review.
     instructions: |
@@ -312,23 +309,30 @@ transformation, enrichment, or any computation the engine should run automatical
 
 ```yaml
 steps:
+  extract_fields:
+    description: 'Extract structured fields from the input.'
+    execution: agent
+    depends_on: []
+
   validate_output:
     description: 'Validate that required fields are present.'
     execution: auto
     handler: check_required_fields
-    allowed_from_states: [fields_extracted]
-    produces_state: validated
+    depends_on: [extract_fields]
     config:
       required_keys: [name, date, summary]
-    transitions:
-      on_error:
-        step: extract_fields
-        produces_state: revision_requested
+
+  handle_validation_error:
+    description: 'Recovery step — invoked only when validation fails.'
+    execution: agent
+    depends_on: [validate_output]
+    trigger_rule: one_failed
 ```
 
 The `handler:` value is the name string. The `config:` block is a freeform key-value object
 delivered to the handler as `context.config`. Add any static configuration your handler needs
-here.
+here. Recovery on handler failure is declared on a downstream step using `trigger_rule: one_failed`
+or `all_failed` — there is no inline `transitions:` block.
 
 ### Writing a handler
 
@@ -444,9 +448,8 @@ steps:
   step_one:
     description: Extract key facts from the document
     execution: agent
+    depends_on: []
     agent_profile: extractor   # loads profiles/extractor.md
-    allowed_from_states: [created]
-    produces_state: extracted
 ```
 
 The `profiles_dir` top-level field defaults to `profiles/` relative to the workflow YAML. Set it explicitly if your profiles live elsewhere:
@@ -549,9 +552,9 @@ create_workflow
     task_description: "Audit and fix JSDoc across the codebase."
 ```
 
-`create_workflow` registers the workflow and starts a run in one call — no YAML file, no `realm workflow register`. The response includes `data.workflow_id` and a `next_action` pointing at the first step. The agent then uses `execute_step` exactly as it would for a YAML workflow.
+`create_workflow` registers the workflow and starts a run in one call — no YAML file, no `realm workflow register`. The response includes `data.workflow_id` and `next_actions` pointing at the first eligible step. The agent then uses `execute_step` exactly as it would for a YAML workflow.
 
-Runs created by `create_workflow` carry the same evidence chain, `next_action` guidance, and state machine enforcement as YAML-registered runs. See [`.github/instructions/realm-create-workflow.instructions.md`](../.github/instructions/realm-create-workflow.instructions.md) for the full protocol.
+Runs created by `create_workflow` carry the same evidence chain and `next_actions` guidance as YAML-registered runs. See [`.github/instructions/realm-create-workflow.instructions.md`](../.github/instructions/realm-create-workflow.instructions.md) for the full protocol.
 
 ### Using multiple workflows
 
@@ -574,7 +577,7 @@ schemas), add a `skill.md` file alongside the workflow. The generic instructions
 skill files compose cleanly: an agent trained on both knows both the Realm protocol and the
 workflow-specific details.
 
-For the full protocol — `next_action` fields, `chained_auto_steps`, `context_hint`, and error recovery — see [MCP Protocol Reference](reference/mcp-protocol.md).
+For the full protocol — `next_actions`, `chained_auto_steps`, `context_hint`, and error recovery — see [MCP Protocol Reference](reference/mcp-protocol.md).
 
 ---
 
@@ -619,7 +622,6 @@ const dispatch = createAgentDispatcher({ step_one: { result: 'the document text'
 const run = await store.create({
   workflowId: 'extraction-demo',
   workflowVersion: 1,
-  initialState: 'created',
   params: {},
 });
 await executeChain({ definition, run, store, dispatch });
@@ -635,7 +637,7 @@ assertStepOutput(run.evidence, 'step_one', { result: 'the document text' });
 ## Next Steps
 
 - Browse the [`examples/03-incident-response/`](../examples/03-incident-response/workflow.yaml) workflow for a realistic 4-step pattern with a filesystem adapter, two agent steps with personas, and a human gate.
-- Read the [YAML Schema Reference](reference/yaml-schema.md) for all step fields, execution modes, and transitions.
+- Read the [YAML Schema Reference](reference/yaml-schema.md) for all step fields, execution modes, and DAG dependencies.
 - Read the [MCP Protocol Reference](reference/mcp-protocol.md) for full tool and response envelope documentation.
 - Read the [`@sensigo/realm` source](../packages/core/src/index.ts) for the full public API.
 ````

@@ -11,7 +11,6 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 | `id`            | string  | Yes      | Unique workflow identifier. Used in all CLI commands and MCP tool calls.                                                     |
 | `name`          | string  | Yes      | Human-readable workflow name.                                                                                                |
 | `version`       | integer | Yes      | Workflow version number. Incremented on each `realm workflow register`.                                                      |
-| `initial_state` | string  | Yes      | State every new run starts in. Must appear in at least one step's `allowed_from_states`.                                     |
 | `params_schema` | object  | No       | JSON Schema for the params accepted by `start_run`. The agent's `call_with.params` skeleton is derived from this at runtime. |
 | `services`      | object  | No       | Named service definitions. Referenced by steps via `uses_service`.                                                           |
 | `steps`         | object  | Yes      | Map of step name → step definition.                                                                                          |
@@ -26,8 +25,9 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 | --------------------- | ------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `description`         | string                          | Yes      | Human-readable step description. Appears in the agent protocol.                                                                                                                                                                                                                                                |
 | `execution`           | `agent` \| `auto`               | Yes      | Who executes this step.                                                                                                                                                                                                                                                                                        |
-| `allowed_from_states` | string[]                        | Yes      | Run states from which this step may execute. The engine blocks any attempt from a state not in this list.                                                                                                                                                                                                      |
-| `produces_state`      | string                          | Yes      | State the run transitions to after this step completes. Must be unique across all steps.                                                                                                                                                                                                                       |
+| `depends_on`          | string[]                        | No       | Step IDs this step waits for. Empty array or omitted means eligible from run start.                                                                                                                                                                                                                            |
+| `trigger_rule`        | string                          | No       | When to evaluate dependency satisfaction. Default: `all_success`. See [`trigger_rule`](#trigger_rule).                                                                                                                                                                                                         |
+| `when`                | string                          | No       | Expression evaluated against prior step evidence. A step is ineligible until this is truthy. See [`when` condition](#when-condition).                                                                                                                                                                          |
 | `uses_service`        | string                          | No       | Name of a service declared in `services`. Only valid on `execution: auto` steps.                                                                                                                                                                                                                               |
 | `service_method`      | `fetch` \| `create` \| `update` | No       | Adapter method to call. Defaults to `fetch`.                                                                                                                                                                                                                                                                   |
 | `operation`           | string                          | No       | Operation name passed to the adapter. Defaults to the step name.                                                                                                                                                                                                                                               |
@@ -39,9 +39,8 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 | `timeout_seconds`     | integer                         | No       | Step execution timeout in seconds. On expiry the run fails with `STEP_TIMEOUT`.                                                                                                                                                                                                                                |
 | `retry`               | object                          | No       | Retry configuration. See [Retry](#retry).                                                                                                                                                                                                                                                                      |
 | `instructions`        | string                          | No       | Agent-facing instructions. Delivered as `gate.agent_hint` when a gate is open.                                                                                                                                                                                                                                 |
-| `prompt`              | string                          | No       | Template-resolved task prompt delivered via `next_action.prompt`. On human gate steps, delivered as `gate.display`. Supports `{{ context.resources.STEP.FIELD }}` and `{{ run.params.FIELD }}`.                                                                                                                |
+| `prompt`              | string                          | No       | Template-resolved task prompt delivered via `next_actions[].prompt`. On human gate steps, delivered as `gate.display`. Supports `{{ context.resources.STEP.FIELD }}` and `{{ run.params.FIELD }}`.                                                                                                             |
 | `gate`                | object                          | No       | Gate configuration. `gate.choices` lists the valid human response values.                                                                                                                                                                                                                                      |
-| `transitions`         | object                          | No       | Conditional routing. See [Transitions](#transitions).                                                                                                                                                                                                                                                          |
 | `input_map`           | `Record<string, string>`        | No       | Maps param names the service adapter receives to dot-path values from the run context. Only valid on `execution: auto` steps with `uses_service`. Each value is a dot-path: `run.params.<key>` reads from the run's start params; `context.resources.<step>.<field>` reads a field from a prior step's output. |
 | `agent_profile`       | string                          | No       | Agent profile name. Only valid on `execution: agent` steps. Must match a file in `profiles_dir`.                                                                                                                                                                                                               |
 
@@ -51,7 +50,7 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 
 ### `execution: agent`
 
-The engine pauses and returns `next_action` pointing at this step. The AI agent (or `realm run` in dev mode) calls `execute_step` with the step's `command` and `params`. The engine validates `params` against `input_schema` before proceeding.
+The engine pauses and returns `next_actions` containing this step. The AI agent (or `realm run` in dev mode) calls `execute_step` with the step's `command` and `params`. The engine validates `params` against `input_schema` before proceeding.
 
 ### `execution: auto`
 
@@ -72,72 +71,104 @@ The engine executes this step immediately without returning to the caller. If th
 
 ---
 
-## Transitions
+## Step dependencies (`depends_on`)
 
-Transitions declare conditional routing for `execution: auto` steps. When a transition fires, the engine routes the run to a named step and state instead of the step's default `produces_state`.
-
-### `on_error`
-
-When the step's handler throws, the engine demotes the error to a `warnings` entry, transitions the run to the branch state, and continues from the branch step. The caller receives `status: ok`.
+Every step declares which steps must settle before it becomes eligible. Steps with an empty or omitted `depends_on` are eligible as soon as the run starts.
 
 ```yaml
-validate_fields:
-  execution: auto
-  handler: validate_fields
-  allowed_from_states: [fields_extracted]
-  produces_state: validated
-  transitions:
-    on_error:
-      step: extract_fields
-      produces_state: revision_requested
+steps:
+  read_data:
+    description: Load data from disk
+    execution: auto
+    depends_on: []      # eligible immediately
+    uses_service: source
+    operation: read
+
+  analyze:
+    description: Analyze the loaded data
+    execution: agent
+    depends_on: [read_data]   # waits for read_data to complete
 ```
 
-`on_error` is only valid on `execution: auto` steps.
+The engine evaluates `depends_on` after every step settles. A step becomes eligible when its `trigger_rule` is satisfied given the current state of its dependencies.
 
-### Gate-response keys (`on_<choice>`)
+---
 
-On a step with `trust: human_confirmed`, each gate choice can route to a different branch. The key must be `on_` followed by a value from `gate.choices`.
+## `trigger_rule`
+
+Controls when a step becomes eligible based on how its dependencies settled. Default: `all_success`.
+
+| Value         | Eligible when…                                                               |
+| ------------- | ---------------------------------------------------------------------------- |
+| `all_success` | All deps completed successfully. Skipped if any dep fails. **(default)**     |
+| `all_failed`  | All deps failed. Use for recovery steps.                                     |
+| `all_done`    | All deps settled (completed, failed, or skipped in any combination).         |
+| `one_failed`  | At least one dep failed. Use for fallback steps.                             |
+| `one_success` | At least one dep completed successfully.                                     |
+| `none_failed` | All deps completed or were skipped — none failed.                            |
+
+### Recovery pattern
+
+Use `trigger_rule: one_failed` or `all_failed` to implement error recovery:
 
 ```yaml
-confirm_submission:
-  execution: auto
-  trust: human_confirmed
-  allowed_from_states: [validated]
-  produces_state: submitted
-  gate:
-    choices: [approve, reject]
-  transitions:
-    on_reject:
-      step: extract_fields
-      produces_state: revision_requested
+steps:
+  extract_fields:
+    description: Extract structured fields from the input
+    execution: auto
+    handler: extract_fields_handler
+    depends_on: []
+
+  validate_fields:
+    description: Validate the extracted fields
+    execution: auto
+    handler: validate_fields_handler
+    depends_on: [extract_fields]      # runs only when extraction succeeds
+
+  handle_extraction_error:
+    description: Notify team — extraction failed
+    execution: agent
+    depends_on: [extract_fields]
+    trigger_rule: one_failed          # runs only when extraction fails
 ```
 
-### `on_success`
+### Skip propagation
 
-Conditionally routes an `execution: auto` step based on the value of a named field in the
-handler's output. The engine reads `field` from the handler result, looks it up in `routes`,
-and takes that transition. If no route matches, it takes `default`.
+When a step fails (or is skipped), all downstream steps whose `trigger_rule` can no longer be satisfied are automatically moved to `skipped_steps`. For example, if `extract_fields` fails, any step with `depends_on: [extract_fields]` and the default `trigger_rule: all_success` is skipped immediately. The run terminates cleanly with `run_phase: failed` when no eligible or in-progress steps remain.
 
-| Sub-field | Type                         | Description                                                    |
-| --------- | ---------------------------- | -------------------------------------------------------------- |
-| `field`   | string                       | Name of the handler output field to read.                      |
-| `routes`  | `Record<string, transition>` | Map of field values to transition targets.                     |
-| `default` | transition                   | Taken when the field value does not match any key in `routes`. |
+`skipped_steps` is included in `realm run inspect` and the `get_run_state` MCP response.
+
+---
+
+## `when` condition
+
+An optional expression evaluated against prior step evidence. A step is eligible only when both its `trigger_rule` is satisfied *and* its `when` expression is truthy:
 
 ```yaml
-transitions:
-  on_success:
-    field: matched
-    routes:
-      'true':
-        step: proceed_step
-        produces_state: verified
-    default:
-      step: fallback_step
-      produces_state: unverified
+steps:
+  classify_ticket:
+    description: Classify the support ticket
+    execution: agent
+    depends_on: []
+
+  handle_billing:
+    description: Route billing tickets to the billing team
+    execution: agent
+    depends_on: [classify_ticket]
+    when: "classify_ticket.category == 'billing'"
+
+  handle_technical:
+    description: Route technical tickets to engineering
+    execution: agent
+    depends_on: [classify_ticket]
+    when: "classify_ticket.category == 'technical'"
 ```
 
-`on_success` is only valid on `execution: auto` steps.
+**Supported operators:** `==`, `!=`, `>`, `<`, `>=`, `<=`. The left side is a dot-path into prior step evidence (`step_name.field_name`). The right side is a quoted string, an unquoted number, `true`, `false`, or `null`.
+
+`when` conditions are evaluated against each step's recorded `output_summary`. Comparison is strict — types must match (`"1"` does not equal `1`).
+
+A step whose `when` condition is permanently false is not automatically moved to `skipped_steps` — it stays ineligible. Only `trigger_rule` impossibility triggers automatic skipping.
 
 ---
 
@@ -231,15 +262,13 @@ templates:
       extract:
         description: 'Extract content from {{ service_name }}'
         execution: auto
+        depends_on: []
         uses_service: '{{ service_name }}'
         operation: read
-        allowed_from_states: ['{{ prefix }}_ready']
-        produces_state: '{{ prefix }}_extracted'
       review:
         description: '{{ agent_description }}'
         execution: agent
-        allowed_from_states: ['{{ prefix }}_extracted']
-        produces_state: '{{ prefix }}_reviewed'
+        depends_on: ['{{ prefix }}_extract']
 ```
 
 ### Using a template
@@ -273,7 +302,6 @@ Unknown params passed at the call site are silently ignored (forward compatibili
 id: document-pipeline
 name: Document Pipeline
 version: 1
-initial_state: created
 
 services:
   documents:
@@ -291,25 +319,17 @@ templates:
       fetch:
         description: 'Fetch from {{ service_name }}'
         execution: auto
+        depends_on: []
         uses_service: '{{ service_name }}'
         operation: read
         input_map:
           path: run.params.path
-        allowed_from_states: ['{{ prefix }}_created']
-        produces_state: '{{ prefix }}_fetched'
       review:
         description: '{{ agent_description }}'
         execution: agent
-        allowed_from_states: ['{{ prefix }}_fetched']
-        produces_state: '{{ prefix }}_reviewed'
+        depends_on: ['{{ prefix }}_fetch']
 
 steps:
-  init:
-    description: Initialise the pipeline
-    execution: auto
-    allowed_from_states: [created]
-    produces_state: doc_created
-
   doc_pipeline:
     use_template: fetch_and_review
     prefix: doc
@@ -318,7 +338,7 @@ steps:
       agent_description: 'Review the fetched document for completeness.'
 ```
 
-This expands to three concrete steps: `init`, `doc_fetch`, `doc_review`.
+This expands to two concrete steps: `doc_fetch` and `doc_review`.
 
 ---
 
@@ -403,17 +423,13 @@ distinguishes "nothing was extracted" from "all extracted were invalid".
 
 ```yaml
 validate_quotes:
+  description: 'Verify extracted quotes appear verbatim in the source document.'
   execution: auto
   handler: validate_verbatim_quotes
-  allowed_from_states: [quotes_extracted]
-  produces_state: quotes_validated
+  depends_on: [extract_quotes]
   config:
     source_step: fetch_document
     source_field: text
-  transitions:
-    on_error:
-      step: extract_quotes
-      produces_state: revision_requested
 ```
 
 ### `validate_field_match`
@@ -430,15 +446,15 @@ guard to verify that a fetched resource belongs to the expected entity.
 
 **Output:** `{ matched, value, pattern, mode }`
 
-This handler never throws on mismatch — `matched: false` is a valid outcome that the workflow
-handles via preconditions, not via `on_error`.
+This handler **never throws on mismatch** — `matched: false` is a valid outcome that the
+workflow handles via preconditions on downstream steps.
 
 ```yaml
 verify_repo:
+  description: 'Verify the fetched diff belongs to the expected repository.'
   execution: auto
   handler: validate_field_match
-  allowed_from_states: [diff_fetched]
-  produces_state: repo_verified
+  depends_on: [fetch_diff]
   config:
     source_step: fetch_diff
     source_field: repo_full_name
