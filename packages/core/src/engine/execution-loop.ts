@@ -22,6 +22,7 @@ import {
   isWorkflowComplete,
   buildEvidenceByStep,
   deriveRunPhase,
+  propagateSkips,
 } from './eligibility.js';
 
 export type StepDispatcher = (
@@ -598,14 +599,19 @@ export async function executeStep(
         in_progress_steps: pendingRun.in_progress_steps.filter((s) => s !== options.command),
         failed_steps: [...pendingRun.failed_steps, options.command],
       };
-      // A run is terminal when all steps are settled OR when no step will ever become
-      // eligible again (e.g. every remaining step's trigger_rule cannot be satisfied).
-      const isComplete =
-        isWorkflowComplete(afterFail, definition) ||
-        (afterFail.in_progress_steps.length === 0 &&
-          findEligibleSteps(definition, afterFail).length === 0);
-      const failedRun: RunRecord = {
+      // Propagate skips: mark steps whose trigger_rule can never be satisfied after this failure.
+      const withSkippedFail: RunRecord = {
         ...afterFail,
+        skipped_steps: propagateSkips(afterFail, definition),
+      };
+      // A run is terminal when all steps are settled OR when no step will ever become
+      // eligible again (safety net for when-condition edge cases not covered by propagateSkips).
+      const isComplete =
+        isWorkflowComplete(withSkippedFail, definition) ||
+        (withSkippedFail.in_progress_steps.length === 0 &&
+          findEligibleSteps(definition, withSkippedFail).length === 0);
+      const failedRun: RunRecord = {
+        ...withSkippedFail,
         evidence: [...pendingRun.evidence, ...allEvidence],
         terminal_state: isComplete,
         ...(isComplete ? { terminal_reason: `Step '${options.command}' failed: ${dispatchError.message}` } : {}),
@@ -721,9 +727,15 @@ export async function executeStep(
     completed_steps: [...pendingRun.completed_steps, options.command],
     evidence: [...pendingRun.evidence, ...allEvidence],
   };
-  const isComplete = isWorkflowComplete(afterComplete, definition);
-  const finalRun: RunRecord = {
+  // Propagate skips: completing this step may make some downstream steps permanently ineligible
+  // (e.g. all_failed steps whose dep just succeeded, one_failed steps whose last unfailed dep just completed).
+  const withSkippedComplete: RunRecord = {
     ...afterComplete,
+    skipped_steps: propagateSkips(afterComplete, definition),
+  };
+  const isComplete = isWorkflowComplete(withSkippedComplete, definition);
+  const finalRun: RunRecord = {
+    ...withSkippedComplete,
     terminal_state: isComplete,
     ...(isComplete ? { terminal_reason: `Workflow completed.` } : {}),
   };
@@ -861,9 +873,15 @@ export async function submitHumanResponse(
     completed_steps: [...rest.completed_steps, gateStepName],
     evidence: [...rest.evidence, gateSnapshot],
   };
-  const isComplete = isWorkflowComplete(afterGate, definition);
-  const finalRun: RunRecord = {
+  // Propagate skips in case resolving the gate completes a dep that makes
+  // some downstream trigger_rules permanently unsatisfiable.
+  const withSkippedGate: RunRecord = {
     ...afterGate,
+    skipped_steps: propagateSkips(afterGate, definition),
+  };
+  const isComplete = isWorkflowComplete(withSkippedGate, definition);
+  const finalRun: RunRecord = {
+    ...withSkippedGate,
     terminal_state: isComplete,
     ...(isComplete ? { terminal_reason: `Workflow completed.` } : {}),
   };

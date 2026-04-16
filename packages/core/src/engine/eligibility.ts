@@ -1,5 +1,6 @@
 // DAG eligibility predicate — determines which workflow steps are eligible to execute
 // based on the completed, in-progress, failed, and skipped step sets in the run record.
+// Also exports propagateSkips, which marks steps whose trigger_rule can never be satisfied.
 import type { WorkflowDefinition, StepDefinition, TriggerRule } from '../types/workflow-definition.js';
 import type { RunRecord } from '../types/run-record.js';
 import type { RunPhase } from '../types/run-record.js';
@@ -47,9 +48,12 @@ export function triggerRuleSatisfied(step: StepDefinition, run: RunRecord): bool
       return deps.every((d) => run.failed_steps.includes(d));
 
     case 'all_done':
-      // All deps in completed_steps OR failed_steps (none still pending or in_progress).
+      // All deps settled: completed, failed, or skipped (skipped deps are permanently settled).
       return deps.every(
-        (d) => run.completed_steps.includes(d) || run.failed_steps.includes(d),
+        (d) =>
+          run.completed_steps.includes(d) ||
+          run.failed_steps.includes(d) ||
+          run.skipped_steps.includes(d),
       );
 
     case 'one_failed':
@@ -213,4 +217,99 @@ export function isWorkflowComplete(run: RunRecord, definition: WorkflowDefinitio
         run.skipped_steps.includes(name),
     ) && run.in_progress_steps.length === 0
   );
+}
+
+/**
+ * Returns false if a step's trigger_rule can provably never be satisfied given the
+ * current settled state. Called by propagateSkips to determine which steps to skip.
+ *
+ * "Settled" means the step is in completed_steps, failed_steps, or skipped_steps.
+ * In-progress and unsettled steps are treated as potentially resolving either way.
+ */
+function canTriggerRuleEverBeSatisfied(step: StepDefinition, run: RunRecord): boolean {
+  const deps = step.depends_on ?? [];
+  if (deps.length === 0) return true;
+
+  const rule: TriggerRule = step.trigger_rule ?? 'all_success';
+
+  switch (rule) {
+    case 'all_success':
+      // Needs every dep to succeed — impossible if any dep already failed or is skipped.
+      return deps.every(
+        (d) => !run.failed_steps.includes(d) && !run.skipped_steps.includes(d),
+      );
+
+    case 'all_failed':
+      // Needs every dep to fail — impossible if any dep already completed or is skipped.
+      return deps.every(
+        (d) => !run.completed_steps.includes(d) && !run.skipped_steps.includes(d),
+      );
+
+    case 'all_done':
+      // Always eventually satisfiable — all deps will settle (complete, fail, or be skipped)
+      // and all_done treats skipped as settled, so this can always fire.
+      return true;
+
+    case 'one_failed':
+      // Needs at least one dep to fail — impossible if all deps are completed or skipped
+      // (none can ever fail). A dep that is still unsettled might yet fail.
+      return deps.some(
+        (d) =>
+          run.failed_steps.includes(d) ||  // already satisfied
+          (!run.completed_steps.includes(d) && !run.skipped_steps.includes(d)),  // might still fail
+      );
+
+    case 'one_success':
+      // Needs at least one dep to succeed — impossible if all deps are failed or skipped
+      // (none can ever succeed). A dep that is still unsettled might yet succeed.
+      return deps.some(
+        (d) =>
+          run.completed_steps.includes(d) ||  // already satisfied
+          (!run.failed_steps.includes(d) && !run.skipped_steps.includes(d)),  // might still succeed
+      );
+
+    case 'none_failed':
+      // Needs no dep to fail — impossible if any dep already failed.
+      return deps.every((d) => !run.failed_steps.includes(d));
+  }
+}
+
+/**
+ * After a step settles (completes, fails, or is already skipped), some downstream steps
+ * may have trigger_rules that can never be satisfied. This function marks those steps
+ * as skipped and iterates until no new skips can be derived (fixed-point).
+ *
+ * Returns the updated skipped_steps array, which may be larger than run.skipped_steps.
+ * Does not mutate the run record — callers apply the result before writing.
+ */
+export function propagateSkips(
+  run: RunRecord,
+  definition: WorkflowDefinition,
+): string[] {
+  const skipped = [...run.skipped_steps];
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const [stepName, step] of Object.entries(definition.steps)) {
+      // Only evaluate steps that are not yet settled.
+      if (
+        run.completed_steps.includes(stepName) ||
+        run.in_progress_steps.includes(stepName) ||
+        run.failed_steps.includes(stepName) ||
+        skipped.includes(stepName)
+      ) {
+        continue;
+      }
+
+      // Use the growing skipped set so cascading skips are detected in one pass.
+      const tempRun: RunRecord = { ...run, skipped_steps: skipped };
+      if (!canTriggerRuleEverBeSatisfied(step, tempRun)) {
+        skipped.push(stepName);
+        changed = true;
+      }
+    }
+  }
+
+  return skipped;
 }
