@@ -150,6 +150,8 @@ describe('trigger_rule: all_failed — recovery after step failure', () => {
     const updatedRun = await store.get(run.id);
     expect(updatedRun.failed_steps).toContain('validate');
     expect(updatedRun.run_phase).toBe('running'); // recovery step still eligible
+    // continue_work has all_success on [validate] — permanently ineligible after failure.
+    expect(updatedRun.skipped_steps).toContain('continue_work');
 
     const eligible = findEligibleSteps(definition, updatedRun);
     expect(eligible).toContain('recover');

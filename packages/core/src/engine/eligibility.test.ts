@@ -9,6 +9,7 @@ import {
   triggerRuleSatisfied,
   evaluateWhenCondition,
   deriveRunPhase,
+  propagateSkips,
 } from './eligibility.js';
 import { JsonFileStore } from '../store/json-file-store.js';
 import type { WorkflowDefinition, StepDefinition } from '../types/workflow-definition.js';
@@ -124,6 +125,12 @@ describe('triggerRuleSatisfied', () => {
   it('all_done: eligible when all deps are completed or failed', () => {
     const step = makeStep({ depends_on: ['a', 'b'], trigger_rule: 'all_done' });
     const run = makeRun({ completed_steps: ['a'], failed_steps: ['b'] });
+    expect(triggerRuleSatisfied(step, run)).toBe(true);
+  });
+
+  it('all_done: eligible when all deps are completed, failed, or skipped', () => {
+    const step = makeStep({ depends_on: ['a', 'b', 'c'], trigger_rule: 'all_done' });
+    const run = makeRun({ completed_steps: ['a'], failed_steps: ['b'], skipped_steps: ['c'] });
     expect(triggerRuleSatisfied(step, run)).toBe(true);
   });
 
@@ -351,6 +358,135 @@ describe('findEligibleSteps — skip propagation', () => {
     const result = findEligibleSteps(definition, run);
     expect(result).toContain('billing-handler');
     expect(result).not.toContain('tech-handler');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// propagateSkips
+// ---------------------------------------------------------------------------
+
+describe('propagateSkips', () => {
+  it('marks a downstream all_success step as skipped when its dep fails', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: ['a'], trigger_rule: 'all_success' },
+    });
+    const run = makeRun({ failed_steps: ['a'] });
+    expect(propagateSkips(run, definition)).toContain('b');
+  });
+
+  it('marks a downstream none_failed step as skipped when its dep fails', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: ['a'], trigger_rule: 'none_failed' },
+    });
+    const run = makeRun({ failed_steps: ['a'] });
+    expect(propagateSkips(run, definition)).toContain('b');
+  });
+
+  it('marks a downstream all_failed step as skipped when its dep completes', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: ['a'], trigger_rule: 'all_failed' },
+    });
+    const run = makeRun({ completed_steps: ['a'] });
+    expect(propagateSkips(run, definition)).toContain('b');
+  });
+
+  it('marks a downstream one_failed step as skipped when all deps complete', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: [] },
+      c: { depends_on: ['a', 'b'], trigger_rule: 'one_failed' },
+    });
+    const run = makeRun({ completed_steps: ['a', 'b'] });
+    expect(propagateSkips(run, definition)).toContain('c');
+  });
+
+  it('marks a downstream one_success step as skipped when all deps fail', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: [] },
+      c: { depends_on: ['a', 'b'], trigger_rule: 'one_success' },
+    });
+    const run = makeRun({ failed_steps: ['a', 'b'] });
+    expect(propagateSkips(run, definition)).toContain('c');
+  });
+
+  it('does not skip an all_done step — all_done is always eventually satisfiable', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: ['a'], trigger_rule: 'all_done' },
+    });
+    const run = makeRun({ failed_steps: ['a'] });
+    expect(propagateSkips(run, definition)).not.toContain('b');
+  });
+
+  it('cascades: skipping B causes C (all_success on [B]) to also be skipped', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: ['a'], trigger_rule: 'all_success' },
+      c: { depends_on: ['b'], trigger_rule: 'all_success' },
+    });
+    const run = makeRun({ failed_steps: ['a'] });
+    const result = propagateSkips(run, definition);
+    expect(result).toContain('b');
+    expect(result).toContain('c');
+  });
+
+  it('does not duplicate an already-skipped step', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: ['a'], trigger_rule: 'all_success' },
+    });
+    const run = makeRun({ failed_steps: ['a'], skipped_steps: ['b'] });
+    const result = propagateSkips(run, definition);
+    expect(result.filter((s) => s === 'b')).toHaveLength(1);
+  });
+
+  it('does not skip completed or failed steps', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: [] },
+    });
+    const run = makeRun({ completed_steps: ['a'], failed_steps: ['b'] });
+    const result = propagateSkips(run, definition);
+    expect(result).not.toContain('a');
+    expect(result).not.toContain('b');
+  });
+
+  it('does not skip a one_failed step when some deps are still unsettled', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: [] },
+      c: { depends_on: ['a', 'b'], trigger_rule: 'one_failed' },
+    });
+    // a completed, b is still pending and might yet fail
+    const run = makeRun({ completed_steps: ['a'] });
+    expect(propagateSkips(run, definition)).not.toContain('c');
+  });
+
+  it('preserves existing skipped_steps in the returned array', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: ['a'], trigger_rule: 'all_success' },
+      c: { depends_on: [] },
+    });
+    const run = makeRun({ failed_steps: ['a'], skipped_steps: ['c'] });
+    const result = propagateSkips(run, definition);
+    expect(result).toContain('b');
+    expect(result).toContain('c');
+  });
+
+  it('does not skip a step whose one_success dep has already completed', () => {
+    const definition = makeWorkflow({
+      a: { depends_on: [] },
+      b: { depends_on: [] },
+      c: { depends_on: ['a', 'b'], trigger_rule: 'one_success' },
+    });
+    // a completed — one_success is already satisfiable
+    const run = makeRun({ completed_steps: ['a'], failed_steps: ['b'] });
+    expect(propagateSkips(run, definition)).not.toContain('c');
   });
 });
 
