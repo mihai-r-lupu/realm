@@ -146,4 +146,4 @@ does not advance until the schema passes.
 - [Example 2 — Reliable Output, Every Time](../02-ticket-classifier/) — schema
   enforcement with enum validation and pattern matching across five fields
 - [YAML Schema Reference](../../docs/reference/yaml-schema.md) — all step fields,
-  execution modes, `input_schema` constraints, and transitions
+  execution modes, `input_schema` constraints, and `depends_on` / `trigger_rule`

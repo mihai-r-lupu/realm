@@ -176,4 +176,4 @@ is present via `context.resources.read_alert.content`.
 - [Example 2 — Ticket Classifier](../02-ticket-classifier/) — agent step schema enforcement,
   `input_schema` validation, `provide_input` on schema rejection
 - [YAML Schema Reference](../../docs/reference/yaml-schema.md) — all step fields, execution
-  modes, gate configuration, and transitions
+  modes, gate configuration, and `depends_on` / `trigger_rule`

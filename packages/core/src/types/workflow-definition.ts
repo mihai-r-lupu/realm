@@ -153,8 +153,3 @@ export interface WorkflowDefinition {
   resolved_profiles?: Record<string, { content: string; content_hash: string }>;
 }
 
-  /**
-   * Which adapter method to invoke for this service step.
-   * Defaults to 'fetch' if omitted.
-   */
-
