@@ -267,17 +267,17 @@ function stepToNextAction(
         ? { tool: step.handler, params: {}, call_with: {} }
         : step.execution === 'agent'
           ? {
-              tool: 'execute_step',
-              params: { run_id: context.runId, command: stepName },
-              call_with: {
-                run_id: context.runId,
-                command: stepName,
-                params:
-                  step.input_schema !== undefined
-                    ? generateSchemaSkeleton(step.input_schema as Record<string, unknown>)
-                    : {},
-              },
-            }
+            tool: 'execute_step',
+            params: { run_id: context.runId, command: stepName },
+            call_with: {
+              run_id: context.runId,
+              command: stepName,
+              params:
+                step.input_schema !== undefined
+                  ? generateSchemaSkeleton(step.input_schema as Record<string, unknown>)
+                  : {},
+            },
+          }
           : null,
     ...(step.execution === 'agent' && step.input_schema !== undefined
       ? { input_schema: step.input_schema }
@@ -404,13 +404,13 @@ export async function executeStep(
       blocked_reason:
         nextActions.length > 0
           ? {
-              eligible_steps: eligible,
-              suggestion: `Call one of the steps indicated in next_actions instead.`,
-            }
+            eligible_steps: eligible,
+            suggestion: `Call one of the steps indicated in next_actions instead.`,
+          }
           : {
-              eligible_steps: eligible,
-              suggestion: `No eligible steps available. Check run_phase and completed_steps.`,
-            },
+            eligible_steps: eligible,
+            suggestion: `No eligible steps available. Check run_phase and completed_steps.`,
+          },
     };
   }
 
@@ -797,11 +797,11 @@ export async function submitHumanResponse(
       err instanceof WorkflowError
         ? err
         : new WorkflowError('Failed to load run from store', {
-            code: 'ENGINE_STORE_FAILED',
-            category: 'ENGINE',
-            agentAction: 'stop',
-            retryable: false,
-          });
+          code: 'ENGINE_STORE_FAILED',
+          category: 'ENGINE',
+          agentAction: 'stop',
+          retryable: false,
+        });
     return errorEnvelope('submit_gate', options.runId, 0, e);
   }
 
@@ -894,11 +894,11 @@ export async function submitHumanResponse(
       err instanceof WorkflowError
         ? err
         : new WorkflowError('Failed to persist gate response', {
-            code: 'ENGINE_STORE_FAILED',
-            category: 'ENGINE',
-            agentAction: 'stop',
-            retryable: false,
-          });
+          code: 'ENGINE_STORE_FAILED',
+          category: 'ENGINE',
+          agentAction: 'stop',
+          retryable: false,
+        });
     return errorEnvelope(gateStepName, options.runId, run.version, e, `Failed to persist gate response.`);
   }
 

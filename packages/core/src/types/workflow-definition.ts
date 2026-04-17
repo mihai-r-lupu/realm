@@ -151,5 +151,11 @@ export interface WorkflowDefinition {
    * Do not serialize/write to workflow YAML — this is a runtime-only field.
    */
   resolved_profiles?: Record<string, { content: string; content_hash: string }>;
+  /**
+   * Schema version stamped by the loader at registration time.
+   * Used by JsonWorkflowStore.get() to reject stale registrations.
+   * Runtime-only — not a user-facing YAML field.
+   */
+  schema_version?: number;
 }
 

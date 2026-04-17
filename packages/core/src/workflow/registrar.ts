@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import type { WorkflowDefinition } from '../types/workflow-definition.js';
 import { WorkflowError } from '../types/workflow-error.js';
+import { CURRENT_WORKFLOW_SCHEMA_VERSION } from './yaml-loader.js';
 
 export interface WorkflowRegistrar {
   /** Persist a WorkflowDefinition under its id, overwriting any previous registration. */
@@ -46,7 +47,15 @@ export class JsonWorkflowStore implements WorkflowRegistrar {
         retryable: false,
       });
     }
-    return JSON.parse(raw) as WorkflowDefinition;
+    const parsed = JSON.parse(raw) as WorkflowDefinition;
+    if (parsed.schema_version === undefined || parsed.schema_version < CURRENT_WORKFLOW_SCHEMA_VERSION) {
+      throw new WorkflowError(
+        'This workflow was registered with an older version of Realm. ' +
+          'Re-register it with: realm workflow register <path-to-workflow>',
+        { code: 'STATE_LEGACY_FORMAT', category: 'STATE', agentAction: 'report_to_user', retryable: false },
+      );
+    }
+    return parsed;
   }
 
   async list(): Promise<WorkflowDefinition[]> {

@@ -14,6 +14,7 @@ export {
   isWorkflowComplete,
   deriveRunPhase,
   buildEvidenceByStep,
+  propagateSkips,
 } from './engine/eligibility.js';
 export {
   TERMINAL_PHASES,
@@ -73,7 +74,7 @@ export { validateInputSchema } from './validation/input-schema.js';
 export { loadSecrets, resolveSecret } from './config/secrets.js';
 
 // Workflow
-export { loadWorkflowFromFile, loadWorkflowFromString } from './workflow/yaml-loader.js';
+export { loadWorkflowFromFile, loadWorkflowFromString, CURRENT_WORKFLOW_SCHEMA_VERSION } from './workflow/yaml-loader.js';
 export { JsonWorkflowStore } from './workflow/registrar.js';
 export type { WorkflowRegistrar } from './workflow/registrar.js';
 

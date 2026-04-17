@@ -8,6 +8,7 @@ import {
   type WorkflowDefinition,
   type ResponseEnvelope,
   type JsonSchema,
+  CURRENT_WORKFLOW_SCHEMA_VERSION,
 } from '@sensigo/realm';
 import { handleStartRun, type HandleRunStores } from './start-run.js';
 
@@ -167,6 +168,7 @@ function buildWorkflowDefinition(workflowId: string, args: CreateWorkflowArgs): 
     id: workflowId,
     name: metadata?.name ?? 'Dynamic Workflow',
     version: 1,
+    schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
     steps: stepsRecord,
   };
 

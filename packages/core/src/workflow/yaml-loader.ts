@@ -7,6 +7,9 @@ import type { WorkflowDefinition, TemplateDefinition, TriggerRule } from '../typ
 import { WorkflowError } from '../types/workflow-error.js';
 import { resolveTemplates } from './template-resolver.js';
 
+/** Bumped on every breaking change to WorkflowDefinition's serialized format. */
+export const CURRENT_WORKFLOW_SCHEMA_VERSION = 1;
+
 const VALID_EXECUTIONS = new Set(['auto', 'agent']);
 const VALID_SERVICE_METHODS = new Set(['fetch', 'create', 'update']);
 const VALID_TRIGGER_RULES = new Set<TriggerRule>([
@@ -249,8 +252,10 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
     });
   }
 
-  // Step 4: Return typed result
-  return doc as unknown as WorkflowDefinition;
+  // Step 4: Stamp schema version and return typed result
+  const definition = doc as unknown as WorkflowDefinition;
+  definition.schema_version = CURRENT_WORKFLOW_SCHEMA_VERSION;
+  return definition;
 }
 
 /** Returns true if any step in the raw steps map declares use_template. */
