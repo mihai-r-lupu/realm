@@ -53,13 +53,14 @@ with the same schema-validated `summarise` outputs as inputs — no re-runs, no 
 
 ```
 fetch_content  (auto — filesystem adapter, loads the article text)
-     │ → content_fetched
+     │
 summarise      (agent — produces: title, summary, word_count)
-     │ → summarised    ← schema enforced before tag_content starts
+     │         ← schema enforced before tag_content starts
 tag_content    (agent — reads context.resources.summarise; produces: tags[])
-     │ → tagged        ← the step a provider timeout targets
+     │         ← the step a provider timeout targets
 record_result  (auto — records title, summary, tags in the evidence chain)
-     │ → completed
+     │
+  completed
 ```
 
 `summarise` and `tag_content` each have their own `input_schema`. Each must pass before the
@@ -114,11 +115,11 @@ folder. With the default agent, trigger it with:
 Either way, the agent will:
 
 1. Start the run — `fetch_content` executes automatically via the filesystem adapter.
-2. Receive a `next_action.prompt` asking it to summarise the article. It submits `title`,
+2. Receive a prompt asking it to summarise the article. It submits `title`,
    `summary`, and `word_count`. If any field fails schema validation, it receives
-   `provide_input` and must correct and resubmit. The state stays at `content_fetched` until
+   `provide_input` and must correct and resubmit. The run stays at `summarise` until
    the schema passes.
-3. Receive a second `next_action.prompt` asking it to generate tags. The prompt already
+3. Receive a second prompt asking it to generate tags. The prompt already
    contains the verified title and summary from step 2. It submits `tags`. Same schema
    enforcement applies — each tag is checked for length, lowercase, and no spaces.
 4. Once the tags schema passes, `record_result` runs and the workflow completes.

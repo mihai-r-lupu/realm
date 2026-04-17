@@ -56,13 +56,13 @@ function makeRunStore(run: RunRecord): RunStore {
 function makeWorkflowStore(def?: WorkflowDefinition): WorkflowRegistrar {
   if (def !== undefined) {
     return {
-      register: async () => {},
+      register: async () => { },
       get: async () => def,
       list: async () => [def],
     };
   }
   return {
-    register: async () => {},
+    register: async () => { },
     get: async () => {
       throw new Error('Workflow not found');
     },

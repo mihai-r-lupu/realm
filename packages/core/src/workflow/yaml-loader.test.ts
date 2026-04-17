@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { loadWorkflowFromString, loadWorkflowFromFile } from './yaml-loader.js';
+import { loadWorkflowFromString, loadWorkflowFromFile, CURRENT_WORKFLOW_SCHEMA_VERSION } from './yaml-loader.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,6 +27,11 @@ describe('loadWorkflowFromString', () => {
     expect(def.name).toBe('Test Workflow');
     expect(def.version).toBe(1);
     expect(Object.keys(def.steps)).toHaveLength(2);
+  });
+
+  it('stamps schema_version on the loaded definition', () => {
+    const def = loadWorkflowFromString(VALID_YAML);
+    expect(def.schema_version).toBe(CURRENT_WORKFLOW_SCHEMA_VERSION);
   });
 
   it('missing top-level field throws WorkflowError', () => {

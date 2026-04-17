@@ -1,16 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { JsonWorkflowStore } from './registrar.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import type { WorkflowDefinition } from '../types/workflow-definition.js';
+import { CURRENT_WORKFLOW_SCHEMA_VERSION } from './yaml-loader.js';
 
 function makeDefinition(id: string, version = 1): WorkflowDefinition {
   return {
     id,
     name: `Workflow ${id}`,
     version,
+    schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
     initial_state: 'created',
     steps: {
       'step-one': {
@@ -64,5 +66,21 @@ describe('JsonWorkflowStore', () => {
     await store.register(makeDefinition('wf-one', 2));
     const retrieved = await store.get('wf-one');
     expect(retrieved.version).toBe(2);
+  });
+
+  it('get throws STATE_LEGACY_FORMAT when schema_version is missing', async () => {
+    const stale = JSON.stringify({ id: 'wf-stale', name: 'Stale', version: 1, steps: {} });
+    await writeFile(join(dir, 'wf-stale.json'), stale, 'utf8');
+    await expect(store.get('wf-stale')).rejects.toMatchObject({
+      code: 'STATE_LEGACY_FORMAT',
+    });
+  });
+
+  it('get throws STATE_LEGACY_FORMAT when schema_version is outdated', async () => {
+    const stale = JSON.stringify({ id: 'wf-old', name: 'Old', version: 1, schema_version: 0, steps: {} });
+    await writeFile(join(dir, 'wf-old.json'), stale, 'utf8');
+    await expect(store.get('wf-old')).rejects.toMatchObject({
+      code: 'STATE_LEGACY_FORMAT',
+    });
   });
 });

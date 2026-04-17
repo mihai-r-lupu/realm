@@ -5,6 +5,7 @@ import {
   ExtensionRegistry,
   createDefaultRegistry,
   executeChain,
+  propagateSkips,
   type WorkflowDefinition,
 } from '@sensigo/realm';
 import { join } from 'node:path';
@@ -144,9 +145,16 @@ async function runSingleFixture(
           stepResumeCount[nextStep] = resumesDone + 1;
           const failedRun = await store.get(runId);
           const { terminal_reason: _tr, ...rest } = failedRun;
+          const newFailedSteps = rest.failed_steps.filter((s) => s !== nextStep);
+          // Recompute skipped_steps: the old skips were derived with nextStep in
+          // failed_steps. Re-derive from scratch so steps that were only skipped
+          // because of this failure become eligible again on the retry.
+          const tempRun = { ...rest, failed_steps: newFailedSteps, skipped_steps: [] as string[] };
+          const newSkippedSteps = propagateSkips(tempRun, definition);
           await store.update({
             ...rest,
-            failed_steps: rest.failed_steps.filter((s) => s !== nextStep),
+            failed_steps: newFailedSteps,
+            skipped_steps: newSkippedSteps,
             terminal_state: false,
           });
           currentRun = await store.get(runId);

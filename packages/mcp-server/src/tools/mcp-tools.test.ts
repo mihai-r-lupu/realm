@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { JsonFileStore, JsonWorkflowStore } from '@sensigo/realm';
 import type { WorkflowDefinition } from '@sensigo/realm';
+import { CURRENT_WORKFLOW_SCHEMA_VERSION } from '@sensigo/realm';
 import { handleListWorkflows } from './list-workflows.js';
 import { handleGetWorkflowProtocol } from './get-workflow-protocol.js';
 import { handleStartRun } from './start-run.js';
@@ -19,6 +20,7 @@ function makeSimpleDef(): WorkflowDefinition {
     id: 'simple-wf',
     name: 'Simple Workflow',
     version: 1,
+    schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
     steps: {
       'step-a': {
         description: 'Auto step',
@@ -35,6 +37,7 @@ function makeAgentDef(): WorkflowDefinition {
     id: 'agent-wf',
     name: 'Agent Workflow',
     version: 1,
+    schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
     steps: {
       'step-auto': {
         description: 'Auto step',
@@ -56,6 +59,7 @@ function makeGateDef(): WorkflowDefinition {
     id: 'gate-wf',
     name: 'Gate Workflow',
     version: 1,
+    schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
     steps: {
       'step-gate': {
         description: 'Gate step',
@@ -257,6 +261,7 @@ describe('mcp tool handlers', () => {
       id: 'gate-trans-wf',
       name: 'Gate Transition Workflow',
       version: 1,
+      schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
       steps: {
         review: {
           description: 'Human gate',
@@ -313,6 +318,7 @@ describe('mcp tool handlers', () => {
       id: 'filesystem-auto-wf',
       name: 'Filesystem Auto Workflow',
       version: 1,
+      schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
       services: {
         source: { adapter: 'filesystem', trust: 'engine_delivered' },
       },

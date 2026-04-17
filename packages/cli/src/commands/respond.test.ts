@@ -4,13 +4,14 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { respondToGate } from './respond.js';
-import { JsonFileStore, JsonWorkflowStore, WorkflowError, executeStep } from '@sensigo/realm';
+import { JsonFileStore, JsonWorkflowStore, WorkflowError, executeStep, CURRENT_WORKFLOW_SCHEMA_VERSION } from '@sensigo/realm';
 import type { WorkflowDefinition } from '@sensigo/realm';
 
 const gateWorkflow: WorkflowDefinition = {
   id: 'respond-test-wf',
   name: 'Respond Test Workflow',
   version: 1,
+  schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
   steps: {
     'step-one': {
       description: 'Auto step with gate',

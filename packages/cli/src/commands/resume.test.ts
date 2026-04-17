@@ -4,13 +4,14 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resumeRun } from './resume.js';
-import { JsonFileStore, JsonWorkflowStore, WorkflowError } from '@sensigo/realm';
+import { JsonFileStore, JsonWorkflowStore, WorkflowError, CURRENT_WORKFLOW_SCHEMA_VERSION } from '@sensigo/realm';
 import type { WorkflowDefinition } from '@sensigo/realm';
 
 const testWorkflow: WorkflowDefinition = {
   id: 'resume-test-wf',
   name: 'Resume Test Workflow',
   version: 1,
+  schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
   steps: {
     'step-one': {
       description: 'First step',
