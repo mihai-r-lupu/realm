@@ -52,15 +52,16 @@ with the same schema-validated `summarise` outputs as inputs — no re-runs, no 
 ## Steps
 
 ```
-fetch_content  (auto — filesystem adapter, loads the article text)
-     │
+fetch_content  (auto — filesystem adapter)          [depends_on: none]
+     ↓
 summarise      (agent — produces: title, summary, word_count)
-     │         ← schema enforced before tag_content starts
+               [depends_on: fetch_content]           schema enforced before tag_content starts
+     ↓
 tag_content    (agent — reads context.resources.summarise; produces: tags[])
-     │         ← the step a provider timeout targets
-record_result  (auto — records title, summary, tags in the evidence chain)
-     │
-  completed
+               [depends_on: summarise]               provider timeout target in resume fixture
+     ↓
+record_result  (auto — terminal step; marks pipeline complete)
+               [depends_on: tag_content]
 ```
 
 `summarise` and `tag_content` each have their own `input_schema`. Each must pass before the

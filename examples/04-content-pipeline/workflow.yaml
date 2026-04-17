@@ -1,8 +1,9 @@
 # examples/04-content-pipeline/workflow.yaml
 # Content Enrichment Pipeline — reads an article from disk, summarises it, tags it using
-# the verified summary, then records the result. Demonstrates: persistent state machine +
-# realm run resume. When the provider times out at tag_content, steps 1 and 2 are already
-# completed — realm run resume continues from tag_content without re-running anything.
+# the verified summary, then records the result. Demonstrates: DAG execution model +
+# realm run resume. When the provider times out at tag_content, fetch_content and summarise
+# are already in completed_steps — realm run resume continues from tag_content without
+# re-running anything.
 id: content-pipeline
 name: Content Enrichment Pipeline
 version: 1
@@ -98,6 +99,8 @@ steps:
             maxLength: 50
 
   record_result:
-    description: Record the enriched content result
+    description: Mark the pipeline complete. Data is already in the evidence chain from
+      summarise and tag_content — this step exists to give the pipeline a clean terminal
+      step distinct from the final agent step.
     execution: auto
     depends_on: [tag_content]
