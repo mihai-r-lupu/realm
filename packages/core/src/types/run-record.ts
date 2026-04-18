@@ -48,6 +48,20 @@ export interface PendingGate {
  */
 export type RunPhase = 'running' | 'gate_waiting' | 'completed' | 'failed' | 'abandoned';
 
+/** Snapshot of a single workflow context entry taken at run start. */
+export interface WorkflowContextSnapshot {
+  /** Absolute path the content was read from. */
+  source_path: string;
+  /** Raw file content. Empty string if the file could not be read. */
+  content: string;
+  /** SHA-256 hex hash of content. Empty string if the file could not be read. */
+  content_hash: string;
+  /** ISO timestamp when the snapshot was taken. */
+  loaded_at: string;
+  /** Set when the file could not be read. Content and hash will be empty strings. */
+  error?: string;
+}
+
 export interface RunRecord {
   id: string;
   workflow_id: string;
@@ -69,6 +83,11 @@ export interface RunRecord {
   version: number;
   params: Record<string, unknown>;
   evidence: EvidenceSnapshot[];
+  /**
+   * Snapshots of workflow context files loaded at run start.
+   * Keyed by entry name. Separate from step evidence — not in evidence[].
+   */
+  workflow_context_snapshots?: Record<string, WorkflowContextSnapshot>;
   created_at: string;
   updated_at: string;
   terminal_state: boolean;

@@ -2,10 +2,10 @@
 // run state update, and ResponseEnvelope construction for the DAG execution model.
 // Includes: step claiming, step-level retry, step timeouts, human gate mechanics,
 // auto-chaining with fan-out, and registry-based dispatch for adapter and handler steps.
-import type { RunRecord, EvidenceSnapshot } from '../types/run-record.js';
+import type { RunRecord, EvidenceSnapshot, WorkflowContextSnapshot } from '../types/run-record.js';
 import type { ResponseEnvelope, NextAction } from '../types/response-envelope.js';
 import { WorkflowError } from '../types/workflow-error.js';
-import type { WorkflowDefinition, StepDefinition, RetryConfig } from '../types/workflow-definition.js';
+import type { WorkflowDefinition, StepDefinition, RetryConfig, ContextWrapperFormat } from '../types/workflow-definition.js';
 import type { RunStore } from '../store/store-interface.js';
 import { captureEvidence } from '../evidence/snapshot.js';
 import { validateInputSchema } from '../validation/input-schema.js';
@@ -17,6 +17,7 @@ import type { ServiceResponse } from '../extensions/service-adapter.js';
 import { resolveSecret } from '../config/secrets.js';
 import { resolvePromptTemplate, resolvePath } from './prompt-template.js';
 import { generateSchemaSkeleton } from '../utils/schema-skeleton.js';
+import { loadWorkflowContext } from './workflow-context-loader.js';
 import {
   findEligibleSteps,
   isWorkflowComplete,
@@ -256,6 +257,10 @@ function stepToNextAction(
     evidenceByStep: Record<string, Record<string, unknown>>;
     runParams: Record<string, unknown>;
     runId: string;
+    workflowContext?: {
+      snapshots: Record<string, WorkflowContextSnapshot>;
+      wrapper: ContextWrapperFormat;
+    };
   },
 ): NextAction {
   const resolvedPrompt =
@@ -301,7 +306,19 @@ export function buildNextActions(
 ): NextAction[] {
   const eligible = findEligibleSteps(definition, run);
   const evidenceByStep = buildEvidenceByStep(run);
-  const context = { evidenceByStep, runParams: run.params, runId: run.id };
+  const context = {
+    evidenceByStep,
+    runParams: run.params,
+    runId: run.id,
+    ...(run.workflow_context_snapshots !== undefined
+      ? {
+          workflowContext: {
+            snapshots: run.workflow_context_snapshots,
+            wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
+          },
+        }
+      : {}),
+  };
 
   return eligible
     .filter(
@@ -494,6 +511,19 @@ export async function executeStep(
     );
   }
 
+  // Load workflow context once at run start — skip if already populated.
+  if (
+    definition.workflow_context !== undefined &&
+    Object.keys(definition.workflow_context).length > 0 &&
+    pendingRun.workflow_context_snapshots === undefined
+  ) {
+    const contextSnapshots = await loadWorkflowContext(definition);
+    pendingRun = await store.update({
+      ...pendingRun,
+      workflow_context_snapshots: contextSnapshots,
+    });
+  }
+
   // Step 4: Dispatch with retry and timeout.
   const retryConfig = stepDef?.retry;
   const maxAttempts = retryConfig?.max_attempts ?? 1;
@@ -674,13 +704,21 @@ export async function executeStep(
     }
 
     const gateEvidenceCtx = { ...evidenceByStep, [options.command]: output };
+    const wfCtxSpread = pendingRun.workflow_context_snapshots !== undefined
+      ? {
+          workflowContext: {
+            snapshots: pendingRun.workflow_context_snapshots,
+            wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
+          },
+        }
+      : {};
     const resolvedGateDisplay =
       stepDef!.prompt !== undefined
-        ? resolvePromptTemplate(stepDef!.prompt, { evidenceByStep: gateEvidenceCtx, runParams: run.params })
+        ? resolvePromptTemplate(stepDef!.prompt, { evidenceByStep: gateEvidenceCtx, runParams: run.params, ...wfCtxSpread })
         : undefined;
     const resolvedGateInstructions =
       stepDef!.instructions !== undefined
-        ? resolvePromptTemplate(stepDef!.instructions, { evidenceByStep: gateEvidenceCtx, runParams: run.params })
+        ? resolvePromptTemplate(stepDef!.instructions, { evidenceByStep: gateEvidenceCtx, runParams: run.params, ...wfCtxSpread })
         : undefined;
 
     const gateNextAction: NextAction = {

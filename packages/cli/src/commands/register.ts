@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { join } from 'node:path';
 import { loadWorkflowFromFile, JsonWorkflowStore } from '@sensigo/realm';
+import type { WorkflowDefinition } from '@sensigo/realm';
 
 export const registerCommand = new Command('register')
   .argument('<path>', 'Path to workflow directory or workflow.yaml file')
@@ -16,6 +17,10 @@ export const registerCommand = new Command('register')
       const definition = loadWorkflowFromFile(filePath);
       const store = new JsonWorkflowStore();
       await store.register(definition);
+      const contextWarnings = lintWorkflowContext(definition);
+      for (const warning of contextWarnings) {
+        console.warn(`⚠  ${warning}`);
+      }
       console.log(
         `Registered: ${definition.id} v${definition.version} (${Object.keys(definition.steps).length} steps)`,
       );
@@ -25,3 +30,35 @@ export const registerCommand = new Command('register')
       process.exit(1);
     }
   });
+
+/** @internal Exported for testing only. */
+export function lintWorkflowContext(definition: WorkflowDefinition): string[] {
+  const contextEntries = Object.keys(definition.workflow_context ?? {});
+  if (contextEntries.length === 0) return [];
+
+  // Only lint agent steps that have a prompt — auto steps have no agent-visible prompt.
+  const agentStepsWithPrompt = Object.values(definition.steps).filter(
+    (s) => s.execution === 'agent' && typeof s.prompt === 'string',
+  );
+  // Need at least 2 agent steps for a proportion warning to be meaningful.
+  if (agentStepsWithPrompt.length < 2) return [];
+
+  const threshold = Math.floor(agentStepsWithPrompt.length / 2);
+  const warnings: string[] = [];
+
+  for (const name of contextEntries) {
+    const refPattern = `workflow.context.${name}`;
+    const refCount = agentStepsWithPrompt.filter((s) =>
+      (s.prompt as string).includes(refPattern),
+    ).length;
+    if (refCount > threshold) {
+      warnings.push(
+        `workflow.context.${name} is referenced in ${refCount} of ${agentStepsWithPrompt.length} ` +
+          `agent step prompts. If this context applies universally, that is intentional — ` +
+          `otherwise consider whether all steps truly need it.`,
+      );
+    }
+  }
+  return warnings;
+}
+
