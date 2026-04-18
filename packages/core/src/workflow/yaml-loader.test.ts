@@ -416,3 +416,101 @@ steps:
     expect(def.resolved_profiles!['custom-profile']!.content).toBe('Custom profile content.');
   });
 });
+
+describe('loadWorkflowFromFile — workflow_context', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'realm-ctx-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  const baseYaml = `
+id: ctx-wf
+name: Context Workflow
+version: 1
+steps:
+  step-one:
+    description: A step
+    execution: agent
+    depends_on: []
+`;
+
+  it('workflow_context relative path is resolved to absolute in the output', () => {
+    writeFileSync(join(tmpDir, 'rules.md'), '# Rules');
+    writeFileSync(
+      join(tmpDir, 'workflow.yaml'),
+      baseYaml + `\nworkflow_context:\n  rules:\n    source:\n      path: ./rules.md\n`,
+    );
+    const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
+    expect(def.workflow_context?.['rules']?.source.path).toBe(join(tmpDir, 'rules.md'));
+  });
+
+  it('context_wrapper value is parsed and stored on the definition', () => {
+    writeFileSync(join(tmpDir, 'rules.md'), '# Rules');
+    writeFileSync(
+      join(tmpDir, 'workflow.yaml'),
+      baseYaml +
+        `\ncontext_wrapper: brackets\nworkflow_context:\n  rules:\n    source:\n      path: ./rules.md\n`,
+    );
+    const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
+    expect(def.context_wrapper).toBe('brackets');
+  });
+
+  it('invalid context_wrapper value throws a descriptive WorkflowError', () => {
+    writeFileSync(
+      join(tmpDir, 'workflow.yaml'),
+      baseYaml + `\ncontext_wrapper: markdown\n`,
+    );
+    expect(() => loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'))).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain('context_wrapper');
+    }
+  });
+
+  it('missing source.path on an entry throws with the entry name in the message', () => {
+    writeFileSync(
+      join(tmpDir, 'workflow.yaml'),
+      baseYaml + `\nworkflow_context:\n  rules:\n    description: no source\n`,
+    );
+    expect(() => loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'))).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain('workflow_context.rules.source.path');
+    }
+  });
+
+  it('schema.json present + no explicit workflow_context.schema → auto-registered with absolute path', () => {
+    writeFileSync(join(tmpDir, 'schema.json'), '{}');
+    writeFileSync(join(tmpDir, 'workflow.yaml'), baseYaml);
+    const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
+    expect(def.workflow_context?.['schema']).toBeDefined();
+    expect(def.workflow_context!['schema']!.source.path).toBe(join(tmpDir, 'schema.json'));
+  });
+
+  it('schema.json present + explicit workflow_context.schema declared → auto-registration skipped', () => {
+    writeFileSync(join(tmpDir, 'schema.json'), '{}');
+    writeFileSync(join(tmpDir, 'explicit-schema.json'), '{"explicit":true}');
+    writeFileSync(
+      join(tmpDir, 'workflow.yaml'),
+      baseYaml +
+        `\nworkflow_context:\n  schema:\n    source:\n      path: ./explicit-schema.json\n`,
+    );
+    const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
+    expect(def.workflow_context!['schema']!.source.path).toBe(
+      join(tmpDir, 'explicit-schema.json'),
+    );
+  });
+
+  it('schema.json absent → workflow_context.schema not created', () => {
+    writeFileSync(join(tmpDir, 'workflow.yaml'), baseYaml);
+    const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
+    expect(def.workflow_context?.['schema']).toBeUndefined();
+  });
+});

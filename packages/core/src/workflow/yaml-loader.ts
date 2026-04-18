@@ -1,5 +1,5 @@
 // Workflow YAML loader — parses workflow.yaml files into typed WorkflowDefinition objects.
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { load } from 'js-yaml';
@@ -81,6 +81,72 @@ export function loadWorkflowFromFile(filePath: string): WorkflowDefinition {
 
   if (Object.keys(resolvedProfiles).length > 0) {
     definition.resolved_profiles = resolvedProfiles;
+  }
+
+  // Validate context_wrapper if present.
+  if (definition.context_wrapper !== undefined) {
+    const VALID_WRAPPER_FORMATS = new Set(['xml', 'brackets', 'none']);
+    if (!VALID_WRAPPER_FORMATS.has(definition.context_wrapper)) {
+      throw new WorkflowError(
+        `Invalid context_wrapper '${String(definition.context_wrapper)}'; must be 'xml', 'brackets', or 'none'`,
+        {
+          code: 'VALIDATION_WORKFLOW_SCHEMA',
+          category: 'VALIDATION',
+          agentAction: 'report_to_user',
+          retryable: false,
+        },
+      );
+    }
+  }
+
+  // Validate and resolve workflow_context entry paths.
+  if (definition.workflow_context !== undefined) {
+    for (const [name, entry] of Object.entries(definition.workflow_context)) {
+      if (name.endsWith('.raw')) {
+        throw new WorkflowError(
+          `workflow_context entry names must not end with '.raw' (found: '${name}')`,
+          {
+            code: 'VALIDATION_WORKFLOW_SCHEMA',
+            category: 'VALIDATION',
+            agentAction: 'report_to_user',
+            retryable: false,
+          },
+        );
+      }
+      if (!/^[\w.]+$/.test(name)) {
+        throw new WorkflowError(
+          `workflow_context entry name '${name}' is invalid; names must match [\\w.]+ (underscores and dots only — no hyphens)`,
+          {
+            code: 'VALIDATION_WORKFLOW_SCHEMA',
+            category: 'VALIDATION',
+            agentAction: 'report_to_user',
+            retryable: false,
+          },
+        );
+      }
+      const rawEntry = entry as unknown as Record<string, unknown>;
+      const rawSource = rawEntry['source'] as Record<string, unknown> | undefined;
+      if (rawSource === undefined || typeof rawSource['path'] !== 'string') {
+        throw new WorkflowError(`workflow_context.${name}.source.path is required`, {
+          code: 'VALIDATION_WORKFLOW_SCHEMA',
+          category: 'VALIDATION',
+          agentAction: 'report_to_user',
+          retryable: false,
+        });
+      }
+      // Resolve relative path to absolute.
+      entry.source.path = resolve(workflowDir, rawSource['path'] as string);
+    }
+  }
+
+  // Auto-register schema.json if present and not explicitly declared.
+  const schemaPath = join(workflowDir, 'schema.json');
+  if (existsSync(schemaPath) && definition.workflow_context?.['schema'] === undefined) {
+    definition.workflow_context ??= {};
+    definition.workflow_context['schema'] = {
+      source: { path: schemaPath },
+      description: 'Auto-registered schema.json from workflow directory',
+    };
   }
 
   return definition;

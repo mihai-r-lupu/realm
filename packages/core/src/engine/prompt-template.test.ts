@@ -57,3 +57,109 @@ describe('resolvePromptTemplate', () => {
     expect(result).toContain('42');
   });
 });
+
+const contextSnapshot = {
+  source_path: '/tmp/guidelines.md',
+  content: 'Be concise.',
+  content_hash: 'abc123',
+  loaded_at: '2026-01-01T00:00:00.000Z',
+};
+
+describe('resolvePromptTemplate — workflow.context namespace', () => {
+  it('{{ workflow.context.NAME }} with wrapper xml wraps in XML tags', () => {
+    const result = resolvePromptTemplate('{{ workflow.context.guidelines }}', {
+      evidenceByStep: {},
+      runParams: {},
+      workflowContext: {
+        snapshots: { guidelines: contextSnapshot },
+        wrapper: 'xml',
+      },
+    });
+    expect(result).toBe('<guidelines>\nBe concise.\n</guidelines>');
+  });
+
+  it('{{ workflow.context.NAME }} with wrapper brackets wraps in bracket tags', () => {
+    const result = resolvePromptTemplate('{{ workflow.context.guidelines }}', {
+      evidenceByStep: {},
+      runParams: {},
+      workflowContext: {
+        snapshots: { guidelines: contextSnapshot },
+        wrapper: 'brackets',
+      },
+    });
+    expect(result).toBe('[guidelines]\nBe concise.\n[/guidelines]');
+  });
+
+  it('{{ workflow.context.NAME }} with wrapper none returns raw content', () => {
+    const result = resolvePromptTemplate('{{ workflow.context.guidelines }}', {
+      evidenceByStep: {},
+      runParams: {},
+      workflowContext: {
+        snapshots: { guidelines: contextSnapshot },
+        wrapper: 'none',
+      },
+    });
+    expect(result).toBe('Be concise.');
+  });
+
+  it('{{ workflow.context.NAME.raw }} returns raw content regardless of wrapper', () => {
+    const result = resolvePromptTemplate('{{ workflow.context.guidelines.raw }}', {
+      evidenceByStep: {},
+      runParams: {},
+      workflowContext: {
+        snapshots: { guidelines: contextSnapshot },
+        wrapper: 'xml',
+      },
+    });
+    expect(result).toBe('Be concise.');
+  });
+
+  it('{{ workflow.context.NAME }} left as-is when entry is absent from snapshots', () => {
+    const result = resolvePromptTemplate('{{ workflow.context.missing }}', {
+      evidenceByStep: {},
+      runParams: {},
+      workflowContext: {
+        snapshots: {},
+        wrapper: 'xml',
+      },
+    });
+    expect(result).toBe('{{ workflow.context.missing }}');
+  });
+
+  it('{{ workflow.context.NAME }} left as-is when snapshot has error set', () => {
+    const errSnapshot = { ...contextSnapshot, content: '', content_hash: '', error: 'ENOENT' };
+    const result = resolvePromptTemplate('{{ workflow.context.guidelines }}', {
+      evidenceByStep: {},
+      runParams: {},
+      workflowContext: {
+        snapshots: { guidelines: errSnapshot },
+        wrapper: 'xml',
+      },
+    });
+    expect(result).toBe('{{ workflow.context.guidelines }}');
+  });
+
+  it('{{ workflow.context.NAME }} left as-is when workflowContext is undefined', () => {
+    const result = resolvePromptTemplate('{{ workflow.context.guidelines }}', {
+      evidenceByStep: {},
+      runParams: {},
+    });
+    expect(result).toBe('{{ workflow.context.guidelines }}');
+  });
+
+  it('existing {{ context.resources.* }} and {{ run.params.* }} continue to work alongside workflow.context', () => {
+    const result = resolvePromptTemplate(
+      'Repo: {{ run.params.repo }}\nCtx: {{ workflow.context.guidelines }}',
+      {
+        evidenceByStep: {},
+        runParams: { repo: 'acme/app' },
+        workflowContext: {
+          snapshots: { guidelines: contextSnapshot },
+          wrapper: 'none',
+        },
+      },
+    );
+    expect(result).toBe('Repo: acme/app\nCtx: Be concise.');
+  });
+});
+

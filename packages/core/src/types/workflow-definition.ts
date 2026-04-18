@@ -157,5 +157,28 @@ export interface WorkflowDefinition {
    * Runtime-only — not a user-facing YAML field.
    */
   schema_version?: number;
+  /**
+   * Named context entries available in all step prompts via {{ workflow.context.NAME }}.
+   * Loaded once at run start. Separate from step evidence.
+   * Paths are resolved to absolute at registration time by the YAML loader.
+   */
+  workflow_context?: Record<string, WorkflowContextEntry>;
+  /**
+   * Wrapper format applied to {{ workflow.context.NAME }} template references.
+   * Does not affect {{ workflow.context.NAME.raw }}.
+   * Default: 'xml'
+   */
+  context_wrapper?: ContextWrapperFormat;
 }
+
+/** A single named entry in the workflow_context section. */
+export interface WorkflowContextEntry {
+  /** Absolute file path — resolved from the YAML-relative path at registration time. */
+  source: { path: string };
+  /** Optional human-readable description of what this context contains. */
+  description?: string;
+}
+
+/** Wrapper format applied to {{ workflow.context.NAME }} template references. */
+export type ContextWrapperFormat = 'xml' | 'brackets' | 'none';
 
