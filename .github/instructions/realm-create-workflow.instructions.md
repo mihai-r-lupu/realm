@@ -231,3 +231,8 @@ them as described in `realm.instructions.md`.
   a YAML-registered workflow if you need auto steps, service adapters, or handlers.
 - `depends_on` references must point to steps earlier in the `steps` array. Forward references
   cause a `provide_input` error at `create_workflow` call time.
+- `workflow_context` is not supported on dynamically-created workflows. It is a YAML-loader
+  feature resolved at registration time — file paths are resolved and validated when
+  `realm workflow register` processes the workflow directory. Dynamic workflows have no
+  directory, so no static context files can be attached. Use a YAML-registered workflow if
+  your steps need static reference files injected into prompts via `{{ workflow.context.NAME }}`.

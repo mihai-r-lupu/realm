@@ -14,8 +14,10 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 | `params_schema` | object  | No       | JSON Schema for the params accepted by `start_run`. The agent's `call_with.params` skeleton is derived from this at runtime. |
 | `services`      | object  | No       | Named service definitions. Referenced by steps via `uses_service`.                                                           |
 | `steps`         | object  | Yes      | Map of step name → step definition.                                                                                          |
-| `protocol`      | object  | No       | Optional protocol customisations. See [Protocol](#protocol-customisation).                                                   |
-| `profiles_dir`  | string  | No       | Path to agent profile files, relative to the workflow YAML. Defaults to `profiles/` in the same directory.                   |
+| `protocol`         | object  | No       | Optional protocol customisations. See [Protocol](#protocol-customisation).                                                   |
+| `profiles_dir`     | string  | No       | Path to agent profile files, relative to the workflow YAML. Defaults to `profiles/` in the same directory.                   |
+| `workflow_context` | object  | No       | Named file entries loaded once at run start and available in all step prompts. See [Workflow context](#workflow-context).     |
+| `context_wrapper`  | string  | No       | Wrapper format applied to `{{ workflow.context.NAME }}` references. One of `xml` (default), `brackets`, `none`.              |
 
 ---
 
@@ -377,12 +379,113 @@ The profile name and its SHA-256 hash are recorded in the evidence snapshot for 
 
 The `prompt` field supports template references resolved at runtime:
 
-| Syntax                               | Resolves to                                       |
-| ------------------------------------ | ------------------------------------------------- |
-| `{{ context.resources.STEP.FIELD }}` | Value of `FIELD` in the evidence output of `STEP` |
-| `{{ run.params.FIELD }}`             | Value of `FIELD` in the run's `params`            |
+| Syntax                                   | Resolves to                                                                      |
+| ---------------------------------------- | -------------------------------------------------------------------------------- |
+| `{{ context.resources.STEP.FIELD }}`     | Value of `FIELD` in the evidence output of `STEP`                                |
+| `{{ run.params.FIELD }}`                 | Value of `FIELD` in the run's `params`                                           |
+| `{{ workflow.context.NAME }}`            | Content of the named workflow context entry, wrapped per `context_wrapper`       |
+| `{{ workflow.context.NAME.raw }}`        | Raw content of the named workflow context entry, no wrapping                     |
 
 Unresolved references are left as literal strings.
+
+---
+
+## Workflow context
+
+The `workflow_context` section declares named files that are loaded once at run start
+and made available in every step prompt. This is the correct place for standing workflow
+configuration — canonical schemas, output format rules, domain glossaries, brand guidelines
+— anything that applies to multiple steps without being specific to one run.
+
+```yaml
+workflow_context:
+  canonical_schema:
+    source:
+      path: ./schema.json       # relative to the workflow YAML file
+    description: "Field definitions and output rules"  # optional
+
+  brand_guidelines:
+    source:
+      path: ./guidelines.md
+
+context_wrapper: xml  # optional; default is xml
+```
+
+In a step prompt:
+
+```yaml
+steps:
+  extract_fields:
+    execution: agent
+    depends_on: []
+    prompt: |
+      Extract the required fields using the schema below.
+
+      {{ workflow.context.canonical_schema }}
+
+      Source document: {{ context.resources.fetch_doc.text }}
+```
+
+With `context_wrapper: xml` (the default), `{{ workflow.context.canonical_schema }}` resolves to:
+
+```
+<canonical_schema>
+{file content}
+</canonical_schema>
+```
+
+For inline references where block-level wrapping would be awkward, use `.raw`:
+
+```yaml
+prompt: |
+  The allowed output format is {{ workflow.context.output_format.raw }}.
+  Apply it to every field you extract.
+```
+
+### Entry fields
+
+| Field               | Type   | Required | Description                                                          |
+| ------------------- | ------ | -------- | -------------------------------------------------------------------- |
+| `source.path`       | string | Yes      | File path relative to the workflow YAML. Resolved to absolute at registration time. |
+| `description`       | string | No       | Human-readable description of what the file contains.               |
+
+### `context_wrapper` values
+
+| Value      | Result for `{{ workflow.context.NAME }}`         |
+| ---------- | ------------------------------------------------ |
+| `xml`      | `<NAME>\n{content}\n</NAME>` **(default)**      |
+| `brackets` | `[NAME]\n{content}\n[/NAME]`                    |
+| `none`     | Raw content, same as `.raw`                      |
+
+`{{ workflow.context.NAME.raw }}` always returns raw content regardless of `context_wrapper`.
+
+### Naming constraints
+
+Entry names must match `[\w.]+` (letters, digits, underscores, and dots — no hyphens). Names
+ending in `.raw` are rejected because `.raw` is the reserved accessor suffix.
+
+### How context is loaded
+
+Files are read on the first `execute_step` call for each run — not at registration time. The
+content is snapshotted into the run record under `workflow_context_snapshots`, separate from
+step evidence. The snapshot is reused for all subsequent steps in the same run. Editing a
+file on disk takes effect at the next run start without re-registration.
+
+If a file cannot be read (missing path, permission error), an error snapshot is recorded and
+execution continues. The template reference is left unresolved in the delivered prompt.
+
+### `schema.json` auto-registration
+
+If `schema.json` is present in the workflow directory and no `workflow_context.schema` entry
+is explicitly declared, the loader automatically registers it as `workflow.context.schema`.
+This makes it possible to place a JSON Schema next to `workflow.yaml` with zero extra
+configuration.
+
+### Lint warning
+
+`realm workflow register` prints a warning when the same context entry is referenced in more
+than half of the agent step prompts in the workflow. This is advisory — registration succeeds
+regardless.
 
 ---
 
