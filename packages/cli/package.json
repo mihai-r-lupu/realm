@@ -6,6 +6,16 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./commands": {
+      "import": "./dist/commands-registry.js",
+      "types": "./dist/commands-registry.d.ts"
+    }
+  },
   "scripts": {
     "build": "tsc --build",
     "test": "vitest run",
