@@ -454,7 +454,7 @@ steps:
     writeFileSync(
       join(tmpDir, 'workflow.yaml'),
       baseYaml +
-        `\ncontext_wrapper: brackets\nworkflow_context:\n  rules:\n    source:\n      path: ./rules.md\n`,
+      `\ncontext_wrapper: brackets\nworkflow_context:\n  rules:\n    source:\n      path: ./rules.md\n`,
     );
     const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
     expect(def.context_wrapper).toBe('brackets');
@@ -500,7 +500,7 @@ steps:
     writeFileSync(
       join(tmpDir, 'workflow.yaml'),
       baseYaml +
-        `\nworkflow_context:\n  schema:\n    source:\n      path: ./explicit-schema.json\n`,
+      `\nworkflow_context:\n  schema:\n    source:\n      path: ./explicit-schema.json\n`,
     );
     const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
     expect(def.workflow_context!['schema']!.source.path).toBe(

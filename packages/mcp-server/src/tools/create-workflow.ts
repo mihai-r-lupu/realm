@@ -25,6 +25,8 @@ export interface CreateWorkflowArgs {
   metadata?: {
     name?: string;
     task_description?: string;
+    model?: string;
+    agent?: string;
   };
 }
 
@@ -176,6 +178,14 @@ function buildWorkflowDefinition(workflowId: string, args: CreateWorkflowArgs): 
     definition.protocol = { quick_start: metadata.task_description };
   }
 
+  definition.origin = 'agent';
+  if (metadata?.model !== undefined) {
+    definition.model = metadata.model;
+  }
+  if (metadata?.agent !== undefined) {
+    definition.agent = metadata.agent;
+  }
+
   return definition;
 }
 
@@ -230,6 +240,8 @@ export function registerCreateWorkflow(server: McpServer, opts?: HandleRunStores
         .object({
           name: z.string().optional(),
           task_description: z.string().optional(),
+          model: z.string().optional(),
+          agent: z.string().optional(),
         })
         .optional(),
     },

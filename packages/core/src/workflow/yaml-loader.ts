@@ -149,6 +149,8 @@ export function loadWorkflowFromFile(filePath: string): WorkflowDefinition {
     };
   }
 
+  definition.origin = 'human';
+
   return definition;
 }
 

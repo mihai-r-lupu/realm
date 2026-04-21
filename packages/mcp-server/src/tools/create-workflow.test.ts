@@ -179,6 +179,41 @@ describe('handleCreateWorkflow', () => {
     // Both "invalid id" and "description must be non-empty" should appear
     expect(result.errors.length).toBeGreaterThan(1);
   });
+
+  it('provenance — origin is set to agent on built definition', async () => {
+    const result = await handleCreateWorkflow(
+      { steps: [{ id: 'step-a', description: 'Do something' }] },
+      stores,
+    );
+    expect(result.status).toBe('ok');
+    const def = await stores.workflowStore.get(result.data['workflow_id'] as string);
+    expect(def.origin).toBe('agent');
+  });
+
+  it('provenance — model and agent are passed through from metadata', async () => {
+    const result = await handleCreateWorkflow(
+      {
+        steps: [{ id: 'step-a', description: 'Do something' }],
+        metadata: { model: 'claude-sonnet-4-6', agent: 'cursor' },
+      },
+      stores,
+    );
+    expect(result.status).toBe('ok');
+    const def = await stores.workflowStore.get(result.data['workflow_id'] as string);
+    expect(def.model).toBe('claude-sonnet-4-6');
+    expect(def.agent).toBe('cursor');
+  });
+
+  it('provenance — model and agent are absent when not provided in metadata', async () => {
+    const result = await handleCreateWorkflow(
+      { steps: [{ id: 'step-a', description: 'Do something' }] },
+      stores,
+    );
+    expect(result.status).toBe('ok');
+    const def = await stores.workflowStore.get(result.data['workflow_id'] as string);
+    expect(def.model).toBeUndefined();
+    expect(def.agent).toBeUndefined();
+  });
 });
 
 describe('end-to-end — create_workflow + execute_step walk to completion', () => {

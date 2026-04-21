@@ -312,11 +312,11 @@ export function buildNextActions(
     runId: run.id,
     ...(run.workflow_context_snapshots !== undefined
       ? {
-          workflowContext: {
-            snapshots: run.workflow_context_snapshots,
-            wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
-          },
-        }
+        workflowContext: {
+          snapshots: run.workflow_context_snapshots,
+          wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
+        },
+      }
       : {}),
   };
 
@@ -706,11 +706,11 @@ export async function executeStep(
     const gateEvidenceCtx = { ...evidenceByStep, [options.command]: output };
     const wfCtxSpread = pendingRun.workflow_context_snapshots !== undefined
       ? {
-          workflowContext: {
-            snapshots: pendingRun.workflow_context_snapshots,
-            wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
-          },
-        }
+        workflowContext: {
+          snapshots: pendingRun.workflow_context_snapshots,
+          wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
+        },
+      }
       : {};
     const resolvedGateDisplay =
       stepDef!.prompt !== undefined
