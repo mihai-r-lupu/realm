@@ -16,30 +16,32 @@ import { watchCommand } from './commands/watch.js';
 import { listCommand } from './commands/list.js';
 import { mcpCommand } from './commands/mcp.js';
 import { serveCommand } from './commands/serve.js';
+import { migrateCommand } from './commands/migrate.js';
 
 /** Commands that operate on workflow definitions (realm workflow <cmd>). */
 export const workflowCommands = [
-  initCommand,
-  validateCommand,
-  registerCommand,
-  watchCommand,
-  runCommand,
-  testCommand,
+    initCommand,
+    validateCommand,
+    registerCommand,
+    watchCommand,
+    runCommand,
+    testCommand,
+    migrateCommand,
 ];
 
 /** Commands that operate on run instances (realm run <cmd>). */
 export const runCommands = [
-  listCommand,
-  inspectCommand,
-  replayCommand,
-  diffCommand,
-  resumeCommand,
-  respondCommand,
-  cleanupCommand,
+    listCommand,
+    inspectCommand,
+    replayCommand,
+    diffCommand,
+    resumeCommand,
+    respondCommand,
+    cleanupCommand,
 ];
 
 /** Top-level commands not nested under a subgroup. */
 export const topLevelCommands = [
-  mcpCommand,
-  serveCommand,
+    mcpCommand,
+    serveCommand,
 ];

@@ -169,6 +169,26 @@ export interface WorkflowDefinition {
    * Default: 'xml'
    */
   context_wrapper?: ContextWrapperFormat;
+  /**
+   * How the workflow was originally created. Stamped at registration time — runtime-only.
+   * Never write to workflow YAML.
+   * 'human' — registered via YAML file (CLI register / watch).
+   * 'agent'  — created at runtime via the create_workflow MCP tool.
+   */
+  origin?: 'human' | 'agent';
+  /**
+   * LLM model identifier used to create this workflow (e.g. "claude-sonnet-4-6", "gpt-4o").
+   * Only meaningful when origin is 'agent'. Self-reported — not verified.
+   * Runtime-only — do not write to workflow YAML.
+   */
+  model?: string;
+  /**
+   * Orchestrating tool or framework that called create_workflow
+   * (e.g. "cursor", "github-copilot"). Only meaningful when origin is 'agent'.
+   * Self-reported — not verified.
+   * Runtime-only — do not write to workflow YAML.
+   */
+  agent?: string;
 }
 
 /** A single named entry in the workflow_context section. */
