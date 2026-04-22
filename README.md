@@ -161,6 +161,13 @@ When no registered workflow matches the task, the agent calls `create_workflow` 
 | `realm run cleanup`              | Mark idle non-terminal runs as abandoned                                     |
 | `realm mcp`                      | Start the MCP server over stdio (for local AI agents)                        |
 | `realm serve`                    | Start the MCP server over HTTP with Bearer token auth (for hosted platforms) |
+| `realm login`                    | Authenticate with Realm Cloud (opens browser)                                |
+| `realm logout`                   | Remove stored Realm Cloud credentials                                        |
+| `realm deploy <path>`            | Deploy a workflow to Realm Cloud                                             |
+| `realm migrate`                  | Migrate all local workflows and runs to Realm Cloud                          |
+| `realm push [path]`              | Push local workflows to Realm Cloud                                          |
+| `realm pull [id]`                | Pull cloud workflows to local store                                          |
+| `realm sync`                     | Two-way sync plan between local and cloud (dry-run by default)               |
 
 Run `realm <command> --help` for full options on any command.
 
