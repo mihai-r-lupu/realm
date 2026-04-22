@@ -163,11 +163,12 @@ When no registered workflow matches the task, the agent calls `create_workflow` 
 | `realm serve`                    | Start the MCP server over HTTP with Bearer token auth (for hosted platforms) |
 | `realm login`                    | Authenticate with Realm Cloud (opens browser)                                |
 | `realm logout`                   | Remove stored Realm Cloud credentials                                        |
-| `realm deploy <path>`            | Deploy a workflow to Realm Cloud                                             |
-| `realm migrate`                  | Migrate all local workflows and runs to Realm Cloud                          |
 | `realm push [path]`              | Push local workflows to Realm Cloud                                          |
 | `realm pull [id]`                | Pull cloud workflows to local store                                          |
 | `realm sync`                     | Two-way sync plan between local and cloud (dry-run by default)               |
+| `realm run push [id]`            | Push local run records to Realm Cloud                                        |
+| `realm run pull [id]`            | Pull cloud run records to local store                                        |
+| `realm run sync`                 | Two-way sync plan for run records between local and cloud (dry-run by default) |
 
 Run `realm <command> --help` for full options on any command.
 
@@ -187,7 +188,7 @@ Run `realm <command> --help` for full options on any command.
 ```bash
 npm install          # install all workspace dependencies
 npm run build        # compile all packages
-npm run test         # run all tests (470 total)
+npm run test         # run all tests (542 total)
 npm run lint         # lint all packages
 ```
 
