@@ -421,29 +421,6 @@ realm logout
 
 ---
 
-### `realm deploy <path>`
-
-Deploys a single local workflow to Realm Cloud. The workflow is loaded from the given path
-and registered in the cloud store.
-
-```bash
-realm deploy ./my-workflow
-realm deploy ./my-workflow/workflow.yaml
-```
-
----
-
-### `realm migrate`
-
-Migrates all local workflows and runs to Realm Cloud in a single operation. Useful for
-bootstrapping a new cloud environment from an existing local store.
-
-```bash
-realm migrate
-```
-
----
-
 ### `realm push [path]`
 
 Pushes one or all local workflows to Realm Cloud.
@@ -518,3 +495,75 @@ realm sync --apply --json                       # output plan + result as JSON
 | `--json`                 | off        | Output plan (and result if `--apply`) as JSON for machine consumption  |
 
 Exit code 1 if any workflow is blocked or has errors.
+
+---
+
+### `realm run push [id]`
+
+Pushes local run records to Realm Cloud.
+
+- Without `--all`, `<id>` must be the ID of a run in the local store.
+- If the same run ID exists in cloud with different content, the push is blocked (exit 1).
+
+```bash
+realm run push abc123               # push a single run by ID
+realm run push --all                # push all local-only runs to cloud
+```
+
+| Option  | Default | Description                             |
+| ------- | ------- | --------------------------------------- |
+| `--all` | off     | Push all local-only runs to cloud       |
+
+Exit code 1 if any run is diverged or the push fails.
+
+---
+
+### `realm run pull [id]`
+
+Pulls cloud run records to the local store.
+
+- Without `--all`, `<id>` must be the ID of a run in the cloud store.
+- Diverged runs (same ID, different content in both stores) are blocked (exit 1).
+
+```bash
+realm run pull abc123               # pull a single run by ID
+realm run pull --all                # pull all cloud-only runs to local
+```
+
+| Option  | Default | Description                             |
+| ------- | ------- | --------------------------------------- |
+| `--all` | off     | Pull all cloud-only runs to local store |
+
+Exit code 1 if any run is diverged or the pull fails.
+
+---
+
+### `realm run sync`
+
+Computes and optionally applies a two-way sync plan for run records between the local store and Realm Cloud.
+By default this is a **dry-run** — it prints the plan without making any changes.
+
+Run sync uses **union semantics** — no strategy parameter is needed. Runs are append-only
+records. Diverged runs (same ID, different content in both stores) are always flagged and
+never auto-resolved.
+
+| Classification | Meaning                                                         |
+| -------------- | --------------------------------------------------------------- |
+| `only_local`   | Exists locally, not in cloud → planned action: push             |
+| `only_cloud`   | Exists in cloud, not locally → planned action: pull             |
+| `identical`    | Both stores have the same record → skip                         |
+| `diverged`     | Both stores have the run but they differ → flagged (no strategy) |
+
+```bash
+realm run sync                  # dry-run: show plan
+realm run sync --apply          # execute the plan
+realm run sync --json           # output plan as JSON (dry-run)
+realm run sync --apply --json   # output plan + result as JSON
+```
+
+| Option    | Default | Description                                         |
+| --------- | ------- | --------------------------------------------------- |
+| `--apply` | off     | Execute the sync plan (mutations enabled)           |
+| `--json`  | off     | Output plan (and result if `--apply`) as JSON       |
+
+Exit code 1 if any run is diverged or has errors.
