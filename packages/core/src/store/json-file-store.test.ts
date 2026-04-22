@@ -185,3 +185,47 @@ describe('JsonFileStore', () => {
     await rm(dir, { recursive: true, force: true });
   });
 });
+
+// ── save() ────────────────────────────────────────────────────────────────────
+
+describe('JsonFileStore.save()', () => {
+  let store: JsonFileStore;
+  let dir: string;
+
+  beforeEach(async () => {
+    ({ store, dir } = await makeTmpStore());
+  });
+
+  it('writes a new record to disk', async () => {
+    const record = await store.create({ workflowId: 'wf-1', workflowVersion: 1, params: {} });
+    // Delete it and re-save as an import.
+    const newRecord = { ...record, id: 'imported-run-1' };
+    await store.save(newRecord);
+    const fetched = await store.get('imported-run-1');
+    expect(fetched.id).toBe('imported-run-1');
+    expect(fetched.version).toBe(record.version);
+  });
+
+  it('is a no-op when called twice with the same record (same version)', async () => {
+    const record = await store.create({ workflowId: 'wf-1', workflowVersion: 1, params: {} });
+    const importRecord = { ...record, id: 'import-idempotent' };
+    await store.save(importRecord);
+    // Second call with same version — must not throw.
+    await expect(store.save(importRecord)).resolves.toBeUndefined();
+  });
+
+  it('throws STATE_RUN_DIVERGED when same ID exists with a different version', async () => {
+    const record = await store.create({ workflowId: 'wf-1', workflowVersion: 1, params: {} });
+    const importRecord = { ...record, id: 'import-diverged' };
+    await store.save(importRecord);
+    // Same ID, different version.
+    const conflicting = { ...importRecord, version: importRecord.version + 5 };
+    await expect(store.save(conflicting)).rejects.toMatchObject({
+      code: 'STATE_RUN_DIVERGED',
+    });
+  });
+
+  it('cleanup', async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+});

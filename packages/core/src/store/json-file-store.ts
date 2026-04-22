@@ -198,6 +198,33 @@ export class JsonFileStore implements RunStore {
     }
   }
 
+  /**
+   * Writes a run record with its existing ID to local storage.
+   * Used for importing records fetched from a remote store.
+   * Idempotent: if the record already exists with the same version, this is a no-op.
+   * Does NOT increment version or apply the optimistic lock — this is an import, not an update.
+   */
+  async save(record: RunRecord): Promise<void> {
+    await this.ensureDir();
+    const path = this.filePath(record.id);
+    if (existsSync(path)) {
+      const raw = await readFile(path, 'utf8');
+      const stored = JSON.parse(raw) as RunRecord;
+      if (stored.version === record.version) return;
+      throw new WorkflowError(
+        `Run '${record.id}' exists locally with a different version (local: ${stored.version}, incoming: ${record.version}). Manual resolution required.`,
+        {
+          code: 'STATE_RUN_DIVERGED',
+          category: 'STATE',
+          agentAction: 'report_to_user',
+          retryable: false,
+          details: { runId: record.id, localVersion: stored.version, incomingVersion: record.version },
+        },
+      );
+    }
+    await writeFile(path, JSON.stringify(record, null, 2), 'utf8');
+  }
+
   async list(workflowId?: string): Promise<RunRecord[]> {
     await this.ensureDir();
     const entries: string[] = await readdir(this.runsDir);
