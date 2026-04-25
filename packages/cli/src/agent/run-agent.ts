@@ -38,6 +38,12 @@ export interface AgentRunOptions {
   slackWebhookUrl?: string;
   /** Poll interval in ms. Defaults to 3000. Lower values are useful in tests. */
   pollIntervalMs?: number;
+  /**
+   * When true, persist the workflow definition to ~/.realm/workflows/ so that
+   * `realm run inspect` and `realm run list` can resolve it by ID.
+   * Defaults to false — realm agent does not register workflows as a side effect.
+   */
+  register?: boolean;
 }
 
 /**
@@ -106,8 +112,11 @@ export async function runAgent(
             : join(options.workflowPath!, 'workflow.yaml'),
         );
 
-  // Register so other realm CLI commands can inspect or resume this run.
-  await deps.workflowStore.register(definition);
+  // Register only when explicitly requested (--register flag).
+  // By default realm agent does not write to ~/.realm/workflows/ as a side effect.
+  if (options.register === true) {
+    await deps.workflowStore.register(definition);
+  }
 
   const initialRecord = await deps.store.create({
     workflowId: definition.id,

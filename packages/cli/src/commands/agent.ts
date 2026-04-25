@@ -18,7 +18,8 @@ export const agentCommand = new Command('agent')
   .option('--params <json>', 'Initial run parameters as JSON string', '{}')
   .option('--provider <provider>', 'LLM provider: openai or anthropic (auto-detected from env)')
   .option('--model <model>', 'Model name override (default: gpt-4o / claude-sonnet-4-5)')
-  .action(async (opts: { workflow: string; params: string; provider?: string; model?: string }) => {
+  .option('--register', 'Persist the workflow definition to ~/.realm/workflows/ (same as realm workflow register)')
+  .action(async (opts: { workflow: string; params: string; provider?: string; model?: string; register?: boolean }) => {
     try {
       const params = JSON.parse(opts.params) as Record<string, unknown>;
       const workflowStore = new JsonWorkflowStore();
@@ -34,6 +35,7 @@ export const agentCommand = new Command('agent')
         {
           workflowPath: opts.workflow,
           params,
+          register: opts.register === true,
           ...(process.env['SLACK_WEBHOOK_URL'] !== undefined && { slackWebhookUrl: process.env['SLACK_WEBHOOK_URL'] }),
         },
       );
