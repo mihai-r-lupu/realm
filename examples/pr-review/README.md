@@ -22,12 +22,9 @@ npm install openai          # for OpenAI
 npm install @anthropic-ai/sdk  # for Anthropic
 ```
 
-## Register and run
+## Run
 
 ```bash
-# Register the workflow so `realm run inspect` and `realm run list` work
-realm workflow register examples/pr-review
-
 # Run autonomously with realm agent
 realm agent \
   --workflow examples/pr-review/workflow.yaml \
@@ -42,6 +39,22 @@ realm agent \
   --params '{"repo":"owner/repo","pr_number":42}' \
   --provider anthropic
 ```
+
+### Persisting the workflow definition
+
+By default `realm agent` does not write to `~/.realm/workflows/`. If you want
+`realm run inspect` and `realm run list` to resolve the workflow by ID, pass
+`--register`:
+
+```bash
+realm agent \
+  --workflow examples/pr-review/workflow.yaml \
+  --params '{"repo":"owner/repo","pr_number":42}' \
+  --register
+```
+
+This is equivalent to running `realm workflow register examples/pr-review`
+before the run.
 
 ## What to expect
 
