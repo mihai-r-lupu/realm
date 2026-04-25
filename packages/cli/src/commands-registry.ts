@@ -17,6 +17,7 @@ import { listCommand } from './commands/list.js';
 import { mcpCommand } from './commands/mcp.js';
 import { serveCommand } from './commands/serve.js';
 import { migrateCommand } from './commands/migrate.js';
+import { agentCommand } from './commands/agent.js';
 
 /** Commands that operate on workflow definitions (realm workflow <cmd>). */
 export const workflowCommands = [
@@ -44,4 +45,5 @@ export const runCommands = [
 export const topLevelCommands = [
     mcpCommand,
     serveCommand,
+    agentCommand,
 ];
