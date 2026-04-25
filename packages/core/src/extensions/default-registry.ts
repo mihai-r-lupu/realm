@@ -3,10 +3,14 @@
 // ensuring built-in adapters are always available without any developer wiring.
 import { ExtensionRegistry } from './registry.js';
 import { FileSystemAdapter } from '../adapters/file-adapter.js';
+import { SlackAdapter } from '../adapters/slack-adapter.js';
 
 /**
  * Returns an ExtensionRegistry pre-populated with Realm's built-in adapters.
- * `FileSystemAdapter` is registered under the name `'filesystem'`.
+ * `FileSystemAdapter` is registered under `'filesystem'`.
+ * `SlackAdapter` is registered under `'slack'` with `webhook_url` taken from the
+ * `SLACK_WEBHOOK_URL` environment variable. If the variable is absent the adapter
+ * is still registered but will fail at call time via `ADAPTER_REQUEST_FAILED`.
  *
  * The engine uses this automatically when no registry is provided — workflows that only
  * use built-in adapters need no registry code at all.
@@ -20,5 +24,8 @@ import { FileSystemAdapter } from '../adapters/file-adapter.js';
 export function createDefaultRegistry(): ExtensionRegistry {
   const r = new ExtensionRegistry();
   r.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
+  r.register('adapter', 'slack', new SlackAdapter('slack', {
+    webhook_url: process.env['SLACK_WEBHOOK_URL'] ?? '',
+  }));
   return r;
 }
