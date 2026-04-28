@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderTemplate, applyFilter, parseFilterArgs, UnknownFilterError } from './render-template.js';
+import { renderTemplate, applyFilter, UnknownFilterError } from './render-template.js';
 
 const evidence = {
   review_security: {
@@ -160,50 +160,6 @@ describe('renderTemplate — workflow.context namespace', () => {
       },
     );
     expect(result).toBe('Repo: acme/app\nCtx: Be concise.');
-  });
-});
-
-// ─── parseFilterArgs ────────────────────────────────────────────────────────
-
-describe('parseFilterArgs', () => {
-  it('returns [] for empty string', () => {
-    expect(parseFilterArgs('')).toEqual([]);
-  });
-
-  it('returns [] for whitespace-only string', () => {
-    expect(parseFilterArgs('   ')).toEqual([]);
-  });
-
-  it('parses single unquoted arg', () => {
-    expect(parseFilterArgs('80')).toEqual(['80']);
-  });
-
-  it('parses single double-quoted string arg with spaces', () => {
-    expect(parseFilterArgs('" / "')).toEqual([' / ']);
-  });
-
-  it('trims unquoted tokens with surrounding spaces', () => {
-    expect(parseFilterArgs(' a , b ')).toEqual(['a', 'b']);
-  });
-
-  it('parses two double-quoted args', () => {
-    expect(parseFilterArgs('"Error", "Issue"')).toEqual(['Error', 'Issue']);
-  });
-
-  it('does not split on comma inside a quoted arg', () => {
-    expect(parseFilterArgs('","')).toEqual([',']);
-  });
-
-  it('parses quoted empty string as empty string arg', () => {
-    expect(parseFilterArgs('""')).toEqual(['']);
-  });
-
-  it('parses single-quoted arg', () => {
-    expect(parseFilterArgs("'hello'")).toEqual(['hello']);
-  });
-
-  it('treats comma inside single quotes as part of token', () => {
-    expect(parseFilterArgs("','")).toEqual([',']);
   });
 });
 
@@ -726,6 +682,22 @@ describe('renderTemplate — pipe filter syntax', () => {
       runParams: { csv: 'a,b,c' },
     });
     expect(result).toBe('a | b | c');
+  });
+
+  it('quoted arg containing pipe is not treated as a filter separator', () => {
+    const result = renderTemplate('{{ run.params.s | replace: "x", "a|b" }}', {
+      evidenceByStep: {},
+      runParams: { s: 'x' },
+    });
+    expect(result).toBe('a|b');
+  });
+
+  it('unquoted args are trimmed', () => {
+    const result = renderTemplate('{{ run.params.s | replace: x , y }}', {
+      evidenceByStep: {},
+      runParams: { s: 'x' },
+    });
+    expect(result).toBe('y');
   });
 });
 
