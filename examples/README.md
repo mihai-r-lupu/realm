@@ -37,6 +37,15 @@ on the gate choice.
 npm install
 ```
 
+Copy the environment variable template and fill in your keys:
+
+```bash
+cp .env.example .env
+# Edit .env and add at minimum OPENAI_API_KEY or ANTHROPIC_API_KEY
+```
+
+The CLI loads `.env` automatically when run from the repo root. No `export` needed.
+
 No per-example build step is required. Examples use `realm mcp` and `realm workflow test`
 directly from the installed CLI.
 
