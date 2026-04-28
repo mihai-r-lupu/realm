@@ -182,47 +182,39 @@ function stripOuterQuotes(token: string): string {
   return token;
 }
 
-/**
- * Parses a comma-separated argument list with quote awareness.
- * Commas inside quoted strings (single or double) are not treated as delimiters.
- * Outer quotes are stripped from each token; unquoted tokens are trimmed.
- * An empty raw string returns [].
- */
-export function parseFilterArgs(raw: string): string[] {
-  if (!raw.trim()) return [];
-  const args: string[] = [];
+// Splits input on every occurrence of delimiter that is not inside a quoted string.
+// Single or double quotes both open/close quote state; the other quote type is ignored
+// while inside a quote. delimiter must be a single character.
+// Returns raw substrings — no trimming, no quote stripping.
+function splitOnUnquotedDelimiter(input: string, delimiter: string): string[] {
+  const segments: string[] = [];
   let current = '';
   let inSingle = false;
   let inDouble = false;
-  for (const ch of raw) {
+  for (const ch of input) {
     if (ch === '"' && !inSingle) { inDouble = !inDouble; current += ch; continue; }
     if (ch === "'" && !inDouble) { inSingle = !inSingle; current += ch; continue; }
-    if (ch === ',' && !inSingle && !inDouble) {
-      args.push(stripOuterQuotes(current.trim()));
+    if (ch === delimiter && !inSingle && !inDouble) {
+      segments.push(current);
       current = '';
       continue;
     }
     current += ch;
   }
-  args.push(stripOuterQuotes(current.trim()));
-  return args;
-}
-
-// Splits a template expression on '|' that are not inside quoted strings.
-// Allows filter args to contain '|' when quoted (e.g. replace: ",", " | ").
-function splitOnUnquotedPipes(expr: string): string[] {
-  const segments: string[] = [];
-  let current = '';
-  let inSingle = false;
-  let inDouble = false;
-  for (const ch of expr) {
-    if (ch === '"' && !inSingle) { inDouble = !inDouble; current += ch; continue; }
-    if (ch === "'" && !inDouble) { inSingle = !inSingle; current += ch; continue; }
-    if (ch === '|' && !inSingle && !inDouble) { segments.push(current); current = ''; continue; }
-    current += ch;
-  }
   segments.push(current);
   return segments;
+}
+
+function splitOnUnquotedPipes(expr: string): string[] {
+  return splitOnUnquotedDelimiter(expr, '|');
+}
+
+// Parses a comma-separated filter argument list with quote awareness.
+// Calls splitOnUnquotedDelimiter, then strips outer quotes and trims each token.
+// An empty or whitespace-only raw string returns [].
+function parseFilterArgs(raw: string): string[] {
+  if (!raw.trim()) return [];
+  return splitOnUnquotedDelimiter(raw, ',').map((token) => stripOuterQuotes(token.trim()));
 }
 
 // Parse the filter chain from the pipe-separated expression tail.
