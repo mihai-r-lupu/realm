@@ -277,6 +277,228 @@ describe('applyFilter — unknown', () => {
   });
 });
 
+// ─── Tier 2 filters ──────────────────────────────────────────────────────────
+
+describe('applyFilter — pluck', () => {
+  it('extracts values for the given key from each object', () => {
+    expect(applyFilter([{ name: 'a' }, { name: 'b' }], 'pluck', ['name'])).toEqual({
+      ok: true,
+      value: ['a', 'b'],
+    });
+  });
+
+  it('omits items where the key is absent', () => {
+    expect(applyFilter([{ name: 'a' }, {}], 'pluck', ['name'])).toEqual({
+      ok: true,
+      value: ['a'],
+    });
+  });
+
+  it('omits non-object items (string)', () => {
+    expect(applyFilter(['x', 'y'], 'pluck', ['name'])).toEqual({ ok: true, value: [] });
+  });
+
+  it('omits null items', () => {
+    expect(applyFilter([null, { name: 'a' }], 'pluck', ['name'])).toEqual({
+      ok: true,
+      value: ['a'],
+    });
+  });
+
+  it('returns empty array when all items are omitted', () => {
+    expect(applyFilter([1, 2, 3], 'pluck', ['name'])).toEqual({ ok: true, value: [] });
+  });
+
+  it('returns type_mismatch for non-array input', () => {
+    expect(applyFilter(42, 'pluck', ['name'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch when arg is missing', () => {
+    expect(applyFilter([{ name: 'a' }], 'pluck', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch when arg is empty string', () => {
+    expect(applyFilter([{ name: 'a' }], 'pluck', [''])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — count', () => {
+  it('returns the array length as a string', () => {
+    expect(applyFilter(['a', 'b', 'c'], 'count', [])).toEqual({ ok: true, value: '3' });
+  });
+
+  it('returns "0" for an empty array', () => {
+    expect(applyFilter([], 'count', [])).toEqual({ ok: true, value: '0' });
+  });
+
+  it('returns type_mismatch for non-array input', () => {
+    expect(applyFilter(42, 'count', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+    expect(applyFilter('hello', 'count', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('ignores args', () => {
+    expect(applyFilter(['a'], 'count', ['ignored'])).toEqual({ ok: true, value: '1' });
+  });
+});
+
+describe('applyFilter — limit', () => {
+  it('returns first N items', () => {
+    expect(applyFilter([1, 2, 3, 4, 5], 'limit', ['3'])).toEqual({ ok: true, value: [1, 2, 3] });
+  });
+
+  it('returns full array when N >= length', () => {
+    expect(applyFilter([1, 2], 'limit', ['10'])).toEqual({ ok: true, value: [1, 2] });
+  });
+
+  it('returns empty array for limit 0', () => {
+    expect(applyFilter([1, 2, 3], 'limit', ['0'])).toEqual({ ok: true, value: [] });
+  });
+
+  it('returns type_mismatch for NaN arg', () => {
+    expect(applyFilter([1, 2], 'limit', ['abc'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch when no arg provided', () => {
+    expect(applyFilter([1, 2], 'limit', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for non-array input', () => {
+    expect(applyFilter(42, 'limit', ['2'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — compact', () => {
+  it('removes null and undefined, keeps other values', () => {
+    expect(applyFilter(['a', null, 'b', undefined, 'c'], 'compact', [])).toEqual({
+      ok: true,
+      value: ['a', 'b', 'c'],
+    });
+  });
+
+  it('keeps falsy values 0, empty string, and false', () => {
+    expect(applyFilter([0, '', false, null], 'compact', [])).toEqual({
+      ok: true,
+      value: [0, '', false],
+    });
+  });
+
+  it('returns the same array when no nulls or undefineds present', () => {
+    expect(applyFilter([1, 2, 3], 'compact', [])).toEqual({ ok: true, value: [1, 2, 3] });
+  });
+
+  it('returns type_mismatch for non-array input', () => {
+    expect(applyFilter(42, 'compact', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — round', () => {
+  it('rounds to specified decimal places', () => {
+    expect(applyFilter(3.14159, 'round', ['2'])).toEqual({ ok: true, value: '3.14' });
+  });
+
+  it('rounds to 0 places when arg is 0', () => {
+    expect(applyFilter(3.14159, 'round', ['0'])).toEqual({ ok: true, value: '3' });
+  });
+
+  it('defaults to 0 decimal places when no arg', () => {
+    expect(applyFilter(3.14159, 'round', [])).toEqual({ ok: true, value: '3' });
+  });
+
+  it('defaults to 0 decimal places when arg is empty string', () => {
+    expect(applyFilter(3.7, 'round', [''])).toEqual({ ok: true, value: '4' });
+  });
+
+  it('returns type_mismatch for non-number input', () => {
+    expect(applyFilter('hello', 'round', ['2'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for NaN arg (unparseable string)', () => {
+    expect(applyFilter(3.14, 'round', ['abc'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — percent', () => {
+  it('formats fraction to percent with specified decimal places', () => {
+    expect(applyFilter(0.857, 'percent', ['1'])).toEqual({ ok: true, value: '85.7%' });
+  });
+
+  it('defaults to 0 decimal places when no arg', () => {
+    expect(applyFilter(0.857, 'percent', [])).toEqual({ ok: true, value: '86%' });
+  });
+
+  it('defaults to 0 decimal places when arg is empty string', () => {
+    expect(applyFilter(0.5, 'percent', [''])).toEqual({ ok: true, value: '50%' });
+  });
+
+  it('handles 1.0 as 100%', () => {
+    expect(applyFilter(1.0, 'percent', ['0'])).toEqual({ ok: true, value: '100%' });
+  });
+
+  it('accepts values outside [0, 1] without error', () => {
+    expect(applyFilter(1.5, 'percent', ['0'])).toEqual({ ok: true, value: '150%' });
+  });
+
+  it('returns type_mismatch for non-number input', () => {
+    expect(applyFilter('hello', 'percent', ['1'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for NaN arg', () => {
+    expect(applyFilter(0.5, 'percent', ['abc'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — yesno', () => {
+  it('returns "yes" for true', () => {
+    expect(applyFilter(true, 'yesno', [])).toEqual({ ok: true, value: 'yes' });
+  });
+
+  it('returns "no" for false', () => {
+    expect(applyFilter(false, 'yesno', [])).toEqual({ ok: true, value: 'no' });
+  });
+
+  it('ignores args without error', () => {
+    expect(applyFilter(true, 'yesno', ['Active'])).toEqual({ ok: true, value: 'yes' });
+  });
+
+  it('returns type_mismatch for non-boolean input', () => {
+    expect(applyFilter(42, 'yesno', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+    expect(applyFilter('true', 'yesno', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — and_join', () => {
+  it('returns undefined for empty array', () => {
+    expect(applyFilter([], 'and_join', [])).toEqual({ ok: true, value: undefined });
+  });
+
+  it('returns the single item for one-element array', () => {
+    expect(applyFilter(['a'], 'and_join', [])).toEqual({ ok: true, value: 'a' });
+  });
+
+  it('joins two items with "and" (no comma)', () => {
+    expect(applyFilter(['a', 'b'], 'and_join', [])).toEqual({ ok: true, value: 'a and b' });
+  });
+
+  it('joins three items with Oxford comma', () => {
+    expect(applyFilter(['a', 'b', 'c'], 'and_join', [])).toEqual({ ok: true, value: 'a, b, and c' });
+  });
+
+  it('joins four items with Oxford comma', () => {
+    expect(applyFilter(['a', 'b', 'c', 'd'], 'and_join', [])).toEqual({
+      ok: true,
+      value: 'a, b, c, and d',
+    });
+  });
+
+  it('stringifies non-string elements', () => {
+    expect(applyFilter([1, 2, 3], 'and_join', [])).toEqual({ ok: true, value: '1, 2, and 3' });
+  });
+
+  it('returns type_mismatch for non-array input', () => {
+    expect(applyFilter(42, 'and_join', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
 // ─── renderTemplate with filters ─────────────────────────────────────────────
 
 describe('renderTemplate — pipe filter syntax', () => {
@@ -367,6 +589,27 @@ describe('renderTemplate — pipe filter syntax', () => {
       runParams: { num: 42 },
     });
     expect(result).toBe('{{ run.params.num | upper | default: fallback }}');
+  });
+
+  it('chains pluck and and_join over a step output array', () => {
+    const result = renderTemplate(
+      '{{ context.resources.step.items | pluck: "name" | and_join }}',
+      {
+        evidenceByStep: {
+          step: { items: [{ name: 'alpha' }, { name: 'beta' }, { name: 'gamma' }] },
+        } as unknown as Record<string, Record<string, unknown>>,
+        runParams: {},
+      },
+    );
+    expect(result).toBe('alpha, beta, and gamma');
+  });
+
+  it('applies percent filter to a numeric run param', () => {
+    const result = renderTemplate('Confidence: {{ run.params.score | percent: 1 }}', {
+      evidenceByStep: {},
+      runParams: { score: 0.857 },
+    });
+    expect(result).toBe('Confidence: 85.7%');
   });
 });
 

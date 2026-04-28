@@ -77,6 +77,82 @@ export function applyFilter(value: unknown, filterName: string, args: string[]):
       return { ok: true, value: `${cut}…` };
     }
 
+    // ─── Tier 2 filters ───────────────────────────────────────────────────
+
+    case 'pluck': {
+      if (!Array.isArray(value)) return { ok: false, reason: 'type_mismatch' };
+      const key = args[0];
+      if (!key) return { ok: false, reason: 'type_mismatch' };
+      const result: unknown[] = [];
+      for (const item of value) {
+        if (typeof item !== 'object' || item === null) continue;
+        const record = item as Record<string, unknown>;
+        if (Object.prototype.hasOwnProperty.call(record, key)) {
+          result.push(record[key]);
+        }
+      }
+      return { ok: true, value: result };
+    }
+
+    case 'count': {
+      if (!Array.isArray(value)) return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: String(value.length) };
+    }
+
+    case 'limit': {
+      if (!Array.isArray(value)) return { ok: false, reason: 'type_mismatch' };
+      const rawLimit = args[0];
+      if (rawLimit === undefined) return { ok: false, reason: 'type_mismatch' };
+      const n = parseInt(rawLimit, 10);
+      if (isNaN(n)) return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: value.slice(0, n) };
+    }
+
+    case 'compact': {
+      if (!Array.isArray(value)) return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: value.filter((item) => item !== null && item !== undefined) };
+    }
+
+    case 'round': {
+      if (typeof value !== 'number') return { ok: false, reason: 'type_mismatch' };
+      const rawDecimals = args[0];
+      let decimals = 0;
+      if (rawDecimals !== undefined && rawDecimals !== '') {
+        const parsed = parseInt(rawDecimals, 10);
+        if (isNaN(parsed)) return { ok: false, reason: 'type_mismatch' };
+        decimals = parsed;
+      }
+      return { ok: true, value: value.toFixed(decimals) };
+    }
+
+    case 'percent': {
+      if (typeof value !== 'number') return { ok: false, reason: 'type_mismatch' };
+      const rawDecimals = args[0];
+      let decimals = 0;
+      if (rawDecimals !== undefined && rawDecimals !== '') {
+        const parsed = parseInt(rawDecimals, 10);
+        if (isNaN(parsed)) return { ok: false, reason: 'type_mismatch' };
+        decimals = parsed;
+      }
+      return { ok: true, value: `${(value * 100).toFixed(decimals)}%` };
+    }
+
+    case 'yesno': {
+      if (typeof value !== 'boolean') return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: value ? 'yes' : 'no' };
+    }
+
+    case 'and_join': {
+      if (!Array.isArray(value)) return { ok: false, reason: 'type_mismatch' };
+      if (value.length === 0) return { ok: true, value: undefined };
+      const strs = value.map((item) => String(item));
+      if (strs.length === 1) return { ok: true, value: strs[0] };
+      if (strs.length === 2) return { ok: true, value: `${strs[0]} and ${strs[1]}` };
+      const last = strs[strs.length - 1];
+      const rest = strs.slice(0, -1);
+      return { ok: true, value: `${rest.join(', ')}, and ${last}` };
+    }
+
     default:
       return { ok: false, reason: 'unknown_filter', filterName };
   }
