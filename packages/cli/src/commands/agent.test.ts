@@ -1,4 +1,4 @@
-// Tests for runAgent(), postGateNotificationToSlack(), and resolveProvider().
+// Tests for runAgent(), postGateNotificationToSlack(), resolveProvider(), and checkAdapterPrerequisites().
 // Uses InMemoryStore and MockLlmProvider to run the agent loop without real I/O.
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
@@ -14,6 +14,7 @@ import { runAgent, postGateNotificationToSlack } from '../agent/run-agent.js';
 import type { AgentDeps, AgentRunOptions } from '../agent/run-agent.js';
 import type { LlmProvider } from '../agent/llm-provider.js';
 import { resolveProvider } from '../agent/llm-provider.js';
+import { checkAdapterPrerequisites, formatPreflightError, checkSlackBidirectionalConfig } from '../agent/preflight.js';
 
 // ---------------------------------------------------------------------------
 // MockLlmProvider — queue-based: returns responses in order of callStep() calls.
@@ -40,7 +41,7 @@ class MockLlmProvider implements LlmProvider {
 
 function makeWorkflowStore(): WorkflowRegistrar {
   return {
-    async register() {},
+    async register() { },
     async get() { throw new Error('not used in these tests'); },
     async list() { return []; },
   };
@@ -274,5 +275,117 @@ describe('postGateNotificationToSlack', () => {
     ).resolves.toBeUndefined();
 
     vi.unstubAllGlobals();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Workflow definitions for preflight tests.
+// ---------------------------------------------------------------------------
+
+const githubWorkflow: WorkflowDefinition = {
+  id: 'github-wf',
+  name: 'GitHub Workflow',
+  version: 1,
+  schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
+  services: {
+    github: { adapter: 'github', trust: 'engine_delivered' },
+  },
+  steps: {
+    fetch: { description: 'Fetch', execution: 'auto', uses_service: 'github', service_method: 'fetch', operation: 'get_pr_diff' },
+  },
+};
+
+const slackWorkflow: WorkflowDefinition = {
+  id: 'slack-wf',
+  name: 'Slack Workflow',
+  version: 1,
+  schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
+  services: {
+    notifications: { adapter: 'slack', trust: 'engine_delivered' },
+  },
+  steps: {
+    notify: { description: 'Notify', execution: 'auto', uses_service: 'notifications', service_method: 'create', operation: 'post_message' },
+  },
+};
+
+const bothAdaptersWorkflow: WorkflowDefinition = {
+  id: 'both-wf',
+  name: 'Both Adapters',
+  version: 1,
+  schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
+  services: {
+    github: { adapter: 'github', trust: 'engine_delivered' },
+    notifications: { adapter: 'slack', trust: 'engine_delivered' },
+  },
+  steps: {
+    fetch: { description: 'Fetch', execution: 'auto', uses_service: 'github', service_method: 'fetch', operation: 'get_pr_diff' },
+  },
+};
+
+describe('checkAdapterPrerequisites', () => {
+  it('returns a finding when the workflow uses adapter: github and GITHUB_TOKEN is missing', () => {
+    const findings = checkAdapterPrerequisites(githubWorkflow, {});
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.serviceName).toBe('github');
+    expect(findings[0]!.adapter).toBe('github');
+    expect(findings[0]!.missingVar).toBe('GITHUB_TOKEN');
+  });
+
+  it('returns a finding when the workflow uses adapter: slack and SLACK_WEBHOOK_URL is missing', () => {
+    const findings = checkAdapterPrerequisites(slackWorkflow, {});
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.serviceName).toBe('notifications');
+    expect(findings[0]!.adapter).toBe('slack');
+    expect(findings[0]!.missingVar).toBe('SLACK_WEBHOOK_URL');
+  });
+
+  it('returns no findings when both required vars are set', () => {
+    const findings = checkAdapterPrerequisites(bothAdaptersWorkflow, {
+      GITHUB_TOKEN: 'ghp_test',
+      SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test',
+    });
+    expect(findings).toHaveLength(0);
+  });
+
+  it('returns no findings for workflows with no external adapter services', () => {
+    const findings = checkAdapterPrerequisites(agentOnlyWorkflow, {});
+    expect(findings).toHaveLength(0);
+  });
+
+  it('formatPreflightError includes service name, adapter name, and export guidance', () => {
+    const findings = checkAdapterPrerequisites(githubWorkflow, {});
+    const msg = formatPreflightError(findings);
+    expect(msg).toContain("service 'github'");
+    expect(msg).toContain("adapter 'github'");
+    expect(msg).toContain('GITHUB_TOKEN');
+    expect(msg).toContain('export GITHUB_TOKEN=');
+  });
+});
+
+describe('checkSlackBidirectionalConfig', () => {
+  it('warns when SLACK_WEBHOOK_URL is set but SLACK_BOT_TOKEN is absent', () => {
+    const warnings = checkSlackBidirectionalConfig({ SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test' });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.message).toContain('SLACK_WEBHOOK_URL');
+    expect(warnings[0]!.message).toContain('SLACK_BOT_TOKEN');
+  });
+
+  it('warns when SLACK_BOT_TOKEN is set but SLACK_SIGNING_SECRET is absent', () => {
+    const warnings = checkSlackBidirectionalConfig({ SLACK_BOT_TOKEN: 'xoxb-test' });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.message).toContain('SLACK_BOT_TOKEN');
+    expect(warnings[0]!.message).toContain('SLACK_SIGNING_SECRET');
+  });
+
+  it('returns no warnings when SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET are both set', () => {
+    const warnings = checkSlackBidirectionalConfig({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_SIGNING_SECRET: 'secret',
+    });
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('returns no warnings when no Slack vars are set', () => {
+    expect(checkSlackBidirectionalConfig({})).toHaveLength(0);
   });
 });

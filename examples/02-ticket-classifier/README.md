@@ -128,6 +128,18 @@ folder. With the default agent, trigger it with:
 > field — the skill will then fire on any ticket classification request. Use the Realm
 > agent (Option A) if you want that behaviour without modifying the skill file.
 
+**Option C — `realm agent` CLI (no VS Code required)**
+
+Run the workflow autonomously from the terminal — no MCP client, no IDE, no configuration:
+
+```bash
+realm agent \
+  --workflow examples/02-ticket-classifier/workflow.yaml \
+  --params "{\"path\":\"$(pwd)/examples/02-ticket-classifier/tickets/billing-overcharge.txt\"}"
+```
+
+Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers. The agent drives both steps sequentially, validating each output against its schema before advancing, and prints the `classify_ticket` result as formatted JSON when the run completes.
+
 Either way, the agent will:
 
 1. Start the run — `read_ticket` executes automatically.

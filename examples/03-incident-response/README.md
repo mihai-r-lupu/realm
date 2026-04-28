@@ -133,6 +133,62 @@ to your workspace's `.github/skills/` folder. With the default agent, trigger it
 > field — the skill will then fire on any incident triage request. Use the Realm agent
 > (Option A) if you want that behaviour without modifying the skill file.
 
+**Option C — `realm agent` CLI (no VS Code required)**
+
+Run the workflow autonomously from the terminal — no MCP client, no IDE, no configuration:
+
+```bash
+realm agent \
+  --workflow examples/03-incident-response/workflow.yaml \
+  --params "{\"path\":\"$(pwd)/examples/03-incident-response/alerts/high-latency.json\"}"
+```
+
+Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers.
+
+When the run reaches `confirm_and_send`, `realm agent` pauses and prints the gate ID and a `realm run respond` command. In a second terminal, run the printed command to approve or reject:
+
+```bash
+# To send:
+realm run respond <run-id> --gate <gate-id> --choice send
+
+# To reject:
+realm run respond <run-id> --gate <gate-id> --choice reject
+```
+
+`realm agent` detects the resolved gate and continues automatically. When the run completes it prints the `draft_response` result as formatted JSON.
+
+### Slack bidirectional approval (Option C — team channel)
+
+When `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are set, any team member watching the channel can
+reply in the gate's Slack thread to approve or reject — no terminal required.
+
+**Required environment variables:**
+
+```bash
+export SLACK_BOT_TOKEN=xoxb-...      # Slack bot token with chat:write scope
+export SLACK_CHANNEL_ID=C...         # Target channel ID
+export SLACK_SIGNING_SECRET=...      # From Slack app → Event Subscriptions → Signing Secret
+```
+
+**How it works:** `realm agent` posts the gate details as a message to the channel, anchoring a
+reply thread. When an engineer replies (e.g. "send it" or "reject — root cause unclear"), the
+agent interprets the reply using the LLM and submits the matching choice automatically.
+Messages that are ambiguous trigger a clarification reply (at most twice per gate). After
+that, a terminal command is still accepted as a fallback.
+
+Two timers run while the gate is open:
+- **Reminder** (default 10 min) — posts a reminder to the thread.
+- **Escalation** (default 30 min) — pings the gate owner (if `gate.owner` is set) or posts a generic prompt.
+
+**Fallback behavior:**
+- If `SLACK_SIGNING_SECRET` is absent, `realm agent` falls back to polling the thread directly
+  (`conversations.replies`) on a configurable interval (default 10 s).
+- If `SLACK_BOT_TOKEN` is absent, the one-way webhook path (`SLACK_WEBHOOK_URL`) is used and
+  the terminal command is always required.
+
+A preflight advisory is printed at startup when the configuration is incomplete but non-blocking
+(e.g. webhook-only, or bot token without signing secret).
+
 The workspace instruction file (`.github/instructions/realm.instructions.md`) gives your agent
 the generic Realm protocol. The `realm-incident-response.md` skill layers the workflow-specific
 behaviour on top.

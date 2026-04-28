@@ -124,7 +124,25 @@ export interface StepDefinition {
    */
   use_template?: string;
   /** Gate configuration — choices available to the human reviewer. */
-  gate?: { choices?: string[] };
+  gate?: {
+    choices?: string[];
+    /**
+     * Slack user ID or handle of the person responsible for resolving this gate.
+     * Used for notification targeting and escalation.
+     * Optional — notifications work without it.
+     * Example: '@mihai.lupu' or 'U012AB3CD'
+     */
+    owner?: string;
+    /**
+     * Developer-authored template string presented to the human reviewer when this gate opens.
+     * Supports {{ context.resources.STEP.FIELD }} and {{ run.params.FIELD }} references.
+     * Resolved from run data at gate-open time. Fail-fast: unresolvable references cause
+     * a stop error rather than opening a gate with broken placeholder text.
+     * When absent, the Slack path falls back to formatGatePreviewForSlack(preview)
+     * and the MCP path falls back to step.prompt resolution (existing behavior).
+     */
+    message?: string;
+  };
   /** Name of the agent profile for this step. Only valid on execution: 'agent' steps. */
   agent_profile?: string;
 }

@@ -15,7 +15,7 @@ import { ExtensionRegistry } from '../extensions/registry.js';
 import { createDefaultRegistry } from '../extensions/default-registry.js';
 import type { ServiceResponse } from '../extensions/service-adapter.js';
 import { resolveSecret } from '../config/secrets.js';
-import { resolvePromptTemplate, resolvePath } from './prompt-template.js';
+import { renderTemplate, resolvePath, UnknownFilterError } from './render-template.js';
 import { generateSchemaSkeleton } from '../utils/schema-skeleton.js';
 import { loadWorkflowContext } from './workflow-context-loader.js';
 import {
@@ -264,7 +264,7 @@ function stepToNextAction(
   },
 ): NextAction {
   const resolvedPrompt =
-    step.prompt !== undefined ? resolvePromptTemplate(step.prompt, context) : undefined;
+    step.prompt !== undefined ? renderTemplate(step.prompt, context) : undefined;
 
   return {
     instruction:
@@ -672,6 +672,54 @@ export async function executeStep(
     const choices = Array.isArray(choicesRaw) ? (choicesRaw as string[]) : ['approve', 'reject'];
     const step_name = options.command;
 
+    // Resolve gate.message if configured — fail-fast on unresolvable references.
+    const gateEvidenceCtxEarly = { ...evidenceByStep, [options.command]: output };
+    const wfCtxSpreadEarly = pendingRun.workflow_context_snapshots !== undefined
+      ? {
+        workflowContext: {
+          snapshots: pendingRun.workflow_context_snapshots,
+          wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
+        },
+      }
+      : {};
+    let resolvedGateMessage: string | undefined;
+    if (stepDef!.gate?.message !== undefined) {
+      let raw: string;
+      try {
+        raw = renderTemplate(stepDef!.gate.message, {
+          evidenceByStep: gateEvidenceCtxEarly,
+          runParams: run.params,
+          ...wfCtxSpreadEarly,
+        }, { strict: true });
+      } catch (err) {
+        if (err instanceof UnknownFilterError) {
+          return makeErrorEnvelope(
+            options,
+            pendingRun,
+            new WorkflowError(
+              `gate.message uses unknown filter '${err.filterName}'`,
+              { code: 'FILTER_UNKNOWN', category: 'ENGINE', agentAction: 'stop', retryable: false },
+            ),
+            definition,
+          );
+        }
+        throw err;
+      }
+      const unresolved = [...raw.matchAll(/\{\{\s*([\w.-]+)\s*\}\}/g)].map((m) => m[1]);
+      if (unresolved.length > 0) {
+        return makeErrorEnvelope(
+          options,
+          pendingRun,
+          new WorkflowError(
+            `gate.message has unresolvable references: ${unresolved.join(', ')}`,
+            { code: 'GATE_MESSAGE_UNRESOLVABLE', category: 'ENGINE', agentAction: 'stop', retryable: false },
+          ),
+          definition,
+        );
+      }
+      resolvedGateMessage = raw;
+    }
+
     let gateRun: RunRecord;
     try {
       gateRun = await store.update({
@@ -684,6 +732,8 @@ export async function executeStep(
           preview: output,
           choices,
           opened_at: new Date().toISOString(),
+          ...(stepDef!.gate?.owner !== undefined ? { owner: stepDef!.gate.owner } : {}),
+          ...(resolvedGateMessage !== undefined ? { resolved_message: resolvedGateMessage } : {}),
         },
       });
     } catch (err) {
@@ -703,22 +753,16 @@ export async function executeStep(
       );
     }
 
-    const gateEvidenceCtx = { ...evidenceByStep, [options.command]: output };
-    const wfCtxSpread = pendingRun.workflow_context_snapshots !== undefined
-      ? {
-        workflowContext: {
-          snapshots: pendingRun.workflow_context_snapshots,
-          wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
-        },
-      }
-      : {};
+    // gate.display fallback chain: gate.message resolved → step.prompt resolved → absent
     const resolvedGateDisplay =
-      stepDef!.prompt !== undefined
-        ? resolvePromptTemplate(stepDef!.prompt, { evidenceByStep: gateEvidenceCtx, runParams: run.params, ...wfCtxSpread })
-        : undefined;
+      resolvedGateMessage !== undefined
+        ? resolvedGateMessage
+        : stepDef!.prompt !== undefined
+          ? renderTemplate(stepDef!.prompt, { evidenceByStep: gateEvidenceCtxEarly, runParams: run.params, ...wfCtxSpreadEarly })
+          : undefined;
     const resolvedGateInstructions =
       stepDef!.instructions !== undefined
-        ? resolvePromptTemplate(stepDef!.instructions, { evidenceByStep: gateEvidenceCtx, runParams: run.params, ...wfCtxSpread })
+        ? renderTemplate(stepDef!.instructions, { evidenceByStep: gateEvidenceCtxEarly, runParams: run.params, ...wfCtxSpreadEarly })
         : undefined;
 
     const gateNextAction: NextAction = {
@@ -902,7 +946,13 @@ export async function submitHumanResponse(
     input: { choice: options.choice },
     output: { ...run.pending_gate.preview, choice: options.choice },
   });
-  const gateSnapshot = { ...gateEvidence, kind: 'gate_response' as const };
+  const gateSnapshot: EvidenceSnapshot = {
+    ...gateEvidence,
+    kind: 'gate_response' as const,
+    ...(run.pending_gate.resolved_message !== undefined
+      ? { gate_message: run.pending_gate.resolved_message }
+      : {}),
+  };
 
   const { pending_gate: _pg, terminal_reason: _tr, ...rest } = run;
   const afterGate: RunRecord = {

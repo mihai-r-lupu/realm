@@ -25,6 +25,12 @@ export interface EvidenceSnapshot {
   attempt?: number;
   /** Distinguishes computation records from human decision records. Absent on pre-existing entries. */
   kind?: 'execution' | 'gate_response';
+  /**
+   * Verbatim message presented to the human reviewer when they made this gate choice.
+   * Present only on gate_response evidence entries when gate.message was configured.
+   * This is an evidence integrity field: it records exactly what the human read.
+   */
+  gate_message?: string;
   /** Diagnostic metadata. Present on snapshots captured after Week 7. */
   diagnostics?: StepDiagnostics;
   /** Name of the agent profile active at this step, if any. */
@@ -40,6 +46,17 @@ export interface PendingGate {
   preview: Record<string, unknown>;
   choices: string[];
   opened_at: string;
+  /**
+   * Slack user ID or handle declared on the step's gate config.
+   * Optional — absent when the workflow step has no owner field.
+   */
+  owner?: string;
+  /**
+   * Developer-authored gate message resolved from run data at gate-open time.
+   * Present only when gate.message is configured on the step. Never derived from step.prompt.
+   * Preserved into EvidenceSnapshot.gate_message at gate resolution for audit purposes.
+   */
+  resolved_message?: string;
 }
 
 /**

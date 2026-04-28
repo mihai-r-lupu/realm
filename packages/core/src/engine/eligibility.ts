@@ -4,7 +4,7 @@
 import type { WorkflowDefinition, StepDefinition, TriggerRule } from '../types/workflow-definition.js';
 import type { RunRecord } from '../types/run-record.js';
 import type { RunPhase } from '../types/run-record.js';
-import { resolvePath } from './prompt-template.js';
+import { resolvePath } from './render-template.js';
 
 /**
  * Derives the run_phase from the run record fields.

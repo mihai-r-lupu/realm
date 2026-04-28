@@ -15,6 +15,40 @@ export interface GitHubAdapterConfig {
 }
 
 /**
+ * Rewraps a `SERVICE_HTTP_4XX` 404 WorkflowError with an actionable diagnostic message.
+ * Returns the original error unchanged for any other error type or status code.
+ * Does not log or expose token values.
+ */
+function enrichGitHub404(
+  err: unknown,
+  repo: string | undefined,
+  prNumber: unknown,
+): unknown {
+  if (
+    err instanceof WorkflowError &&
+    err.code === 'SERVICE_HTTP_4XX' &&
+    err.details['status'] === 404
+  ) {
+    return new WorkflowError(
+      `HTTP 404: Resource not found.\n\n` +
+      `Likely causes:\n` +
+      `  - Repository '${repo ?? '<repo>'}' or PR #${prNumber} does not exist\n` +
+      `  - GITHUB_TOKEN does not have access to this repository (private repos return 404)\n\n` +
+      `Verify with:\n` +
+      `  gh pr view ${prNumber} --repo ${repo ?? '<repo>'}`,
+      {
+        code: 'SERVICE_HTTP_4XX',
+        category: 'SERVICE',
+        agentAction: 'stop',
+        retryable: false,
+        details: err.details,
+      },
+    );
+  }
+  return err;
+}
+
+/**
  * GitHubAdapter communicates with the GitHub REST API.
  *
  * Supported operations:
@@ -66,11 +100,11 @@ export class GitHubAdapter implements ServiceAdapter {
       method === 'GET'
         ? { method, headers: this.buildHeaders(), signal: signal ?? null }
         : {
-            method,
-            headers: this.buildHeaders(),
-            body: JSON.stringify(body),
-            signal: signal ?? null,
-          };
+          method,
+          headers: this.buildHeaders(),
+          body: JSON.stringify(body),
+          signal: signal ?? null,
+        };
 
     let response: Response;
     try {
@@ -121,13 +155,21 @@ export class GitHubAdapter implements ServiceAdapter {
 
     if (operation === 'get_pr_diff') {
       const url = `${this.baseUrl}/repos/${repo}/pulls/${prNumber}/files`;
-      const result = await this.executeRequest('GET', url, undefined, signal);
-      return { ...result, data: { ...(result.data as Record<string, unknown>), repo } };
+      try {
+        const result = await this.executeRequest('GET', url, undefined, signal);
+        return { ...result, data: { ...(result.data as Record<string, unknown>), repo } };
+      } catch (err) {
+        throw enrichGitHub404(err, repo, prNumber);
+      }
     }
 
     if (operation === 'get_linked_issues') {
       const url = `${this.baseUrl}/repos/${repo}/issues?pr=${prNumber}`;
-      return this.executeRequest('GET', url, undefined, signal);
+      try {
+        return await this.executeRequest('GET', url, undefined, signal);
+      } catch (err) {
+        throw enrichGitHub404(err, repo, prNumber);
+      }
     }
 
     throw new WorkflowError(`GitHubAdapter: unknown operation: ${operation}`, {
