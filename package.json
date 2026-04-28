@@ -12,12 +12,14 @@
     "lint": "turbo run lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "dashboard": "node scripts/dashboard.mjs"
+    "dashboard": "node scripts/dashboard.mjs",
+    "postinstall": "lefthook install"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "eslint": "^9.0.0",
     "jiti": "^2.0.0",
+    "lefthook": "^2.1.6",
     "prettier": "^3.2.0",
     "turbo": "latest",
     "typescript": "^5.4.0",
