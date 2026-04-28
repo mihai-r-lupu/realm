@@ -14,7 +14,7 @@ import type {
 import type { RunStore } from '../store/store-interface.js';
 import { captureEvidence } from '../evidence/snapshot.js';
 import { validateInputSchema } from '../validation/input-schema.js';
-import { TERMINAL_PHASES, isTerminalPhase } from './lifecycle.js';
+import { TERMINAL_PHASES } from './lifecycle.js';
 import { checkPreconditions, evaluateAllPreconditions } from './precondition.js';
 import { ExtensionRegistry } from '../extensions/registry.js';
 import { createDefaultRegistry } from '../extensions/default-registry.js';
@@ -27,7 +27,6 @@ import {
   findEligibleSteps,
   isWorkflowComplete,
   buildEvidenceByStep,
-  deriveRunPhase,
   propagateSkips,
 } from './eligibility.js';
 

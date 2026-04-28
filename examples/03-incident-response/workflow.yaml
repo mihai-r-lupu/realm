@@ -93,6 +93,9 @@ steps:
       Impacted services: {{ context.resources.analyze_cause.impacted_services }}
       Confidence: {{ context.resources.analyze_cause.confidence }}
       Runbook: {{ context.resources.analyze_cause.runbook }}
+
+      Raw alert data:
+      {{ context.resources.read_alert.content }}
     input_schema:
       type: object
       required: [headline, message]
@@ -120,11 +123,11 @@ steps:
         - send
         - reject
       message: |
-        {{ context.resources.analyze_cause.severity | upper }} — {{ context.resources.analyze_cause.root_cause }}
+        {{ context.resources.analyze_cause.severity | upper }} — {{ context.resources.analyze_cause.root_cause | truncate: 80 }}
         Impacted: {{ context.resources.analyze_cause.impacted_services | join }}
         Confidence: {{ context.resources.analyze_cause.confidence }}
 
-        Draft: {{ context.resources.draft_response.headline }}
+        Draft: {{ context.resources.draft_response.headline | truncate: 80 }}
     prompt: |
       INCIDENT ANALYSIS
       Severity:  {{ context.resources.analyze_cause.severity }}
