@@ -120,7 +120,12 @@ Lists all runs, sorted by most recent first.
 ```bash
 realm run list
 realm run list --workflow <workflow-id>   # filter by workflow
+realm run list --status <phase>           # filter by run phase
 ```
+
+Valid `--status` values: `running`, `gate_waiting`, `completed`, `failed`, `abandoned`.
+
+When filtering by `gate_waiting`, each line also shows the gate step name and gate age (time since the gate opened).
 
 Output per run: `run-id  workflow-id vN  run_phase  timestamp  N step(s)`
 
@@ -177,7 +182,8 @@ indicates truncation — use `realm run replay` to re-evaluate with modified val
 **Human gate steps:** A gate step appears in the evidence chain as a single entry — the same
 step ID covers both the gate opening (when the engine paused for human input) and the gate
 response (when a choice was submitted via `realm run respond`). The step count does not
-increase when a gate is responded to.
+increase when a gate is responded to. When `gate.message` is configured, the inspect output
+shows a `Message:` line under `Choice:` with the exact text the human saw at decision time.
 
 #### Field reference
 

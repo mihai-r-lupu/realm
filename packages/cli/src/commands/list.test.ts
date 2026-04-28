@@ -1,6 +1,6 @@
 // Tests for listRuns business logic.
 import { describe, it, expect } from 'vitest';
-import { listRuns } from './list.js';
+import { listRuns, formatGateAge } from './list.js';
 import type { RunStore, RunRecord } from '@sensigo/realm';
 
 function makeRun(overrides: Partial<RunRecord> = {}): RunRecord {
@@ -149,5 +149,85 @@ describe('listRuns', () => {
     const result = await listRuns('wf-a', makeStore([a, b]));
     expect(result).toContain('run-a');
     expect(result).not.toContain('run-b');
+  });
+});
+
+describe('listRuns statusFilter', () => {
+  it('returns only gate_waiting runs when statusFilter is gate_waiting', async () => {
+    const waiting = makeRun({
+      id: 'run-waiting',
+      run_phase: 'gate_waiting',
+      terminal_state: false,
+      pending_gate: {
+        gate_id: 'g1',
+        step_name: 'human_review',
+        preview: {},
+        choices: ['approve'],
+        opened_at: '2024-01-01T00:00:00.000Z',
+      },
+    });
+    const completed = makeRun({ id: 'run-done', run_phase: 'completed' });
+    const result = await listRuns(undefined, makeStore([waiting, completed]), 'gate_waiting');
+    expect(result).toContain('run-waiting');
+    expect(result).not.toContain('run-done');
+  });
+
+  it('returns only completed runs when statusFilter is completed', async () => {
+    const waiting = makeRun({
+      id: 'run-waiting',
+      run_phase: 'gate_waiting',
+      terminal_state: false,
+    });
+    const completed = makeRun({ id: 'run-done', run_phase: 'completed' });
+    const result = await listRuns(undefined, makeStore([waiting, completed]), 'completed');
+    expect(result).toContain('run-done');
+    expect(result).not.toContain('run-waiting');
+  });
+
+  it('returns all runs when statusFilter is omitted', async () => {
+    const a = makeRun({ id: 'run-a', run_phase: 'running', terminal_state: false });
+    const b = makeRun({ id: 'run-b', run_phase: 'completed' });
+    const result = await listRuns(undefined, makeStore([a, b]));
+    expect(result).toContain('run-a');
+    expect(result).toContain('run-b');
+  });
+
+  it('gate_waiting row includes gate step name and formatted age', async () => {
+    const openedAt = new Date(Date.now() - 25 * 60 * 1000).toISOString(); // 25 minutes ago
+    const waiting = makeRun({
+      id: 'run-gate',
+      run_phase: 'gate_waiting',
+      terminal_state: false,
+      pending_gate: {
+        gate_id: 'g2',
+        step_name: 'human_review',
+        preview: {},
+        choices: ['approve'],
+        opened_at: openedAt,
+      },
+    });
+    const result = await listRuns(undefined, makeStore([waiting]), 'gate_waiting');
+    expect(result).toContain('human_review');
+    expect(result).toContain('25m');
+  });
+});
+
+describe('formatGateAge', () => {
+  it('formats elapsed time under 60 minutes as Xm', () => {
+    const openedAt = new Date(0).toISOString();
+    const now = new Date(42 * 60 * 1000); // 42 minutes later
+    expect(formatGateAge(openedAt, now)).toBe('42m');
+  });
+
+  it('formats elapsed time under 24 hours as Xh Ym', () => {
+    const openedAt = new Date(0).toISOString();
+    const now = new Date((2 * 60 + 15) * 60 * 1000); // 2h 15m later
+    expect(formatGateAge(openedAt, now)).toBe('2h 15m');
+  });
+
+  it('formats elapsed time 24 hours or more as Xd Yh', () => {
+    const openedAt = new Date(0).toISOString();
+    const now = new Date((3 * 24 * 60 + 5 * 60) * 60 * 1000); // 3d 5h later
+    expect(formatGateAge(openedAt, now)).toBe('3d 5h');
   });
 });

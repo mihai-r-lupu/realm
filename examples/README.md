@@ -9,9 +9,24 @@ workflow), so you can see exactly what changes and why.
 | [01-code-reviewer/](01-code-reviewer/)         | Verification gap, non-determinism, instruction file spiral, no audit trail         | Workflow states as verification gates, `input_schema` enforcement    |
 | [02-ticket-classifier/](02-ticket-classifier/) | Structured output failures, tool calling brittleness, hidden framework retry logic | Agent step `input_schema` enforcement, schema-driven `provide_input` |
 | [03-incident-response/](03-incident-response/) | No human gate before irreversible action, no audit trail, duplicate posts on retry | Human gate, idempotency via evidence chain, sequential agent steps   |
+| [04-content-pipeline/](04-content-pipeline/)   | State loss on failure, expensive full restart, no checkpoint recovery              | Checkpoint/resume, DAG execution model, `realm run resume` from any failed step |
 
-More examples covering checkpoint/resume and multi-agent coordination are planned.
+More examples covering multi-agent coordination are planned.
 See `.private/realm-ai-automation-pain-points-final.md` for the full priority ladder.
+
+---
+
+## Standalone agent execution
+
+The following example demonstrates `realm agent` — the CLI path for running a workflow
+autonomously without an MCP client or IDE. It requires no VS Code, no `.vscode/mcp.json`,
+and no AI chat session. It is the reference for the `realm agent` execution model from
+end to end: auto steps, agent steps, a human gate mid-run, and conditional branching based
+on the gate choice.
+
+| Example | What it demonstrates |
+| ------- | -------------------- |
+| [pr-review/](pr-review/) | `realm agent` end-to-end: GitHub PR fetch (auto step), structured LLM summary (agent step), human gate mid-run, conditional Slack post on gate resolution |
 
 ---
 

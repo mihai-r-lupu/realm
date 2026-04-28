@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { executeStep, executeChain, buildNextActions } from './execution-loop.js';
+import { executeStep, executeChain, buildNextActions, submitHumanResponse } from './execution-loop.js';
 import { JsonFileStore } from '../store/json-file-store.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import { ExtensionRegistry } from '../extensions/registry.js';
@@ -957,6 +957,80 @@ describe('executeStep', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // gate owner propagation
+  // ---------------------------------------------------------------------------
+
+  describe('gate owner propagation', () => {
+    it('propagates gate.owner from step definition into pending_gate.owner', async () => {
+      const gateOwnerWorkflow: WorkflowDefinition = {
+        id: 'gate-owner-wf',
+        name: 'Gate Owner Workflow',
+        version: 1,
+        steps: {
+          gate_step: {
+            description: 'Gate step with owner',
+            execution: 'auto',
+            trust: 'human_confirmed',
+            depends_on: [],
+            gate: { choices: ['send', 'discard'], owner: '@mihai.lupu' },
+          },
+        },
+      };
+
+      const run = await store.create({
+        workflowId: 'gate-owner-wf',
+        workflowVersion: 1,
+        params: {},
+      });
+
+      const envelope = await executeStep(store, gateOwnerWorkflow, {
+        runId: run.id,
+        command: 'gate_step',
+        input: {},
+        dispatcher: echoDispatcher,
+      });
+
+      expect(envelope.status).toBe('confirm_required');
+      const updatedRun = await store.get(run.id);
+      expect(updatedRun.pending_gate?.owner).toBe('@mihai.lupu');
+    });
+
+    it('pending_gate.owner is undefined when gate has no owner', async () => {
+      const gateNoOwnerWorkflow: WorkflowDefinition = {
+        id: 'gate-no-owner-wf',
+        name: 'Gate No Owner Workflow',
+        version: 1,
+        steps: {
+          gate_step: {
+            description: 'Gate step without owner',
+            execution: 'auto',
+            trust: 'human_confirmed',
+            depends_on: [],
+            gate: { choices: ['approve', 'reject'] },
+          },
+        },
+      };
+
+      const run = await store.create({
+        workflowId: 'gate-no-owner-wf',
+        workflowVersion: 1,
+        params: {},
+      });
+
+      const envelope = await executeStep(store, gateNoOwnerWorkflow, {
+        runId: run.id,
+        command: 'gate_step',
+        input: {},
+        dispatcher: echoDispatcher,
+      });
+
+      expect(envelope.status).toBe('confirm_required');
+      const updatedRun = await store.get(run.id);
+      expect(updatedRun.pending_gate?.owner).toBeUndefined();
+    });
+  });
+
   // Cleanup
   it('cleanup', async () => {
     await rm(dir, { recursive: true, force: true });
@@ -1104,6 +1178,260 @@ describe('executeStep', () => {
       expect(envelope.status).toBe('ok');
       expect(envelope.evidence[0]?.agent_profile).toBeUndefined();
       expect(envelope.evidence[0]?.agent_profile_hash).toBeUndefined();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // gate.message template resolution
+  // ---------------------------------------------------------------------------
+
+  describe('gate.message template resolution', () => {
+    it('fail-fast: returns stop error when gate.message contains an unresolvable reference', async () => {
+      const gateMessageBrokenWf: WorkflowDefinition = {
+        id: 'gate-msg-broken-wf',
+        name: 'Gate Message Broken',
+        version: 1,
+        steps: {
+          gate_step: {
+            description: 'Gate step with broken message reference',
+            execution: 'auto',
+            trust: 'human_confirmed',
+            depends_on: [],
+            gate: {
+              choices: ['approve', 'reject'],
+              message: 'Count: {{ context.resources.gate_step.missing_field }}',
+            },
+          },
+        },
+      };
+
+      const run = await store.create({
+        workflowId: 'gate-msg-broken-wf',
+        workflowVersion: 1,
+        params: {},
+      });
+
+      const envelope = await executeStep(store, gateMessageBrokenWf, {
+        runId: run.id,
+        command: 'gate_step',
+        input: {},
+        dispatcher: async () => ({}), // output has no missing_field
+      });
+
+      expect(envelope.status).toBe('error');
+      expect(envelope.agent_action).toBe('stop');
+      expect(envelope.errors[0]).toContain('gate.message has unresolvable references');
+      expect(envelope.errors[0]).toContain('context.resources.gate_step.missing_field');
+
+      // Gate must not be written to the store.
+      const updatedRun = await store.get(run.id);
+      expect(updatedRun.pending_gate).toBeUndefined();
+    });
+
+    it('happy path: gate.message with self-reference resolves and populates gate.display and resolved_message', async () => {
+      const gateMessageWf: WorkflowDefinition = {
+        id: 'gate-msg-happy-wf',
+        name: 'Gate Message Happy',
+        version: 1,
+        steps: {
+          gate_step: {
+            description: 'Gate step with valid message self-reference',
+            execution: 'auto',
+            trust: 'human_confirmed',
+            depends_on: [],
+            gate: {
+              choices: ['approve', 'reject'],
+              message: 'Found: {{ context.resources.gate_step.count }}',
+            },
+          },
+        },
+      };
+
+      const run = await store.create({
+        workflowId: 'gate-msg-happy-wf',
+        workflowVersion: 1,
+        params: {},
+      });
+
+      const envelope = await executeStep(store, gateMessageWf, {
+        runId: run.id,
+        command: 'gate_step',
+        input: {},
+        dispatcher: async () => ({ count: 7 }),
+      });
+
+      expect(envelope.status).toBe('confirm_required');
+      expect(envelope.gate?.display).toBe('Found: 7');
+
+      const updatedRun = await store.get(run.id);
+      expect(updatedRun.pending_gate?.resolved_message).toBe('Found: 7');
+    });
+
+    it('evidence persistence: gate_message appears on gate_response snapshot and not in output blob', async () => {
+      const gateMessageEvidenceWf: WorkflowDefinition = {
+        id: 'gate-msg-evidence-wf',
+        name: 'Gate Message Evidence',
+        version: 1,
+        steps: {
+          gate_step: {
+            description: 'Gate step for evidence test',
+            execution: 'auto',
+            trust: 'human_confirmed',
+            depends_on: [],
+            gate: {
+              choices: ['approve', 'reject'],
+              message: 'Found: {{ context.resources.gate_step.count }}',
+            },
+          },
+        },
+      };
+
+      const run = await store.create({
+        workflowId: 'gate-msg-evidence-wf',
+        workflowVersion: 1,
+        params: {},
+      });
+
+      const envelope = await executeStep(store, gateMessageEvidenceWf, {
+        runId: run.id,
+        command: 'gate_step',
+        input: {},
+        dispatcher: async () => ({ count: 7 }),
+      });
+
+      expect(envelope.status).toBe('confirm_required');
+      const gateId = envelope.gate!.gate_id;
+
+      await submitHumanResponse(store, gateMessageEvidenceWf, {
+        runId: run.id,
+        gateId,
+        choice: 'approve',
+      });
+
+      const finalRun = await store.get(run.id);
+      const gateSnap = finalRun.evidence.find((e) => e.kind === 'gate_response');
+      expect(gateSnap).toBeDefined();
+      expect(gateSnap!.gate_message).toBe('Found: 7');
+      // gate_message must NOT appear in the output blob.
+      expect(gateSnap!.output_summary).not.toHaveProperty('gate_message');
+    });
+
+    it('no gate.message: pending_gate.resolved_message is absent and gate.display falls back to step.prompt', async () => {
+      const gateNoMsgWf: WorkflowDefinition = {
+        id: 'gate-no-msg-wf',
+        name: 'Gate No Message',
+        version: 1,
+        steps: {
+          gate_step: {
+            description: 'Gate step without gate.message',
+            execution: 'auto',
+            trust: 'human_confirmed',
+            depends_on: [],
+            prompt: 'Prompt fallback',
+            gate: { choices: ['approve', 'reject'] },
+          },
+        },
+      };
+
+      const run = await store.create({
+        workflowId: 'gate-no-msg-wf',
+        workflowVersion: 1,
+        params: {},
+      });
+
+      const envelope = await executeStep(store, gateNoMsgWf, {
+        runId: run.id,
+        command: 'gate_step',
+        input: {},
+        dispatcher: async () => ({}),
+      });
+
+      expect(envelope.status).toBe('confirm_required');
+      expect(envelope.gate?.display).toBe('Prompt fallback');
+
+      const updatedRun = await store.get(run.id);
+      expect(updatedRun.pending_gate?.resolved_message).toBeUndefined();
+    });
+
+    it('no gate.message: gate_response evidence snapshot has no gate_message field', async () => {
+      const gateNoMsgEvidenceWf: WorkflowDefinition = {
+        id: 'gate-no-msg-ev-wf',
+        name: 'Gate No Message Evidence',
+        version: 1,
+        steps: {
+          gate_step: {
+            description: 'Gate step without gate.message for evidence check',
+            execution: 'auto',
+            trust: 'human_confirmed',
+            depends_on: [],
+            gate: { choices: ['approve', 'reject'] },
+          },
+        },
+      };
+
+      const run = await store.create({
+        workflowId: 'gate-no-msg-ev-wf',
+        workflowVersion: 1,
+        params: {},
+      });
+
+      const envelope = await executeStep(store, gateNoMsgEvidenceWf, {
+        runId: run.id,
+        command: 'gate_step',
+        input: {},
+        dispatcher: async () => ({}),
+      });
+
+      expect(envelope.status).toBe('confirm_required');
+
+      await submitHumanResponse(store, gateNoMsgEvidenceWf, {
+        runId: run.id,
+        gateId: envelope.gate!.gate_id,
+        choice: 'approve',
+      });
+
+      const finalRun = await store.get(run.id);
+      const gateSnap = finalRun.evidence.find((e) => e.kind === 'gate_response');
+      expect(gateSnap).toBeDefined();
+      expect(gateSnap!.gate_message).toBeUndefined();
+    });
+
+    it('gate.message present and step.prompt also present: gate.display uses gate.message not step.prompt', async () => {
+      const gateMsgOverPromptWf: WorkflowDefinition = {
+        id: 'gate-msg-over-prompt-wf',
+        name: 'Gate Message Over Prompt',
+        version: 1,
+        steps: {
+          gate_step: {
+            description: 'Gate step with both message and prompt',
+            execution: 'auto',
+            trust: 'human_confirmed',
+            depends_on: [],
+            prompt: 'This is step.prompt text',
+            gate: {
+              choices: ['approve', 'reject'],
+              message: 'This is gate.message text',
+            },
+          },
+        },
+      };
+
+      const run = await store.create({
+        workflowId: 'gate-msg-over-prompt-wf',
+        workflowVersion: 1,
+        params: {},
+      });
+
+      const envelope = await executeStep(store, gateMsgOverPromptWf, {
+        runId: run.id,
+        command: 'gate_step',
+        input: {},
+        dispatcher: async () => ({}),
+      });
+
+      expect(envelope.status).toBe('confirm_required');
+      expect(envelope.gate?.display).toBe('This is gate.message text');
+      expect(envelope.gate?.display).not.toContain('step.prompt');
     });
   });
 });

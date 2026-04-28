@@ -123,8 +123,9 @@ recovery path was taken, and `context_hint` will describe what happened.
 ### 6. Human gate (`status: confirm_required`)
 
 1. Read `gate.agent_hint` for instructions on how to present the gate (if set).
-2. Present `gate.display` to the user verbatim. If `gate.display` is absent, construct a prompt
-   from `gate.preview` — the step output awaiting human review.
+2. Present `gate.display` to the user verbatim. `gate.display` is resolved from `gate.message`
+   if the workflow configured one; otherwise it falls back to the step's `prompt`. If `gate.display`
+   is absent, construct a prompt from `gate.preview` — the step output awaiting human review.
 3. Collect the user's choice from `gate.response_spec.choices`.
 4. Call `submit_human_response` using `next_actions[0].instruction.call_with` with:
    - `gate_id` from `gate.gate_id` (required — distinct from `run_id`)

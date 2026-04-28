@@ -4,6 +4,11 @@ Demonstrates `realm agent` end-to-end: a GitHub pull request is fetched
 automatically, an AI agent writes a structured summary, a human approves
 (or rejects) before posting, and Slack receives the result.
 
+> **Preflight:** `realm agent` checks that all required environment variables
+> are set before starting a run. If `GITHUB_TOKEN` or `SLACK_WEBHOOK_URL` is
+> missing, it stops immediately with an actionable error listing which variables
+> to set — no run is created.
+
 ## Prerequisites
 
 Set the following environment variables:
@@ -24,11 +29,21 @@ npm install @anthropic-ai/sdk  # for Anthropic
 
 ## Run
 
+Replace `<owner/repo>` with the GitHub repository (e.g. `octocat/Hello-World`) and
+`<pr-number>` with an open pull request number in that repo.
+
+To find an open PR:
+
 ```bash
-# Run autonomously with realm agent
+gh pr list --repo <owner/repo> --limit 5
+```
+
+Then run:
+
+```bash
 realm agent \
   --workflow examples/pr-review/workflow.yaml \
-  --params '{"repo":"owner/repo","pr_number":42}'
+  --params '{"repo":"<owner/repo>","pr_number":<pr-number>}'
 ```
 
 To use Anthropic instead of OpenAI:
@@ -36,7 +51,7 @@ To use Anthropic instead of OpenAI:
 ```bash
 realm agent \
   --workflow examples/pr-review/workflow.yaml \
-  --params '{"repo":"owner/repo","pr_number":42}' \
+  --params '{"repo":"<owner/repo>","pr_number":<pr-number>}' \
   --provider anthropic
 ```
 
@@ -49,7 +64,7 @@ By default `realm agent` does not write to `~/.realm/workflows/`. If you want
 ```bash
 realm agent \
   --workflow examples/pr-review/workflow.yaml \
-  --params '{"repo":"owner/repo","pr_number":42}' \
+  --params '{"repo":"<owner/repo>","pr_number":<pr-number>}' \
   --register
 ```
 
@@ -76,8 +91,8 @@ before the run.
    If `SLACK_WEBHOOK_URL` is set, a Slack message is sent at this point with
    the approval command.
 
-   The gate accepts two choices: `approve` and `reject`. The run pauses until
-   one of them is submitted.
+   The gate accepts `approve` and `reject`. The run pauses until one is
+   submitted.
 
 4. **Gate response** — In a separate terminal, run the printed command:
 
@@ -110,7 +125,8 @@ before the run.
    The engine evaluates `when:` expressions against the step evidence map after
    the gate resolves. Only the branch whose condition is true becomes eligible.
 
-6. **Run complete** — `realm agent` exits 0 and prints the run ID.
+6. **Run complete** — `realm agent` prints the run ID, the `write_summary` result as
+   formatted JSON, and exits 0.
 
 ## Inspect the run
 
@@ -118,6 +134,19 @@ before the run.
 realm run inspect <run-id>
 realm run replay <run-id>
 ```
+
+## Troubleshooting
+
+**`Step 'fetch_pr' failed: HTTP 404`**
+
+Possible causes:
+
+- `repo` or `pr_number` does not exist — verify with:
+  ```bash
+  gh pr view <pr-number> --repo <owner/repo>
+  ```
+- `GITHUB_TOKEN` does not have access to the repository (private repos return 404, not 403).
+  Confirm the token has `repo` scope and that the repository name is correct.
 
 ## Notes
 

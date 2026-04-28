@@ -151,8 +151,9 @@ When no registered workflow matches the task, the agent calls `create_workflow` 
 | `realm workflow register <path>` | Register a workflow in the local store                                       |
 | `realm workflow watch <path>`    | Watch a workflow YAML and re-register on every change                        |
 | `realm workflow run <path>`      | Run a workflow interactively (development mode)                              |
+| `realm agent`                    | Run a workflow autonomously with an LLM — no MCP client or IDE required      |
 | `realm workflow test <path>`     | Run fixture-based tests against a workflow                                   |
-| `realm run list`                 | List all runs                                                                |
+| `realm run list`                 | List all runs; filter by `--workflow <id>` or `--status <phase>` |
 | `realm run resume <run-id>`      | Resume a paused run                                                          |
 | `realm run respond <run-id>`     | Submit a response to a human gate                                            |
 | `realm run inspect <run-id>`     | Print the full evidence chain for a run                                      |

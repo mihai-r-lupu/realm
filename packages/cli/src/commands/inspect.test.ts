@@ -123,4 +123,31 @@ describe('inspectRun', () => {
     expect(result).toContain('step_one');
     expect(result).toContain('Evidence (1 steps)');
   });
+
+  it('surfaces gate_message on gate_response evidence entries', async () => {
+    const snap = makeSnapshot('confirm_update', {
+      kind: 'gate_response',
+      gate_message: 'Confirm update',
+      input_summary: { choice: 'send' },
+      output_summary: { draft: 'hello', choice: 'send' },
+    });
+    const run = makeRun([snap]);
+    const result = await inspectRun('run_test1', makeRunStore(run), makeWorkflowStore(basicDef));
+    expect(result).toContain('Message:  "Confirm update"');
+    expect(result).toContain('Choice:   send');
+    expect(result).toContain('gate_response');
+  });
+
+  it('omits Message: line when gate_message is absent on a gate_response entry', async () => {
+    const snap = makeSnapshot('confirm_update', {
+      kind: 'gate_response',
+      input_summary: { choice: 'reject' },
+      output_summary: { draft: 'hello', choice: 'reject' },
+    });
+    const run = makeRun([snap]);
+    const result = await inspectRun('run_test1', makeRunStore(run), makeWorkflowStore(basicDef));
+    expect(result).not.toContain('Message:');
+    expect(result).toContain('Choice:   reject');
+    expect(result).toContain('gate_response');
+  });
 });

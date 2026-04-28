@@ -92,7 +92,7 @@ When the engine opens a gate:
 
 | Field                        | Description                                                                   |
 | ---------------------------- | ----------------------------------------------------------------------------- |
-| `gate.display`               | The human-facing content resolved from the step's `prompt`. Present verbatim. |
+| `gate.display`               | The human-facing content. Resolved from `gate.message` if configured; falls back to `step.prompt` resolved. Present verbatim. |
 | `gate.agent_hint`            | Optional presentation instructions from the step's `instructions` field.      |
 | `gate.response_spec.choices` | Valid choice values (e.g. `["approve", "reject"]`).                           |
 | `gate.preview`               | Full step output at gate opening, for reference and debugging.                |

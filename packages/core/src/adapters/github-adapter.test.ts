@@ -95,3 +95,47 @@ describe('GitHubAdapter', () => {
     ).rejects.toMatchObject({ code: 'STEP_ABORTED' });
   });
 });
+
+describe('GitHubAdapter 404 enrichment', () => {
+  it('enriches a 404 response with actionable diagnostic message', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' }),
+    );
+    const adapter = new GitHubAdapter('test', { auth: { token: 'token' } });
+    try {
+      await adapter.fetch('get_pr_diff', { repo: 'owner/repo', pr_number: 42 }, {});
+      expect.fail('expected to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(WorkflowError);
+      const we = err as WorkflowError;
+      expect(we.code).toBe('SERVICE_HTTP_4XX');
+      expect(we.message).toContain('owner/repo');
+      expect(we.message).toContain('42');
+      expect(we.message).toContain('private');
+      expect(we.message).toContain('gh pr view');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('enriches a 404 on get_linked_issues with actionable diagnostic message', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' }),
+    );
+    const adapter = new GitHubAdapter('test', { auth: { token: 'token' } });
+    try {
+      await adapter.fetch('get_linked_issues', { repo: 'owner/repo', pr_number: 42 }, {});
+      expect.fail('expected to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(WorkflowError);
+      const we = err as WorkflowError;
+      expect(we.code).toBe('SERVICE_HTTP_4XX');
+      expect(we.message).toContain('owner/repo');
+      expect(we.message).toContain('42');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

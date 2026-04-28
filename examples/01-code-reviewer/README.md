@@ -135,6 +135,18 @@ folder. With the default agent, trigger it with:
 > field — the skill will then fire on any code review request. Use the Realm agent
 > (Option A) if you want that behaviour without modifying the skill file.
 
+**Option C — `realm agent` CLI (no VS Code required)**
+
+Run the workflow autonomously from the terminal — no MCP client, no IDE, no configuration:
+
+```bash
+realm agent \
+  --workflow examples/01-code-reviewer/workflow.yaml \
+  --params "{\"path\":\"$(pwd)/examples/01-code-reviewer/diffs/add-oauth-provider.diff\"}"
+```
+
+Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers. The agent drives the full workflow, resubmits automatically if any field fails schema validation, and prints the `review_changes` result as formatted JSON when the run completes.
+
 Either way, the agent starts the run, loads the diff automatically, then receives a prompt
 asking for the structured review. If any field violates the schema — wrong enum
 value, summary too short, missing boolean — it receives `agent_action: provide_input`

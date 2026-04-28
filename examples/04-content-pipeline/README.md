@@ -113,6 +113,18 @@ folder. With the default agent, trigger it with:
 > field — the skill will then fire on any content enrichment request. Use the Realm agent
 > (Option A) if you want that behaviour without modifying the skill file.
 
+**Option C — `realm agent` CLI (no VS Code required)**
+
+Run the workflow autonomously from the terminal — no MCP client, no IDE, no configuration:
+
+```bash
+realm agent \
+  --workflow examples/04-content-pipeline/workflow.yaml \
+  --params "{\"path\":\"$(pwd)/examples/04-content-pipeline/articles/ml-infrastructure.txt\"}"
+```
+
+Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers. The agent drives all steps sequentially and prints the `tag_content` result as formatted JSON when the run completes. If `tag_content` times out mid-run, use `realm run list` to find the run ID and `realm run resume` as described in the timeout section below.
+
 Either way, the agent will:
 
 1. Start the run — `fetch_content` executes automatically via the filesystem adapter.

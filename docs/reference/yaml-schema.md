@@ -42,7 +42,7 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 | `retry`               | object                          | No       | Retry configuration. See [Retry](#retry).                                                                                                                                                                                                                                                                      |
 | `instructions`        | string                          | No       | Agent-facing instructions. Delivered as `gate.agent_hint` when a gate is open.                                                                                                                                                                                                                                 |
 | `prompt`              | string                          | No       | Template-resolved task prompt delivered via `next_actions[].prompt`. On human gate steps, delivered as `gate.display`. Supports `{{ context.resources.STEP.FIELD }}` and `{{ run.params.FIELD }}`.                                                                                                             |
-| `gate`                | object                          | No       | Gate configuration. `gate.choices` lists the valid human response values.                                                                                                                                                                                                                                      |
+| `gate`                | object                          | No       | Gate configuration. `gate.choices` lists the valid human response values. `gate.message` is a developer-authored template string shown to the human reviewer. See [Gate message](#gate-message).                                                                                                                 |
 | `input_map`           | `Record<string, string>`        | No       | Maps param names the service adapter receives to dot-path values from the run context. Only valid on `execution: auto` steps with `uses_service`. Each value is a dot-path: `run.params.<key>` reads from the run's start params; `context.resources.<step>.<field>` reads a field from a prior step's output. |
 | `agent_profile`       | string                          | No       | Agent profile name. Only valid on `execution: agent` steps. Must match a file in `profiles_dir`.                                                                                                                                                                                                               |
 
@@ -186,6 +186,85 @@ write_to_target:
 ```
 
 Supported operators: `>`, `<`, `>=`, `<=`, `==`, `!=`. The left side is a dot-path into the evidence of a prior step (`step.result.field`). The right side is a literal value.
+
+---
+
+## Gate message
+
+`gate.message` is a developer-authored template string shown to the human reviewer when a gate opens. It is distinct from `prompt` — `prompt` is the LLM's task directive, while `gate.message` is a human-readable decision summary.
+
+**Primary use case — self-reference:** the gate step's own output is available via `context.resources.STEP_NAME.FIELD`, where `STEP_NAME` is this step's own name:
+
+```yaml
+confirm_update:
+  execution: agent
+  trust: human_confirmed
+  gate:
+    choices: [confirm, reject]
+    message: |
+      *Update Request*
+      Fields found: {{ context.resources.confirm_update.fields_found }} / {{ context.resources.confirm_update.total_fields }}
+      Missing: {{ context.resources.confirm_update.missing_fields }}
+      Confirm to proceed or reject to cancel.
+  prompt: |
+    Validate the incoming fields. Return JSON: { fields_found, total_fields, missing_fields }.
+```
+
+Cross-step references also work: `{{ context.resources.prior_step.field }}`.
+
+**Fail-fast behavior:** if any `{{ ... }}` reference is unresolvable when the gate opens, the step returns a stop error immediately. The gate does not open with broken placeholder text. Fix the template or the step's output schema.
+
+**gate.display fallback chain (MCP path):**
+
+1. `gate.message` resolved → used as `gate.display`
+2. `step.prompt` resolved → used as `gate.display` (existing behavior, unchanged)
+3. Neither present → `gate.display` absent (existing behavior, unchanged)
+
+**Audit guarantee:** the resolved message is stored verbatim in the run's evidence chain. `realm run inspect` surfaces it in the `gate_response` entry under `Message:`, so the exact text the human read when they made their choice is preserved permanently.
+
+**Slack path:** when `gate.message` is present, the resolved text is used in the Slack notification in place of the raw JSON preview. When absent, the existing `formatGatePreviewForSlack(preview)` fallback applies.
+
+---
+
+## Template filters
+
+Template expressions support an optional pipe-filter chain: `{{ path | filter1 | filter2: arg }}`.
+
+The path is resolved first. Each filter in the chain receives the current value and produces a new value. If any filter produces a type mismatch the placeholder is left intact (`{{ path | ... }}`). Unknown filters in `gate.message` templates cause a `FILTER_UNKNOWN` stop error.
+
+### Tier 1 filters
+
+| Filter | Arg | Input | Output |
+|---|---|---|---|
+| `bullets` | — | `string[]` | `• item\n• item\n…` — empty array → placeholder |
+| `join` | separator (default `", "`) | `string[]` | items joined by separator |
+| `default` | fallback value (default `""`) | any | fallback when value is `null` or `undefined`; passes through `""`, `0`, `false` unchanged |
+| `upper` | — | `string` | uppercased string |
+| `truncate` | max length (integer) | `string` | string cut at word boundary ≤ N + `…`; unchanged if already short enough |
+
+`truncate` does not auto-stringify numbers; ensure the value is a string in the step's output if truncation is needed.
+
+**Arg quoting:** a single quoted argument follows the filter name after a colon. Quoted args strip the outer quote characters: `join: " / "` passes ` / ` as the separator.
+
+**`default:` fires on `null` or `undefined` only — not on filter errors.** A short-circuit from a prior `ok: false` result (type mismatch or unknown filter in lenient mode) leaves the placeholder intact; `default:` is not reached. For example, `{{ items | pluck: "name" | default: "none" }}` where `pluck` produces a type mismatch short-circuits before `default:` — the result is the placeholder, not `"none"`.
+
+**Filter chain example:**
+
+```yaml
+gate:
+  message: |
+    Issues found:
+    {{ context.resources.scan.issues | bullets }}
+
+    Summary: {{ context.resources.scan.summary | truncate: 200 }}
+    Repo: {{ run.params.repo | upper }}
+    Tags: {{ context.resources.scan.tags | join: ", " }}
+    Status: {{ context.resources.scan.status | default: unknown }}
+```
+
+**Strict mode:** `gate.message` is rendered in strict mode — an unknown filter name returns a `FILTER_UNKNOWN` stop error rather than leaving the placeholder intact. All other template call sites (`prompt`, `instructions`, `gate.display` fallback) are lenient: unknown filters leave the placeholder as-is.
+
+**Author note:** If you need a fallback for optional fields that may also be the wrong type, ensure the step always outputs the field as a string or omits it — don't rely on `| default:` to cover upstream type errors.
 
 ---
 

@@ -117,7 +117,47 @@ Run ID: abc123
 
 ---
 
-## 6. Inspect the Evidence Chain
+## 6. Run with `realm agent`
+
+`realm workflow run` (section 5) manually drives each step by prompting you to type JSON — useful for learning the state machine without setting up an LLM. `realm agent` does the same thing end-to-end with a real LLM, in a single terminal command, with no MCP client or IDE required:
+
+```bash
+realm agent \
+  --workflow ./extraction-demo \
+  --params '{"path":"input.txt"}'
+```
+
+Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers.
+
+`realm agent` registers the workflow temporarily, starts a run, and drives every `execution: agent` step. Auto steps run without any LLM call. Schema validation applies exactly as in the interactive run — if the LLM returns invalid output, the engine rejects it, the agent retries, and the run only advances when the schema passes.
+
+If the workflow contains a human gate, `realm agent` pauses and prints the `realm run respond` command to use. Run it in a second terminal to approve or reject. `realm agent` detects the resolved gate and continues automatically.
+
+When the run completes, `realm agent` prints the last agent step's output directly to the terminal:
+
+```
+Run complete: dc8b8c11-48db-4613-85b8-9c4dff1681f8
+
+Result (step_one):
+{
+  "result": "the document text"
+}
+```
+
+To also persist the workflow definition so `realm run inspect` and `realm run list` resolve it by ID, pass `--register`:
+
+```bash
+realm agent \
+  --workflow ./extraction-demo \
+  --params '{"path":"input.txt"}' \
+  --register
+```
+
+**`realm agent` vs MCP:** use `realm agent` for standalone runs — CI pipelines, quick local testing with a real LLM, scripts that must complete without an IDE. Use MCP (section 12) when an AI agent embedded in an IDE should drive workflows as part of a broader interactive session.
+
+---
+
+## 7. Inspect the Evidence Chain
 
 After a run completes (or fails), inspect the full evidence chain:
 
@@ -164,7 +204,7 @@ for the full field guide and diagnostic patterns.
 
 ---
 
-## 7. Adding a Service
+## 8. Adding a Service
 
 Services let the engine fetch, create, or update data in external systems.
 
@@ -257,7 +297,7 @@ registry.register('adapter', 'google_docs', googleDocsAdapter);
 
 ---
 
-## 8. Adding a Human Gate
+## 9. Adding a Human Gate
 
 A human gate pauses a run and requires explicit approval before the engine advances to the next step. Add one to `workflow.yaml`:
 
@@ -277,7 +317,13 @@ steps:
       choices:
         - approve
         - reject
+      message: |
+        {{ context.resources.analyze_findings.finding_count }} findings identified.
+        Severity: {{ context.resources.analyze_findings.highest_severity }}.
+        Reply 'approve' to accept or 'reject' to flag for re-review.
 ```
+
+`gate.message` is optional. When set, it is resolved at gate-open using the step's output for template substitution — including self-reference (`{{ context.resources.review_findings.field }}` reads the gate step's own output). If any `{{ }}` placeholder cannot be resolved, the engine returns an error and the gate does not open. The resolved message is stored permanently in the evidence chain as a verbatim record of what the human saw.
 
 When the engine reaches a step with `trust: human_confirmed`, it pauses the run and returns `status: confirm_required`. The run will not advance until a human responds.
 
@@ -293,7 +339,7 @@ realm run respond <run-id>
 
 When the engine opens a gate, the `confirm_required` response includes a `gate` object:
 
-- `gate.display` — the human-facing content resolved from `step.prompt`. Present this to the user verbatim before asking for their choice.
+- `gate.display` — the human-facing content. Resolved from `gate.message` if configured; otherwise falls back to `step.prompt` resolved. Present this to the user verbatim before asking for their choice.
 - `gate.agent_hint` — optional agent protocol instruction resolved from `step.instructions`. If present, the agent follows this to determine how to present the gate.
 - `gate.response_spec.choices` — the valid choice values (e.g. `["approve", "reject"]`). Pass one of these as `choice` when calling `submit_human_response`.
 - `gate.preview` — the full step output at point of gate opening, for reference and debugging.
@@ -302,7 +348,7 @@ When the engine opens a gate, the `confirm_required` response includes a `gate` 
 
 ---
 
-## 9. Adding a Step Handler
+## 10. Adding a Step Handler
 
 A step handler contains business logic for an `execution: auto` step — validation,
 transformation, enrichment, or any computation the engine should run automatically.
@@ -417,7 +463,7 @@ For full interface documentation, context field reference, handler composition p
 
 ---
 
-## 10. Adding Agent Profiles
+## 11. Adding Agent Profiles
 
 An agent profile is a Markdown file that defines a persona for an `execution: agent` step. The profile content is delivered to the AI agent verbatim as `agent_profile_instructions` when the step is reached, before it submits any output.
 
@@ -477,7 +523,7 @@ For the complete field reference, see [Agent profiles](reference/yaml-schema.md#
 
 ---
 
-## 11. Connect an AI Agent via MCP
+## 12. Connect an AI Agent via MCP
 
 The MCP server is built into the `realm` CLI — no extra install needed if you already have
 `@sensigo/realm-cli` installed globally. Start it with:
@@ -581,7 +627,7 @@ For the full protocol — `next_actions`, `chained_auto_steps`, `context_hint`, 
 
 ---
 
-## 12. Testing Workflows
+## 13. Testing Workflows
 
 Write a fixture file in `extraction-demo/fixtures/happy-path.yaml`:
 

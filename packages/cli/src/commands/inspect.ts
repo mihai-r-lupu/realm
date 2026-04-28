@@ -129,15 +129,27 @@ export async function inspectRun(
       const snap = snaps[0]!;
       const statusColored = colorStatus(snap.status);
       const hashShort = chalk.dim(`hash: ${snap.evidence_hash.slice(0, 8)}`);
+      const kindLabel = snap.kind === 'gate_response' ? chalk.cyan(' gate_response') : '';
       const profileLabel =
         snap.agent_profile !== undefined ? chalk.cyan(` [profile: ${snap.agent_profile}]`) : '';
       lines.push(
-        `  ${idx + 1}. ${stepId.padEnd(22)}${profileLabel} ${statusColored}   ${snap.duration_ms}ms   ${hashShort}`,
+        `  ${idx + 1}. ${stepId.padEnd(22)}${profileLabel}${kindLabel} ${statusColored}   ${snap.duration_ms}ms   ${hashShort}`,
       );
-      lines.push(`     Input:  ${formatSummary(snap.input_summary)}`);
-      lines.push(`     Output: ${formatSummary(snap.output_summary)}`);
-      if (snap.diagnostics !== undefined) {
-        lines.push(chalk.dim(`     Diagnostics: ${formatDiagnostics(snap.diagnostics)}`));
+      if (snap.kind === 'gate_response') {
+        const choice = snap.input_summary['choice'] ?? snap.output_summary['choice'];
+        if (choice !== undefined) {
+          lines.push(`     Choice:   ${String(choice)}`);
+        }
+        if (snap.gate_message !== undefined) {
+          lines.push(`     Message:  "${snap.gate_message}"`);
+        }
+        lines.push(`     Output:   ${formatSummary(snap.output_summary)}`);
+      } else {
+        lines.push(`     Input:  ${formatSummary(snap.input_summary)}`);
+        lines.push(`     Output: ${formatSummary(snap.output_summary)}`);
+        if (snap.diagnostics !== undefined) {
+          lines.push(chalk.dim(`     Diagnostics: ${formatDiagnostics(snap.diagnostics)}`));
+        }
       }
     }
   });

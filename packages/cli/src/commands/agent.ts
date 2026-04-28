@@ -1,7 +1,9 @@
 // realm agent — autonomous CLI command that drives a workflow using an LLM provider.
 // Core loop logic lives in packages/cli/src/agent/run-agent.ts for testability.
 import { Command } from 'commander';
+import { join } from 'node:path';
 import {
+  loadWorkflowFromFile,
   JsonFileStore,
   JsonWorkflowStore,
   createDefaultRegistry,
@@ -11,6 +13,7 @@ import {
 import type { ProviderName } from '../agent/llm-provider.js';
 import { resolveProvider } from '../agent/llm-provider.js';
 import { runAgent } from '../agent/run-agent.js';
+import { checkAdapterPrerequisites, formatPreflightError, checkSlackBidirectionalConfig } from '../agent/preflight.js';
 
 export const agentCommand = new Command('agent')
   .description('Run a workflow autonomously using an LLM provider')
@@ -22,6 +25,28 @@ export const agentCommand = new Command('agent')
   .action(async (opts: { workflow: string; params: string; provider?: string; model?: string; register?: boolean }) => {
     try {
       const params = JSON.parse(opts.params) as Record<string, unknown>;
+
+      // Resolve and load workflow definition before starting a run.
+      const inputPath = opts.workflow;
+      const filePath =
+        inputPath.endsWith('.yaml') || inputPath.endsWith('.yml')
+          ? inputPath
+          : join(inputPath, 'workflow.yaml');
+      const definition = loadWorkflowFromFile(filePath);
+
+      // Fail fast if required adapter env vars are missing.
+      const preflightFindings = checkAdapterPrerequisites(definition);
+      if (preflightFindings.length > 0) {
+        console.error(formatPreflightError(preflightFindings));
+        process.exit(1);
+      }
+
+      // Print advisory warnings for incomplete Slack bidirectional config.
+      const slackWarnings = checkSlackBidirectionalConfig();
+      for (const warning of slackWarnings) {
+        console.warn(`  ⚠  ${warning.message}`);
+      }
+
       const workflowStore = new JsonWorkflowStore();
       const store = new JsonFileStore();
       const provider = await resolveProvider(opts.provider as ProviderName | undefined, opts.model);
@@ -33,10 +58,17 @@ export const agentCommand = new Command('agent')
       const result = await runAgent(
         { store, workflowStore, provider, registry },
         {
-          workflowPath: opts.workflow,
+          definition,
           params,
           register: opts.register === true,
           ...(process.env['SLACK_WEBHOOK_URL'] !== undefined && { slackWebhookUrl: process.env['SLACK_WEBHOOK_URL'] }),
+          ...(process.env['SLACK_BOT_TOKEN'] !== undefined && { slackBotToken: process.env['SLACK_BOT_TOKEN'] }),
+          ...(process.env['SLACK_CHANNEL_ID'] !== undefined && { slackChannelId: process.env['SLACK_CHANNEL_ID'] }),
+          ...(process.env['SLACK_SIGNING_SECRET'] !== undefined && { slackSigningSecret: process.env['SLACK_SIGNING_SECRET'] }),
+          ...(process.env['SLACK_EVENTS_PORT'] !== undefined && { slackEventsPort: parseInt(process.env['SLACK_EVENTS_PORT'], 10) }),
+          ...(process.env['SLACK_POLL_INTERVAL_MS'] !== undefined && { slackPollIntervalMs: parseInt(process.env['SLACK_POLL_INTERVAL_MS'], 10) }),
+          ...(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'] !== undefined && { slackGateReminderIntervalMs: parseInt(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'], 10) }),
+          ...(process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'] !== undefined && { slackGateEscalationThresholdMs: parseInt(process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'], 10) }),
         },
       );
       process.exit(result === 'completed' ? 0 : 1);
@@ -45,3 +77,4 @@ export const agentCommand = new Command('agent')
       process.exit(1);
     }
   });
+

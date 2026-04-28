@@ -8,6 +8,10 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- `gate.message` template field on gate config — a developer-authored human-facing message resolved at gate-open from step output (and self-reference via `{{ context.resources.MY_GATE_STEP.field }}`). Fail-fast: if any `{{ }}` placeholder cannot be resolved, the engine returns `agent_action: stop` with error code `GATE_MESSAGE_UNRESOLVABLE` and the gate does not open. Resolved message stored as `PendingGate.resolved_message` in the run record and as a dedicated `gate_message` field on `kind: gate_response` evidence snapshots — creating a permanent verbatim record of exactly what the human read at decision time.
+- `gate.display` fallback chain (MCP): `gate.message` resolved → `step.prompt` resolved → absent. Present whichever is non-null to the user verbatim.
+- `realm run inspect` now renders a `Message:` line under `Choice:` in gate_response evidence entries when `gate_message` is set.
+- New error codes: `GATE_MESSAGE_UNRESOLVABLE` (post-resolution `{{ }}` detected in gate.message), `ENGINE_GATE_OPEN_FAILED` (gate-open precondition failed).
 - Step templates: `templates:` top-level block and `use_template:` step field. Define
   reusable named step groups with `{{ param }}` placeholders; instantiate them with
   `prefix:` and `params:` at the call site. Resolved at load time — zero runtime overhead.
