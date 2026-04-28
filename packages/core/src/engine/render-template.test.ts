@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderTemplate, applyFilter, UnknownFilterError } from './render-template.js';
 
 const evidence = {
@@ -239,6 +239,55 @@ describe('applyFilter — upper', () => {
   });
 });
 
+describe('applyFilter — lower', () => {
+  it('lowercases a string', () => {
+    expect(applyFilter('HELLO', 'lower', [])).toEqual({ ok: true, value: 'hello' });
+  });
+
+  it('lowercases mixed case', () => {
+    expect(applyFilter('HeLLo WoRLd', 'lower', [])).toEqual({ ok: true, value: 'hello world' });
+  });
+
+  it('already lowercase string is unchanged', () => {
+    expect(applyFilter('hello', 'lower', [])).toEqual({ ok: true, value: 'hello' });
+  });
+
+  it('empty string returns empty string', () => {
+    expect(applyFilter('', 'lower', [])).toEqual({ ok: true, value: '' });
+  });
+
+  it('returns type_mismatch for non-string input', () => {
+    expect(applyFilter(42, 'lower', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+    expect(applyFilter(['a'], 'lower', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — capitalize', () => {
+  it('uppercases the first character, leaves the rest unchanged', () => {
+    expect(applyFilter('hello world', 'capitalize', [])).toEqual({ ok: true, value: 'Hello world' });
+  });
+
+  it('all-caps rest remains unchanged', () => {
+    expect(applyFilter('DATABASE_UNAVAILABLE', 'capitalize', [])).toEqual({ ok: true, value: 'DATABASE_UNAVAILABLE' });
+  });
+
+  it('already capitalized string is unchanged', () => {
+    expect(applyFilter('Hello', 'capitalize', [])).toEqual({ ok: true, value: 'Hello' });
+  });
+
+  it('empty string returns empty string', () => {
+    expect(applyFilter('', 'capitalize', [])).toEqual({ ok: true, value: '' });
+  });
+
+  it('single character is uppercased', () => {
+    expect(applyFilter('a', 'capitalize', [])).toEqual({ ok: true, value: 'A' });
+  });
+
+  it('returns type_mismatch for non-string input', () => {
+    expect(applyFilter(42, 'capitalize', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
 describe('applyFilter — truncate', () => {
   it('returns string as-is when shorter than limit', () => {
     expect(applyFilter('short', 'truncate', ['100'])).toEqual({ ok: true, value: 'short' });
@@ -417,6 +466,90 @@ describe('applyFilter — round', () => {
   });
 });
 
+describe('applyFilter — floor', () => {
+  it('floors a positive fraction', () => {
+    expect(applyFilter(3.7, 'floor', [])).toEqual({ ok: true, value: '3' });
+  });
+
+  it('floors a negative fraction', () => {
+    expect(applyFilter(-3.2, 'floor', [])).toEqual({ ok: true, value: '-4' });
+  });
+
+  it('integer value is unchanged', () => {
+    expect(applyFilter(3.0, 'floor', [])).toEqual({ ok: true, value: '3' });
+  });
+
+  it('returns type_mismatch for non-number input', () => {
+    expect(applyFilter('3.7', 'floor', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — ceil', () => {
+  it('ceils a positive fraction', () => {
+    expect(applyFilter(3.2, 'ceil', [])).toEqual({ ok: true, value: '4' });
+  });
+
+  it('ceils a negative fraction', () => {
+    expect(applyFilter(-3.7, 'ceil', [])).toEqual({ ok: true, value: '-3' });
+  });
+
+  it('integer value is unchanged', () => {
+    expect(applyFilter(3.0, 'ceil', [])).toEqual({ ok: true, value: '3' });
+  });
+
+  it('returns type_mismatch for non-number input', () => {
+    expect(applyFilter('3.2', 'ceil', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — abs', () => {
+  it('returns absolute value of a negative number', () => {
+    expect(applyFilter(-42, 'abs', [])).toEqual({ ok: true, value: '42' });
+  });
+
+  it('returns absolute value of a positive number unchanged', () => {
+    expect(applyFilter(42, 'abs', [])).toEqual({ ok: true, value: '42' });
+  });
+
+  it('returns absolute value of a negative fraction', () => {
+    expect(applyFilter(-3.5, 'abs', [])).toEqual({ ok: true, value: '3.5' });
+  });
+
+  it('zero returns "0"', () => {
+    expect(applyFilter(0, 'abs', [])).toEqual({ ok: true, value: '0' });
+  });
+
+  it('returns type_mismatch for non-number input', () => {
+    expect(applyFilter('-42', 'abs', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — number_format', () => {
+  it('formats large integer with thousands separator', () => {
+    expect(applyFilter(1234567, 'number_format', [])).toEqual({ ok: true, value: '1,234,567' });
+  });
+
+  it('formats with decimal places', () => {
+    expect(applyFilter(1234567.891, 'number_format', ['2'])).toEqual({ ok: true, value: '1,234,567.89' });
+  });
+
+  it('explicit 0 decimals formats with thousands separator only', () => {
+    expect(applyFilter(1000, 'number_format', ['0'])).toEqual({ ok: true, value: '1,000' });
+  });
+
+  it('zero value returns "0"', () => {
+    expect(applyFilter(0, 'number_format', [])).toEqual({ ok: true, value: '0' });
+  });
+
+  it('returns type_mismatch for non-number input', () => {
+    expect(applyFilter('1234', 'number_format', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for invalid arg', () => {
+    expect(applyFilter(1234, 'number_format', ['abc'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
 describe('applyFilter — percent', () => {
   it('formats fraction to percent with specified decimal places', () => {
     expect(applyFilter(0.857, 'percent', ['1'])).toEqual({ ok: true, value: '85.7%' });
@@ -563,6 +696,411 @@ describe('applyFilter — and_join', () => {
   });
 });
 
+describe('applyFilter — trim', () => {
+  it('strips leading and trailing whitespace', () => {
+    expect(applyFilter('  hello  ', 'trim', [])).toEqual({ ok: true, value: 'hello' });
+  });
+
+  it('returns string unchanged when no whitespace', () => {
+    expect(applyFilter('hello', 'trim', [])).toEqual({ ok: true, value: 'hello' });
+  });
+
+  it('strips tabs and newlines', () => {
+    expect(applyFilter('\t hello \n', 'trim', [])).toEqual({ ok: true, value: 'hello' });
+  });
+
+  it('empty string returns empty string', () => {
+    expect(applyFilter('', 'trim', [])).toEqual({ ok: true, value: '' });
+  });
+
+  it('returns type_mismatch for non-string input', () => {
+    expect(applyFilter(42, 'trim', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — first', () => {
+  it('returns the first element of a non-empty array', () => {
+    expect(applyFilter([1, 2, 3], 'first', [])).toEqual({ ok: true, value: 1 });
+  });
+
+  it('returns the first string element', () => {
+    expect(applyFilter(['a', 'b'], 'first', [])).toEqual({ ok: true, value: 'a' });
+  });
+
+  it('returns undefined for empty array', () => {
+    expect(applyFilter([], 'first', [])).toEqual({ ok: true, value: undefined });
+  });
+
+  it('returns type_mismatch for non-array input', () => {
+    expect(applyFilter(42, 'first', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — last', () => {
+  it('returns the last element of a non-empty array', () => {
+    expect(applyFilter([1, 2, 3], 'last', [])).toEqual({ ok: true, value: 3 });
+  });
+
+  it('returns undefined for empty array', () => {
+    expect(applyFilter([], 'last', [])).toEqual({ ok: true, value: undefined });
+  });
+
+  it('returns type_mismatch for non-array input', () => {
+    expect(applyFilter(42, 'last', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — sum', () => {
+  it('sums an array of integers', () => {
+    expect(applyFilter([1, 2, 3], 'sum', [])).toEqual({ ok: true, value: '6' });
+  });
+
+  it('returns "0" for empty array', () => {
+    expect(applyFilter([], 'sum', [])).toEqual({ ok: true, value: '0' });
+  });
+
+  it('sums floats', () => {
+    expect(applyFilter([1.5, 2.5], 'sum', [])).toEqual({ ok: true, value: '4' });
+  });
+
+  it('single element', () => {
+    expect(applyFilter([42], 'sum', [])).toEqual({ ok: true, value: '42' });
+  });
+
+  it('returns type_mismatch for non-number element', () => {
+    expect(applyFilter([1, 'two', 3], 'sum', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for non-array input', () => {
+    expect(applyFilter(42, 'sum', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — flatten', () => {
+  it('flattens one level deep', () => {
+    expect(applyFilter([[1, 2], [3]], 'flatten', [])).toEqual({ ok: true, value: [1, 2, 3] });
+  });
+
+  it('already flat array is unchanged', () => {
+    expect(applyFilter([1, 2, 3], 'flatten', [])).toEqual({ ok: true, value: [1, 2, 3] });
+  });
+
+  it('only flattens one level deep (does not recurse)', () => {
+    expect(applyFilter([[1, [2]], [3]], 'flatten', [])).toEqual({ ok: true, value: [1, [2], 3] });
+  });
+
+  it('empty array returns empty array', () => {
+    expect(applyFilter([], 'flatten', [])).toEqual({ ok: true, value: [] });
+  });
+
+  it('returns type_mismatch for non-array input', () => {
+    expect(applyFilter(42, 'flatten', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — split', () => {
+  it('splits on a single-character delimiter', () => {
+    expect(applyFilter('a,b,c', 'split', [','])).toEqual({ ok: true, value: ['a', 'b', 'c'] });
+  });
+
+  it('splits on a multi-character delimiter', () => {
+    expect(applyFilter('a::b::c', 'split', ['::'])).toEqual({ ok: true, value: ['a', 'b', 'c'] });
+  });
+
+  it('returns single-element array when delimiter not found', () => {
+    expect(applyFilter('hello', 'split', [','])).toEqual({ ok: true, value: ['hello'] });
+  });
+
+  it('returns type_mismatch when no arg provided', () => {
+    expect(applyFilter('a,b', 'split', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for empty delimiter', () => {
+    expect(applyFilter('a,b', 'split', [''])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for non-string input', () => {
+    expect(applyFilter(42, 'split', [','])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — sort', () => {
+  it('sorts a string array lexicographically', () => {
+    expect(applyFilter(['banana', 'apple', 'cherry'], 'sort', [])).toEqual({
+      ok: true,
+      value: ['apple', 'banana', 'cherry'],
+    });
+  });
+
+  it('already-sorted array is unchanged', () => {
+    expect(applyFilter(['a', 'b', 'c'], 'sort', [])).toEqual({ ok: true, value: ['a', 'b', 'c'] });
+  });
+
+  it('stable sort: equal-string elements keep original order', () => {
+    const first = { id: 1 };
+    const second = { id: 2 };
+    // Both stringify to "[object Object]" — localeCompare returns 0
+    expect(applyFilter([first, second], 'sort', [])).toEqual({ ok: true, value: [first, second] });
+  });
+
+  it('coerces non-string elements via String() for comparison', () => {
+    expect(applyFilter([3, 1, 2], 'sort', [])).toEqual({ ok: true, value: [1, 2, 3] });
+  });
+
+  it('empty array returns empty array', () => {
+    expect(applyFilter([], 'sort', [])).toEqual({ ok: true, value: [] });
+  });
+
+  it('does not mutate the input array', () => {
+    const input = ['c', 'a', 'b'];
+    applyFilter(input, 'sort', []);
+    expect(input).toEqual(['c', 'a', 'b']);
+  });
+
+  it('returns type_mismatch for non-array input', () => {
+    expect(applyFilter('hello', 'sort', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — unique', () => {
+  it('removes duplicate strings', () => {
+    expect(applyFilter(['a', 'b', 'a', 'c'], 'unique', [])).toEqual({
+      ok: true,
+      value: ['a', 'b', 'c'],
+    });
+  });
+
+  it('first occurrence is kept when duplicates exist', () => {
+    expect(applyFilter(['b', 'a', 'b'], 'unique', [])).toEqual({ ok: true, value: ['b', 'a'] });
+  });
+
+  it('removes duplicate numbers', () => {
+    expect(applyFilter([1, 2, 1], 'unique', [])).toEqual({ ok: true, value: [1, 2] });
+  });
+
+  it('deduplicates objects by JSON.stringify equality', () => {
+    expect(applyFilter([{ a: 1 }, { a: 1 }], 'unique', [])).toEqual({
+      ok: true,
+      value: [{ a: 1 }],
+    });
+  });
+
+  it('keeps objects with different property order as distinct', () => {
+    const result = applyFilter([{ a: 1, b: 2 }, { b: 2, a: 1 }], 'unique', []);
+    expect(result).toEqual({ ok: true, value: [{ a: 1, b: 2 }, { b: 2, a: 1 }] });
+  });
+
+  it('empty array returns empty array', () => {
+    expect(applyFilter([], 'unique', [])).toEqual({ ok: true, value: [] });
+  });
+
+  it('returns type_mismatch for non-array input', () => {
+    expect(applyFilter('hello', 'unique', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — title', () => {
+  it('capitalizes the first letter of each whitespace-separated word', () => {
+    expect(applyFilter('hello world', 'title', [])).toEqual({ ok: true, value: 'Hello World' });
+  });
+
+  it('hyphens are not word boundaries', () => {
+    expect(applyFilter('co-author', 'title', [])).toEqual({ ok: true, value: 'Co-author' });
+  });
+
+  it('leaves remaining characters unchanged', () => {
+    expect(applyFilter('the API guide', 'title', [])).toEqual({ ok: true, value: 'The API Guide' });
+  });
+
+  it('empty string returns empty string', () => {
+    expect(applyFilter('', 'title', [])).toEqual({ ok: true, value: '' });
+  });
+
+  it('returns type_mismatch for non-string input', () => {
+    expect(applyFilter(42, 'title', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — code', () => {
+  it('wraps value in single backticks', () => {
+    expect(applyFilter('main', 'code', [])).toEqual({ ok: true, value: '`main`' });
+  });
+
+  it('empty string becomes two backticks', () => {
+    expect(applyFilter('', 'code', [])).toEqual({ ok: true, value: '``' });
+  });
+
+  it('returns type_mismatch for non-string input', () => {
+    expect(applyFilter(42, 'code', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — indent', () => {
+  it('indents each line by N spaces', () => {
+    expect(applyFilter('hello\nworld', 'indent', ['2'])).toEqual({
+      ok: true,
+      value: '  hello\n  world',
+    });
+  });
+
+  it('zero indent leaves string unchanged', () => {
+    expect(applyFilter('hello', 'indent', ['0'])).toEqual({ ok: true, value: 'hello' });
+  });
+
+  it('empty lines are not indented', () => {
+    expect(applyFilter('hello\n\nworld', 'indent', ['2'])).toEqual({
+      ok: true,
+      value: '  hello\n\n  world',
+    });
+  });
+
+  it('trailing newline line is not indented', () => {
+    expect(applyFilter('hello\n', 'indent', ['2'])).toEqual({ ok: true, value: '  hello\n' });
+  });
+
+  it('returns type_mismatch when arg is missing', () => {
+    expect(applyFilter('hello', 'indent', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for non-integer arg', () => {
+    expect(applyFilter('hello', 'indent', ['abc'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for non-string input', () => {
+    expect(applyFilter(42, 'indent', ['2'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — date', () => {
+  const INPUT = '2026-01-28T14:32:00Z';
+
+  it('formats with short preset by default (no arg)', () => {
+    expect(applyFilter(INPUT, 'date', [])).toEqual({ ok: true, value: 'Jan 28, 2026' });
+  });
+
+  it('formats with short preset (explicit arg)', () => {
+    expect(applyFilter(INPUT, 'date', ['short'])).toEqual({ ok: true, value: 'Jan 28, 2026' });
+  });
+
+  it('formats with long preset', () => {
+    expect(applyFilter(INPUT, 'date', ['long'])).toEqual({ ok: true, value: 'January 28, 2026' });
+  });
+
+  it('formats with iso preset', () => {
+    expect(applyFilter(INPUT, 'date', ['iso'])).toEqual({ ok: true, value: '2026-01-28' });
+  });
+
+  it('formats with time preset', () => {
+    expect(applyFilter(INPUT, 'date', ['time'])).toEqual({ ok: true, value: '14:32' });
+  });
+
+  it('formats with datetime preset', () => {
+    expect(applyFilter(INPUT, 'date', ['datetime'])).toEqual({
+      ok: true,
+      value: 'Jan 28, 2026, 14:32',
+    });
+  });
+
+  it('midnight edge case: time preset returns 00:00 not 24:00', () => {
+    expect(applyFilter('2026-01-28T00:00:00Z', 'date', ['time'])).toEqual({
+      ok: true,
+      value: '00:00',
+    });
+  });
+
+  it('midnight edge case: datetime preset contains 00:00', () => {
+    const result = applyFilter('2026-01-28T00:00:00Z', 'date', ['datetime']);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(String(result.value)).toContain('00:00');
+  });
+
+  it('returns type_mismatch for unparseable string', () => {
+    expect(applyFilter('not a date', 'date', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for unknown preset', () => {
+    expect(applyFilter(INPUT, 'date', ['bogus'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for non-string input', () => {
+    expect(applyFilter(42, 'date', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — from_now', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date('2026-01-28T10:00:00Z') });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns "3 minutes ago" for input 3 minutes in the past', () => {
+    expect(applyFilter('2026-01-28T09:57:00Z', 'from_now', [])).toEqual({
+      ok: true,
+      value: '3 minutes ago',
+    });
+  });
+
+  it('returns "2 hours ago" for input 2 hours in the past', () => {
+    expect(applyFilter('2026-01-28T08:00:00Z', 'from_now', [])).toEqual({
+      ok: true,
+      value: '2 hours ago',
+    });
+  });
+
+  it('returns relative day for input 1 day in the past', () => {
+    const result = applyFilter('2026-01-27T10:00:00Z', 'from_now', []);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(String(result.value)).toMatch(/ago|yesterday/);
+  });
+
+  it('returns future relative time for input 5 minutes ahead', () => {
+    expect(applyFilter('2026-01-28T10:05:00Z', 'from_now', [])).toEqual({
+      ok: true,
+      value: 'in 5 minutes',
+    });
+  });
+
+  it('returns type_mismatch for unparseable string', () => {
+    expect(applyFilter('not a date', 'from_now', [])).toEqual({
+      ok: false,
+      reason: 'type_mismatch',
+    });
+  });
+
+  it('returns type_mismatch for non-string input', () => {
+    expect(applyFilter(42, 'from_now', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
+describe('applyFilter — duration', () => {
+  it('formats seconds only for input under 60s', () => {
+    expect(applyFilter(45000, 'duration', [])).toEqual({ ok: true, value: '45s' });
+  });
+
+  it('formats minutes and seconds for input over 60s', () => {
+    expect(applyFilter(83000, 'duration', [])).toEqual({ ok: true, value: '1m 23s' });
+  });
+
+  it('formats round minutes with zero seconds', () => {
+    expect(applyFilter(120000, 'duration', [])).toEqual({ ok: true, value: '2m 0s' });
+  });
+
+  it('returns "0s" for zero input', () => {
+    expect(applyFilter(0, 'duration', [])).toEqual({ ok: true, value: '0s' });
+  });
+
+  it('returns type_mismatch for negative input', () => {
+    expect(applyFilter(-1000, 'duration', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for non-number input', () => {
+    expect(applyFilter('45000', 'duration', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
 // ─── renderTemplate with filters ─────────────────────────────────────────────
 
 describe('renderTemplate — pipe filter syntax', () => {
@@ -698,6 +1236,30 @@ describe('renderTemplate — pipe filter syntax', () => {
       runParams: { s: 'x' },
     });
     expect(result).toBe('y');
+  });
+
+  it('applies lower filter', () => {
+    const result = renderTemplate('{{ run.params.env | lower }}', {
+      evidenceByStep: {},
+      runParams: { env: 'PRODUCTION' },
+    });
+    expect(result).toBe('production');
+  });
+
+  it('applies capitalize filter preserving subsequent characters', () => {
+    const result = renderTemplate('{{ run.params.status | capitalize }}', {
+      evidenceByStep: {},
+      runParams: { status: 'cRITICAL' },
+    });
+    expect(result).toBe('CRITICAL');
+  });
+
+  it('split then and_join produces formatted output', () => {
+    const result = renderTemplate('{{ run.params.csv | split: "," | and_join }}', {
+      evidenceByStep: {},
+      runParams: { csv: 'a,b,c' },
+    });
+    expect(result).toBe('a, b, and c');
   });
 });
 

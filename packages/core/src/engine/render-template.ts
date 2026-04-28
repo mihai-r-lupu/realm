@@ -34,6 +34,42 @@ export class UnknownFilterError extends Error {
   }
 }
 
+// Static lookup table for date formatting presets used by the `date` filter.
+const DATE_PRESETS: Record<string, (d: Date) => string> = {
+  short: (d) =>
+    new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(d),
+  long: (d) =>
+    new Intl.DateTimeFormat('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(d),
+  iso: (d) => d.toISOString().slice(0, 10),
+  time: (d) =>
+    new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'UTC',
+    }).format(d),
+  datetime: (d) =>
+    new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'UTC',
+    }).format(d),
+};
+
 /**
  * Applies a single named filter to a value and returns a FilterResult.
  * Exported for direct testing of individual filter behaviour.
@@ -61,6 +97,17 @@ export function applyFilter(value: unknown, filterName: string, args: string[]):
     case 'upper': {
       if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
       return { ok: true, value: value.toUpperCase() };
+    }
+
+    case 'lower': {
+      if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: value.toLowerCase() };
+    }
+
+    case 'capitalize': {
+      if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
+      if (value.length === 0) return { ok: true, value: '' };
+      return { ok: true, value: value.charAt(0).toUpperCase() + value.slice(1) };
     }
 
     case 'truncate': {
@@ -125,6 +172,37 @@ export function applyFilter(value: unknown, filterName: string, args: string[]):
       return { ok: true, value: value.toFixed(decimals) };
     }
 
+    case 'floor': {
+      if (typeof value !== 'number') return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: String(Math.floor(value)) };
+    }
+
+    case 'ceil': {
+      if (typeof value !== 'number') return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: String(Math.ceil(value)) };
+    }
+
+    case 'abs': {
+      if (typeof value !== 'number') return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: String(Math.abs(value)) };
+    }
+
+    case 'number_format': {
+      if (typeof value !== 'number') return { ok: false, reason: 'type_mismatch' };
+      const rawDecimals = args[0];
+      let decimals = 0;
+      if (rawDecimals !== undefined && rawDecimals !== '') {
+        const parsed = parseInt(rawDecimals, 10);
+        if (isNaN(parsed)) return { ok: false, reason: 'type_mismatch' };
+        decimals = parsed;
+      }
+      const opts: Intl.NumberFormatOptions =
+        decimals === 0
+          ? { maximumFractionDigits: 0 }
+          : { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
+      return { ok: true, value: new Intl.NumberFormat('en-US', opts).format(value) };
+    }
+
     case 'percent': {
       if (typeof value !== 'number') return { ok: false, reason: 'type_mismatch' };
       const rawDecimals = args[0];
@@ -164,6 +242,135 @@ export function applyFilter(value: unknown, filterName: string, args: string[]):
       const last = strs[strs.length - 1];
       const rest = strs.slice(0, -1);
       return { ok: true, value: `${rest.join(', ')}, and ${last}` };
+    }
+
+    case 'trim': {
+      if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: value.trim() };
+    }
+
+    case 'first': {
+      if (!Array.isArray(value)) return { ok: false, reason: 'type_mismatch' };
+      if (value.length === 0) return { ok: true, value: undefined };
+      return { ok: true, value: value[0] };
+    }
+
+    case 'last': {
+      if (!Array.isArray(value)) return { ok: false, reason: 'type_mismatch' };
+      if (value.length === 0) return { ok: true, value: undefined };
+      return { ok: true, value: value[value.length - 1] };
+    }
+
+    case 'sum': {
+      if (!Array.isArray(value)) return { ok: false, reason: 'type_mismatch' };
+      if (value.length === 0) return { ok: true, value: '0' };
+      let total = 0;
+      for (const item of value) {
+        if (typeof item !== 'number') return { ok: false, reason: 'type_mismatch' };
+        total += item;
+      }
+      return { ok: true, value: String(total) };
+    }
+
+    case 'flatten': {
+      if (!Array.isArray(value)) return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: value.flat(1) };
+    }
+
+    case 'split': {
+      if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
+      const delimiter = args[0];
+      if (delimiter === undefined || delimiter === '') return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: value.split(delimiter) };
+    }
+
+    case 'sort': {
+      if (!Array.isArray(value)) return { ok: false, reason: 'type_mismatch' };
+      const sorted = [...value].sort((a, b) => String(a).localeCompare(String(b)));
+      return { ok: true, value: sorted };
+    }
+
+    case 'unique': {
+      if (!Array.isArray(value)) return { ok: false, reason: 'type_mismatch' };
+      const seen = new Set<string>();
+      const result: unknown[] = [];
+      for (const item of value) {
+        const key = JSON.stringify(item);
+        if (!seen.has(key)) {
+          seen.add(key);
+          result.push(item);
+        }
+      }
+      return { ok: true, value: result };
+    }
+
+    case 'title': {
+      if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
+      return {
+        ok: true,
+        value: value.replace(/\S+/g, (word) => word.charAt(0).toUpperCase() + word.slice(1)),
+      };
+    }
+
+    case 'code': {
+      if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: `\`${value}\`` };
+    }
+
+    case 'indent': {
+      if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
+      const raw = args[0];
+      if (raw === undefined) return { ok: false, reason: 'type_mismatch' };
+      const n = parseInt(raw, 10);
+      if (isNaN(n)) return { ok: false, reason: 'type_mismatch' };
+      if (n === 0) return { ok: true, value };
+      const prefix = ' '.repeat(n);
+      return {
+        ok: true,
+        value: value
+          .split('\n')
+          .map((line) => (line.length > 0 ? prefix + line : line))
+          .join('\n'),
+      };
+    }
+
+    case 'date': {
+      if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return { ok: false, reason: 'type_mismatch' };
+      const preset = args[0] ?? 'short';
+      const formatter = DATE_PRESETS[preset];
+      if (!formatter) return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: formatter(d) };
+    }
+
+    case 'from_now': {
+      if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return { ok: false, reason: 'type_mismatch' };
+      const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+      const diffMs = d.getTime() - Date.now();
+      const diffSec = Math.round(diffMs / 1000);
+      const absSec = Math.abs(diffSec);
+      if (absSec < 60) return { ok: true, value: rtf.format(diffSec, 'second') };
+      const diffMin = Math.round(diffMs / 60000);
+      const absMin = Math.abs(diffMin);
+      if (absMin < 60) return { ok: true, value: rtf.format(diffMin, 'minute') };
+      const diffHr = Math.round(diffMs / 3600000);
+      const absHr = Math.abs(diffHr);
+      if (absHr < 24) return { ok: true, value: rtf.format(diffHr, 'hour') };
+      const diffDay = Math.round(diffMs / 86400000);
+      return { ok: true, value: rtf.format(diffDay, 'day') };
+    }
+
+    case 'duration': {
+      if (typeof value !== 'number') return { ok: false, reason: 'type_mismatch' };
+      if (value < 0) return { ok: false, reason: 'type_mismatch' };
+      const totalSec = Math.floor(value / 1000);
+      if (totalSec < 60) return { ok: true, value: `${totalSec}s` };
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      return { ok: true, value: `${mins}m ${secs}s` };
     }
 
     default:
