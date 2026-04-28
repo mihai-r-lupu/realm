@@ -137,8 +137,21 @@ export function applyFilter(value: unknown, filterName: string, args: string[]):
       return { ok: true, value: `${(value * 100).toFixed(decimals)}%` };
     }
 
+    case 'replace': {
+      if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
+      const search = args[0];
+      const replacement = args[1];
+      if (search === undefined || replacement === undefined) return { ok: false, reason: 'type_mismatch' };
+      if (search === '') return { ok: false, reason: 'type_mismatch' };
+      return { ok: true, value: value.replaceAll(search, replacement) };
+    }
+
     case 'yesno': {
       if (typeof value !== 'boolean') return { ok: false, reason: 'type_mismatch' };
+      if (args.length >= 2) {
+        return { ok: true, value: value ? args[0] : args[1] };
+      }
+      // zero or one arg: fall back to defaults (preserves Phase 43b promise)
       return { ok: true, value: value ? 'yes' : 'no' };
     }
 
@@ -158,30 +171,72 @@ export function applyFilter(value: unknown, filterName: string, args: string[]):
   }
 }
 
-// Strip matched outer quotes from a filter arg (e.g. `" / "` → ` / `).
-function parseFilterArg(raw: string): string {
-  const trimmed = raw.trim();
+// Strip outer matching quotes from a single token.
+function stripOuterQuotes(token: string): string {
   if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    (token.startsWith('"') && token.endsWith('"')) ||
+    (token.startsWith("'") && token.endsWith("'"))
   ) {
-    return trimmed.slice(1, -1);
+    return token.slice(1, -1);
   }
-  return trimmed;
+  return token;
+}
+
+/**
+ * Parses a comma-separated argument list with quote awareness.
+ * Commas inside quoted strings (single or double) are not treated as delimiters.
+ * Outer quotes are stripped from each token; unquoted tokens are trimmed.
+ * An empty raw string returns [].
+ */
+export function parseFilterArgs(raw: string): string[] {
+  if (!raw.trim()) return [];
+  const args: string[] = [];
+  let current = '';
+  let inSingle = false;
+  let inDouble = false;
+  for (const ch of raw) {
+    if (ch === '"' && !inSingle) { inDouble = !inDouble; current += ch; continue; }
+    if (ch === "'" && !inDouble) { inSingle = !inSingle; current += ch; continue; }
+    if (ch === ',' && !inSingle && !inDouble) {
+      args.push(stripOuterQuotes(current.trim()));
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  args.push(stripOuterQuotes(current.trim()));
+  return args;
+}
+
+// Splits a template expression on '|' that are not inside quoted strings.
+// Allows filter args to contain '|' when quoted (e.g. replace: ",", " | ").
+function splitOnUnquotedPipes(expr: string): string[] {
+  const segments: string[] = [];
+  let current = '';
+  let inSingle = false;
+  let inDouble = false;
+  for (const ch of expr) {
+    if (ch === '"' && !inSingle) { inDouble = !inDouble; current += ch; continue; }
+    if (ch === "'" && !inDouble) { inSingle = !inSingle; current += ch; continue; }
+    if (ch === '|' && !inSingle && !inDouble) { segments.push(current); current = ''; continue; }
+    current += ch;
+  }
+  segments.push(current);
+  return segments;
 }
 
 // Parse the filter chain from the pipe-separated expression tail.
 // Returns an array of { name, args } entries.
 function parseFilters(expr: string): Array<{ name: string; args: string[] }> {
-  const segments = expr.split('|').slice(1); // first segment is the path
+  const segments = splitOnUnquotedPipes(expr).slice(1); // first segment is the path
   return segments.map((seg) => {
     const colonIdx = seg.indexOf(':');
     if (colonIdx === -1) {
       return { name: seg.trim(), args: [] };
     }
     const name = seg.slice(0, colonIdx).trim();
-    const arg = parseFilterArg(seg.slice(colonIdx + 1));
-    return { name, args: [arg] };
+    const args = parseFilterArgs(seg.slice(colonIdx + 1));
+    return { name, args };
   });
 }
 
