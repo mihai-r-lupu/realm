@@ -72,7 +72,9 @@ describe('SlackAdapter', () => {
     await expect(adapter.create('post_message', { text: 'hi' }, {})).rejects.toMatchObject({
       code: 'ADAPTER_REQUEST_FAILED',
     });
-    await expect(adapter.create('post_message', { text: 'hi' }, {})).rejects.toBeInstanceOf(WorkflowError);
+    await expect(adapter.create('post_message', { text: 'hi' }, {})).rejects.toBeInstanceOf(
+      WorkflowError,
+    );
   });
 
   it('network error throws ADAPTER_REQUEST_FAILED', async () => {

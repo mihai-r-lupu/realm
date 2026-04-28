@@ -66,6 +66,28 @@ export interface AgentRunOptions {
 }
 
 /**
+ * Formats a step output object as human-readable plain text for the terminal.
+ * Renders `headline` and `message` string fields directly; falls back to JSON.
+ */
+function formatOutputForTerminal(output: Record<string, unknown>): string {
+  const headline = typeof output['headline'] === 'string' ? output['headline'] : undefined;
+  const message = typeof output['message'] === 'string' ? output['message'] : undefined;
+
+  if (headline !== undefined || message !== undefined) {
+    const parts: string[] = [];
+    if (headline !== undefined) parts.push(headline);
+    if (message !== undefined) parts.push(message);
+    return parts.join('\n\n');
+  }
+
+  if (Object.keys(output).length === 0) {
+    return '(no output)';
+  }
+
+  return JSON.stringify(output, null, 2);
+}
+
+/**
  * Formats a gate preview object as human-readable Slack mrkdwn text.
  * Uses `headline` and `message` fields when present; falls back to indented JSON.
  */
@@ -120,7 +142,9 @@ export async function postGateNotificationToSlack(
       body: JSON.stringify(body),
     });
   } catch (err) {
-    console.warn(`  ⚠  Slack notification failed: ${err instanceof Error ? err.message : String(err)}`);
+    console.warn(
+      `  ⚠  Slack notification failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
@@ -132,12 +156,19 @@ async function pollUntilGateResolved(
   signal?: AbortSignal,
 ): Promise<void> {
   console.log('   Waiting for approval...');
-  for (; ;) {
+  for (;;) {
     if (signal?.aborted) break;
     await new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, intervalMs);
       if (signal !== undefined) {
-        signal.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true });
+        signal.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timer);
+            resolve();
+          },
+          { once: true },
+        );
       }
     });
     if (signal?.aborted) break;
@@ -159,9 +190,10 @@ export async function postGateViaApi(
 ): Promise<string | undefined> {
   const ownerLine = gate.owner !== undefined ? `\n*Owner:* ${gate.owner}` : '';
   const previewText = gate.resolved_message ?? formatGatePreviewForSlack(gate.preview);
+  const choiceList = gate.choices.map((c) => `\`${c}\``).join(' or ');
   const blockText =
     `*Gate:* \`${gate.step_name}\`${ownerLine}\n\n${previewText}\n\n---\n` +
-    `*Gate requires a terminal response — open a terminal and run:*\n\`\`\`${approveCmd}\`\`\``;
+    `*Reply in this thread with ${choiceList} to resolve, or run the terminal command:*\n\`\`\`${approveCmd}\`\`\``;
   try {
     const response = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
@@ -178,7 +210,9 @@ export async function postGateViaApi(
     const data = (await response.json()) as { ok: boolean; ts?: string };
     return data.ok ? data.ts : undefined;
   } catch (err) {
-    console.warn(`Gate API notification failed: ${err instanceof Error ? err.message : String(err)}`);
+    console.warn(
+      `Gate API notification failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return undefined;
   }
 }
@@ -272,10 +306,20 @@ export interface BidirectionalGateParams {
  */
 export async function handleBidirectionalGate(params: BidirectionalGateParams): Promise<void> {
   const {
-    gate, runId, definition, store, provider,
-    slackBotToken, slackChannelId, gateThreadTs,
-    slackSigningSecret, slackEventsPort, slackPollIntervalMs,
-    gateReminderIntervalMs, gateEscalationThresholdMs, pollIntervalMs,
+    gate,
+    runId,
+    definition,
+    store,
+    provider,
+    slackBotToken,
+    slackChannelId,
+    gateThreadTs,
+    slackSigningSecret,
+    slackEventsPort,
+    slackPollIntervalMs,
+    gateReminderIntervalMs,
+    gateEscalationThresholdMs,
+    pollIntervalMs,
   } = params;
 
   let clarificationCount = 0;
@@ -370,14 +414,14 @@ export async function handleBidirectionalGate(params: BidirectionalGateParams): 
   const clearTimers =
     gateThreadTs !== undefined
       ? startGateReminderTimers(
-        slackBotToken,
-        slackChannelId,
-        gateThreadTs,
-        gate,
-        gateReminderIntervalMs,
-        gateEscalationThresholdMs,
-      )
-      : (): void => { };
+          slackBotToken,
+          slackChannelId,
+          gateThreadTs,
+          gate,
+          gateReminderIntervalMs,
+          gateEscalationThresholdMs,
+        )
+      : (): void => {};
 
   try {
     // Poll the store as the unified done-detector — resolves when candidate processor
@@ -395,19 +439,16 @@ export async function handleBidirectionalGate(params: BidirectionalGateParams): 
  * Returns 'completed' when the run finishes normally; 'failed' otherwise.
  * Throws on setup failures (e.g. workflow file not found, provider error).
  */
-export async function runAgent(
-  deps: AgentDeps,
-  options: AgentRunOptions,
-): Promise<AgentRunResult> {
+export async function runAgent(deps: AgentDeps, options: AgentRunOptions): Promise<AgentRunResult> {
   // Load or use provided definition.
   const definition: WorkflowDefinition =
     options.definition !== undefined
       ? options.definition
       : loadWorkflowFromFile(
-        options.workflowPath!.endsWith('.yaml') || options.workflowPath!.endsWith('.yml')
-          ? options.workflowPath!
-          : join(options.workflowPath!, 'workflow.yaml'),
-      );
+          options.workflowPath!.endsWith('.yaml') || options.workflowPath!.endsWith('.yml')
+            ? options.workflowPath!
+            : join(options.workflowPath!, 'workflow.yaml'),
+        );
 
   // Register only when explicitly requested (--register flag).
   // By default realm agent does not write to ~/.realm/workflows/ as a side effect.
@@ -433,11 +474,18 @@ export async function runAgent(
       const gate = currentRun.pending_gate;
 
       console.log(`\n⏸  Gate: ${gate.step_name} | ID: ${gate.gate_id}`);
-      console.log(`   Preview: ${JSON.stringify(gate.preview, null, 2)}`);
-      console.log('');
+      const gateText = gate.resolved_message ?? formatOutputForTerminal(gate.preview);
+      const indented = gateText
+        .trimEnd()
+        .split('\n')
+        .map((l) => `   ${l}`)
+        .join('\n');
+      console.log('\n' + indented + '\n');
       for (const choice of gate.choices) {
         const label = choice.charAt(0).toUpperCase() + choice.slice(1);
-        console.log(`   ${label}: realm run respond ${runId} --gate ${gate.gate_id} --choice ${choice}`);
+        console.log(
+          `   ${label}: realm run respond ${runId} --gate ${gate.gate_id} --choice ${choice}`,
+        );
       }
 
       // Use the first choice as the approve command for the Slack notification.
@@ -581,7 +629,7 @@ export async function runAgent(
       );
     if (lastAgentEvidence !== undefined) {
       console.log(`\nResult (${lastAgentEvidence.step_id}):`);
-      console.log(JSON.stringify(lastAgentEvidence.output_summary, null, 2));
+      console.log(formatOutputForTerminal(lastAgentEvidence.output_summary));
     }
 
     return 'completed';

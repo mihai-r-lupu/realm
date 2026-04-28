@@ -61,4 +61,3 @@ export function lintWorkflowContext(definition: WorkflowDefinition): string[] {
   }
   return warnings;
 }
-

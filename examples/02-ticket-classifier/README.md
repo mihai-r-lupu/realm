@@ -53,7 +53,7 @@ identify_ticket:
 
 classify_ticket:
   execution: agent
-  depends_on: [identify_ticket]   # cannot start until identify passes
+  depends_on: [identify_ticket] # cannot start until identify passes
   prompt: |
     Classify this {{ context.resources.identify_ticket.product_area }} ticket.
     Reported issue: {{ context.resources.identify_ticket.reported_issue }}
@@ -199,4 +199,3 @@ Each fixture has two `agent_responses` entries — one for `identify_ticket`, on
   drafted response.
 - [YAML Schema Reference](../../docs/reference/yaml-schema.md) — all step fields,
   execution modes, gate configuration, and `depends_on` / `trigger_rule`
-

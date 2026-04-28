@@ -79,10 +79,7 @@ export async function listRuns(
 export const listCommand = new Command('list')
   .description('List all runs, sorted by most recent first')
   .option('--workflow <id>', 'Filter by workflow ID')
-  .option(
-    '--status <phase>',
-    `Filter by run phase (${VALID_PHASES.join(', ')})`,
-  )
+  .option('--status <phase>', `Filter by run phase (${VALID_PHASES.join(', ')})`)
   .action(async (opts: { workflow?: string; status?: string }) => {
     const { JsonFileStore } = await import('@sensigo/realm');
     const store = new JsonFileStore();

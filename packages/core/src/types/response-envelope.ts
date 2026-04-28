@@ -77,4 +77,3 @@ export interface ResponseEnvelope {
    */
   chained_auto_steps?: Array<{ step: string; run_phase: string; branched_via?: string }>;
 }
-

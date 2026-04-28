@@ -92,5 +92,3 @@ export function registerGetRunState(server: McpServer, opts?: HandleRunStateStor
     },
   );
 }
-
-

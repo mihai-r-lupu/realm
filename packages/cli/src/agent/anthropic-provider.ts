@@ -46,7 +46,9 @@ export class AnthropicProvider implements LlmProvider {
 
     const makeRequest = async (userContent: string): Promise<string> => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response = await (client.messages.create as (opts: Record<string, unknown>) => Promise<any>)({
+      const response = await (
+        client.messages.create as (opts: Record<string, unknown>) => Promise<any>
+      )({
         model: this.model,
         max_tokens: 4096,
         system: systemPrompt,

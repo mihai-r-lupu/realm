@@ -10,9 +10,7 @@ const SECRET = 'test-signing-secret-x1y2z3';
 const BASE_PORT = 14500;
 
 function signPayload(secret: string, timestamp: string, body: string): string {
-  return (
-    'v0=' + createHmac('sha256', secret).update(`v0:${timestamp}:${body}`).digest('hex')
-  );
+  return 'v0=' + createHmac('sha256', secret).update(`v0:${timestamp}:${body}`).digest('hex');
 }
 
 function nowTs(): string {

@@ -22,4 +22,3 @@ export const TERMINAL_STATES = TERMINAL_PHASES;
 export const RESUMABLE_STATES = RESUMABLE_PHASES;
 export const WAITING_STATES = WAITING_PHASES;
 export const isTerminalState = isTerminalPhase;
-

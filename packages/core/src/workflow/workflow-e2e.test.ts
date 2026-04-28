@@ -243,7 +243,8 @@ describe('workflow_context integration', () => {
     // next_actions after step_one should include step_two with resolved prompt.
     const stepTwoAction = res1.next_actions.find(
       (a) =>
-        (a.instruction?.call_with as Record<string, unknown> | undefined)?.['command'] === 'step_two',
+        (a.instruction?.call_with as Record<string, unknown> | undefined)?.['command'] ===
+        'step_two',
     );
     expect(stepTwoAction).toBeDefined();
     expect(stepTwoAction!.prompt).toContain('<schema>');

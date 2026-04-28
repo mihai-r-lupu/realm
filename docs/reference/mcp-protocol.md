@@ -32,21 +32,21 @@ Realm exposes 7 MCP tools. This document covers the full protocol: tool call pat
 
 Every tool call returns a `ResponseEnvelope`:
 
-| Field                | Type           | Description                                                                                                             |
-| -------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `command`            | string         | The step name that was executed.                                                                                        |
-| `run_id`             | string         | Stable run identifier.                                                                                                  |
-| `run_version`        | number         | Integer version of the run record. Observability only — not required as input to any tool.                              |
-| `status`             | string         | `ok`, `error`, `blocked`, or `confirm_required`.                                                                        |
-| `data`               | object         | Step output from the handler or adapter.                                                                                |
-| `evidence`           | array          | Evidence snapshots produced by this call.                                                                               |
-| `warnings`           | string[]       | Non-fatal notices (e.g. a recovery path was taken — check `context_hint` for details).                                  |
-| `errors`             | string[]       | Error messages when `status` is `error` or `blocked`.                                                                   |
-| `context_hint`       | string         | Human-readable description of what just happened and the current run state. Present on every response including errors. |
-| `next_actions`       | array          | Steps available for execution. Empty on terminal or unrecoverable states. Multiple items signal parallel fan-out.        |
-| `agent_action`       | string         | Error recovery instruction. Present only when `status` is `error` or `blocked`.                                         |
-| `chained_auto_steps` | array          | Ordered record of auto steps the engine ran silently in this call. Omitted when no auto steps were chained.             |
-| `gate`               | object         | Gate data. Present only when `status` is `confirm_required`.                                                            |
+| Field                | Type     | Description                                                                                                             |
+| -------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `command`            | string   | The step name that was executed.                                                                                        |
+| `run_id`             | string   | Stable run identifier.                                                                                                  |
+| `run_version`        | number   | Integer version of the run record. Observability only — not required as input to any tool.                              |
+| `status`             | string   | `ok`, `error`, `blocked`, or `confirm_required`.                                                                        |
+| `data`               | object   | Step output from the handler or adapter.                                                                                |
+| `evidence`           | array    | Evidence snapshots produced by this call.                                                                               |
+| `warnings`           | string[] | Non-fatal notices (e.g. a recovery path was taken — check `context_hint` for details).                                  |
+| `errors`             | string[] | Error messages when `status` is `error` or `blocked`.                                                                   |
+| `context_hint`       | string   | Human-readable description of what just happened and the current run state. Present on every response including errors. |
+| `next_actions`       | array    | Steps available for execution. Empty on terminal or unrecoverable states. Multiple items signal parallel fan-out.       |
+| `agent_action`       | string   | Error recovery instruction. Present only when `status` is `error` or `blocked`.                                         |
+| `chained_auto_steps` | array    | Ordered record of auto steps the engine ran silently in this call. Omitted when no auto steps were chained.             |
+| `gate`               | object   | Gate data. Present only when `status` is `confirm_required`.                                                            |
 
 ---
 
@@ -56,13 +56,13 @@ Every tool call returns a `ResponseEnvelope`:
 
 Each item has the following fields:
 
-| Field                   | Description                                                                                                                                              |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `orientation`           | Forward-looking state description — what state the run is in and what step comes next. Distinct from `context_hint`, which describes what just happened. |
-| `prompt`                | The resolved task prompt for the current agent step. Read this and act on it.                                                                            |
-| `instruction.tool`      | The tool to call next (`execute_step` or `submit_human_response`).                                                                                       |
+| Field                   | Description                                                                                                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `orientation`           | Forward-looking state description — what state the run is in and what step comes next. Distinct from `context_hint`, which describes what just happened.                                |
+| `prompt`                | The resolved task prompt for the current agent step. Read this and act on it.                                                                                                           |
+| `instruction.tool`      | The tool to call next (`execute_step` or `submit_human_response`).                                                                                                                      |
 | `instruction.call_with` | Ready-to-use argument object. For agent steps, `call_with.params` is a schema skeleton — placeholder strings for enums, zero values for scalars. Fill in your values and call the tool. |
-| `input_schema`          | JSON Schema for the `params` this step expects.                                                                                                          |
+| `input_schema`          | JSON Schema for the `params` this step expects.                                                                                                                                         |
 
 ---
 
@@ -90,12 +90,12 @@ When the engine opens a gate:
 3. Collect the user's choice from `gate.response_spec.choices`.
 4. Call `submit_human_response` using `next_actions[0].instruction.call_with` with the choice filled in.
 
-| Field                        | Description                                                                   |
-| ---------------------------- | ----------------------------------------------------------------------------- |
+| Field                        | Description                                                                                                                   |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `gate.display`               | The human-facing content. Resolved from `gate.message` if configured; falls back to `step.prompt` resolved. Present verbatim. |
-| `gate.agent_hint`            | Optional presentation instructions from the step's `instructions` field.      |
-| `gate.response_spec.choices` | Valid choice values (e.g. `["approve", "reject"]`).                           |
-| `gate.preview`               | Full step output at gate opening, for reference and debugging.                |
+| `gate.agent_hint`            | Optional presentation instructions from the step's `instructions` field.                                                      |
+| `gate.response_spec.choices` | Valid choice values (e.g. `["approve", "reject"]`).                                                                           |
+| `gate.preview`               | Full step output at gate opening, for reference and debugging.                                                                |
 
 ---
 
@@ -103,13 +103,13 @@ When the engine opens a gate:
 
 `status: error` and `status: blocked` responses always include `agent_action`. Do not parse error message text to decide recovery — use `agent_action`.
 
-| `agent_action`         | Meaning                                                                  | What to do                                                                                                                                      |
-| ---------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `stop`                 | Terminal failure. Cannot recover.                                        | Report to user. Do not retry.                                                                                                                   |
-| `report_to_user`       | Engine state inconsistent (e.g. version conflict).                       | Surface to user. Do not retry.                                                                                                                  |
-| `provide_input`        | Submitted `params` were rejected by schema validation.                   | Fix `params` and retry `execute_step` with the same `command`. Use `next_actions[0].instruction.call_with` for the corrected call shape.        |
-| `resolve_precondition` | A precondition failed or the step is not eligible for the current run state. | Follow `next_actions[0]` to an eligible step, or read `blocked_reason.eligible_steps` for what can run.                                    |
-| `wait_for_human`       | A gate is open and waiting for a choice.                                 | Call `submit_human_response` with the user's choice.                                                                                            |
+| `agent_action`         | Meaning                                                                      | What to do                                                                                                                               |
+| ---------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `stop`                 | Terminal failure. Cannot recover.                                            | Report to user. Do not retry.                                                                                                            |
+| `report_to_user`       | Engine state inconsistent (e.g. version conflict).                           | Surface to user. Do not retry.                                                                                                           |
+| `provide_input`        | Submitted `params` were rejected by schema validation.                       | Fix `params` and retry `execute_step` with the same `command`. Use `next_actions[0].instruction.call_with` for the corrected call shape. |
+| `resolve_precondition` | A precondition failed or the step is not eligible for the current run state. | Follow `next_actions[0]` to an eligible step, or read `blocked_reason.eligible_steps` for what can run.                                  |
+| `wait_for_human`       | A gate is open and waiting for a choice.                                     | Call `submit_human_response` with the user's choice.                                                                                     |
 
 When `agent_action` is `provide_input` or `resolve_precondition` and `next_actions` is non-empty, follow the first item exactly as after a successful step.
 

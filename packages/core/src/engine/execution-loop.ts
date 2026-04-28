@@ -5,7 +5,12 @@
 import type { RunRecord, EvidenceSnapshot, WorkflowContextSnapshot } from '../types/run-record.js';
 import type { ResponseEnvelope, NextAction } from '../types/response-envelope.js';
 import { WorkflowError } from '../types/workflow-error.js';
-import type { WorkflowDefinition, StepDefinition, RetryConfig, ContextWrapperFormat } from '../types/workflow-definition.js';
+import type {
+  WorkflowDefinition,
+  StepDefinition,
+  RetryConfig,
+  ContextWrapperFormat,
+} from '../types/workflow-definition.js';
 import type { RunStore } from '../store/store-interface.js';
 import { captureEvidence } from '../evidence/snapshot.js';
 import { validateInputSchema } from '../validation/input-schema.js';
@@ -272,26 +277,24 @@ function stepToNextAction(
         ? { tool: step.handler, params: {}, call_with: {} }
         : step.execution === 'agent'
           ? {
-            tool: 'execute_step',
-            params: { run_id: context.runId, command: stepName },
-            call_with: {
-              run_id: context.runId,
-              command: stepName,
-              params:
-                step.input_schema !== undefined
-                  ? generateSchemaSkeleton(step.input_schema as Record<string, unknown>)
-                  : {},
-            },
-          }
+              tool: 'execute_step',
+              params: { run_id: context.runId, command: stepName },
+              call_with: {
+                run_id: context.runId,
+                command: stepName,
+                params:
+                  step.input_schema !== undefined
+                    ? generateSchemaSkeleton(step.input_schema as Record<string, unknown>)
+                    : {},
+              },
+            }
           : null,
     ...(step.execution === 'agent' && step.input_schema !== undefined
       ? { input_schema: step.input_schema }
       : {}),
     human_readable: `Execute step '${stepName}': ${step.description}`,
     orientation: `Run is active. Next step ready: '${stepName}'.`,
-    ...(step.timeout_seconds !== undefined
-      ? { expected_timeout: `${step.timeout_seconds}s` }
-      : {}),
+    ...(step.timeout_seconds !== undefined ? { expected_timeout: `${step.timeout_seconds}s` } : {}),
     ...(resolvedPrompt !== undefined ? { prompt: resolvedPrompt } : {}),
   };
 }
@@ -300,10 +303,7 @@ function stepToNextAction(
  * Returns NextAction objects for all agent-executable eligible steps.
  * Auto steps are excluded — they are executed internally by executeChain.
  */
-export function buildNextActions(
-  definition: WorkflowDefinition,
-  run: RunRecord,
-): NextAction[] {
+export function buildNextActions(definition: WorkflowDefinition, run: RunRecord): NextAction[] {
   const eligible = findEligibleSteps(definition, run);
   const evidenceByStep = buildEvidenceByStep(run);
   const context = {
@@ -312,11 +312,11 @@ export function buildNextActions(
     runId: run.id,
     ...(run.workflow_context_snapshots !== undefined
       ? {
-        workflowContext: {
-          snapshots: run.workflow_context_snapshots,
-          wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
-        },
-      }
+          workflowContext: {
+            snapshots: run.workflow_context_snapshots,
+            wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
+          },
+        }
       : {}),
   };
 
@@ -359,9 +359,7 @@ function makeErrorEnvelope(
   definition?: WorkflowDefinition,
 ): ResponseEnvelope {
   const hint =
-    run !== null
-      ? `Error during '${options.command}'. Run phase: '${run.run_phase}'.`
-      : undefined;
+    run !== null ? `Error during '${options.command}'. Run phase: '${run.run_phase}'.` : undefined;
   const base = errorEnvelope(
     options.command,
     options.runId,
@@ -421,13 +419,13 @@ export async function executeStep(
       blocked_reason:
         nextActions.length > 0
           ? {
-            eligible_steps: eligible,
-            suggestion: `Call one of the steps indicated in next_actions instead.`,
-          }
+              eligible_steps: eligible,
+              suggestion: `Call one of the steps indicated in next_actions instead.`,
+            }
           : {
-            eligible_steps: eligible,
-            suggestion: `No eligible steps available. Check run_phase and completed_steps.`,
-          },
+              eligible_steps: eligible,
+              suggestion: `No eligible steps available. Check run_phase and completed_steps.`,
+            },
     };
   }
 
@@ -580,7 +578,10 @@ export async function executeStep(
       input: options.input,
       output: attemptOutput,
       ...(attemptError !== null ? { error: attemptError.message } : {}),
-      diagnostics: { input_token_estimate: inputTokenEstimate, precondition_trace: preconditionTrace },
+      diagnostics: {
+        input_token_estimate: inputTokenEstimate,
+        precondition_trace: preconditionTrace,
+      },
       ...(profileData !== undefined
         ? { agentProfile: profile!, agentProfileHash: profileData.content_hash }
         : {}),
@@ -644,7 +645,9 @@ export async function executeStep(
         ...withSkippedFail,
         evidence: [...pendingRun.evidence, ...allEvidence],
         terminal_state: isComplete,
-        ...(isComplete ? { terminal_reason: `Step '${options.command}' failed: ${dispatchError.message}` } : {}),
+        ...(isComplete
+          ? { terminal_reason: `Step '${options.command}' failed: ${dispatchError.message}` }
+          : {}),
       };
       await store.update(failedRun);
     } catch (cleanupErr) {
@@ -668,38 +671,46 @@ export async function executeStep(
   // Step 5b: Gate check — if trust requires human confirmation, open a gate and halt.
   if (stepDef!.trust === 'human_confirmed' || stepDef!.trust === 'human_reviewed') {
     const gate_id = crypto.randomUUID();
-    const choicesRaw = stepDef!.gate?.choices ?? stepDef!.input_schema?.properties?.['choice']?.enum;
+    const choicesRaw =
+      stepDef!.gate?.choices ?? stepDef!.input_schema?.properties?.['choice']?.enum;
     const choices = Array.isArray(choicesRaw) ? (choicesRaw as string[]) : ['approve', 'reject'];
     const step_name = options.command;
 
     // Resolve gate.message if configured — fail-fast on unresolvable references.
     const gateEvidenceCtxEarly = { ...evidenceByStep, [options.command]: output };
-    const wfCtxSpreadEarly = pendingRun.workflow_context_snapshots !== undefined
-      ? {
-        workflowContext: {
-          snapshots: pendingRun.workflow_context_snapshots,
-          wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
-        },
-      }
-      : {};
+    const wfCtxSpreadEarly =
+      pendingRun.workflow_context_snapshots !== undefined
+        ? {
+            workflowContext: {
+              snapshots: pendingRun.workflow_context_snapshots,
+              wrapper: (definition.context_wrapper ?? 'xml') as ContextWrapperFormat,
+            },
+          }
+        : {};
     let resolvedGateMessage: string | undefined;
     if (stepDef!.gate?.message !== undefined) {
       let raw: string;
       try {
-        raw = renderTemplate(stepDef!.gate.message, {
-          evidenceByStep: gateEvidenceCtxEarly,
-          runParams: run.params,
-          ...wfCtxSpreadEarly,
-        }, { strict: true });
+        raw = renderTemplate(
+          stepDef!.gate.message,
+          {
+            evidenceByStep: gateEvidenceCtxEarly,
+            runParams: run.params,
+            ...wfCtxSpreadEarly,
+          },
+          { strict: true },
+        );
       } catch (err) {
         if (err instanceof UnknownFilterError) {
           return makeErrorEnvelope(
             options,
             pendingRun,
-            new WorkflowError(
-              `gate.message uses unknown filter '${err.filterName}'`,
-              { code: 'FILTER_UNKNOWN', category: 'ENGINE', agentAction: 'stop', retryable: false },
-            ),
+            new WorkflowError(`gate.message uses unknown filter '${err.filterName}'`, {
+              code: 'FILTER_UNKNOWN',
+              category: 'ENGINE',
+              agentAction: 'stop',
+              retryable: false,
+            }),
             definition,
           );
         }
@@ -710,10 +721,12 @@ export async function executeStep(
         return makeErrorEnvelope(
           options,
           pendingRun,
-          new WorkflowError(
-            `gate.message has unresolvable references: ${unresolved.join(', ')}`,
-            { code: 'GATE_MESSAGE_UNRESOLVABLE', category: 'ENGINE', agentAction: 'stop', retryable: false },
-          ),
+          new WorkflowError(`gate.message has unresolvable references: ${unresolved.join(', ')}`, {
+            code: 'GATE_MESSAGE_UNRESOLVABLE',
+            category: 'ENGINE',
+            agentAction: 'stop',
+            retryable: false,
+          }),
           definition,
         );
       }
@@ -758,11 +771,19 @@ export async function executeStep(
       resolvedGateMessage !== undefined
         ? resolvedGateMessage
         : stepDef!.prompt !== undefined
-          ? renderTemplate(stepDef!.prompt, { evidenceByStep: gateEvidenceCtxEarly, runParams: run.params, ...wfCtxSpreadEarly })
+          ? renderTemplate(stepDef!.prompt, {
+              evidenceByStep: gateEvidenceCtxEarly,
+              runParams: run.params,
+              ...wfCtxSpreadEarly,
+            })
           : undefined;
     const resolvedGateInstructions =
       stepDef!.instructions !== undefined
-        ? renderTemplate(stepDef!.instructions, { evidenceByStep: gateEvidenceCtxEarly, runParams: run.params, ...wfCtxSpreadEarly })
+        ? renderTemplate(stepDef!.instructions, {
+            evidenceByStep: gateEvidenceCtxEarly,
+            runParams: run.params,
+            ...wfCtxSpreadEarly,
+          })
         : undefined;
 
     const gateNextAction: NextAction = {
@@ -840,12 +861,11 @@ export async function executeStep(
 
   // Step 7: Build and return ResponseEnvelope.
   const nextActions = savedRun.terminal_state ? [] : buildNextActions(definition, savedRun);
-  const orientation =
-    savedRun.terminal_state
-      ? `Run completed (phase: '${savedRun.run_phase}'). Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`
-      : nextActions.length > 0
-        ? `Step '${options.command}' completed. ${nextActions.length} step(s) now available.`
-        : `Step '${options.command}' completed. Waiting for other steps to complete.`;
+  const orientation = savedRun.terminal_state
+    ? `Run completed (phase: '${savedRun.run_phase}'). Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`
+    : nextActions.length > 0
+      ? `Step '${options.command}' completed. ${nextActions.length} step(s) now available.`
+      : `Step '${options.command}' completed. Waiting for other steps to complete.`;
 
   return {
     command: options.command,
@@ -879,11 +899,11 @@ export async function submitHumanResponse(
       err instanceof WorkflowError
         ? err
         : new WorkflowError('Failed to load run from store', {
-          code: 'ENGINE_STORE_FAILED',
-          category: 'ENGINE',
-          agentAction: 'stop',
-          retryable: false,
-        });
+            code: 'ENGINE_STORE_FAILED',
+            category: 'ENGINE',
+            agentAction: 'stop',
+            retryable: false,
+          });
     return errorEnvelope('submit_gate', options.runId, 0, e);
   }
 
@@ -982,21 +1002,26 @@ export async function submitHumanResponse(
       err instanceof WorkflowError
         ? err
         : new WorkflowError('Failed to persist gate response', {
-          code: 'ENGINE_STORE_FAILED',
-          category: 'ENGINE',
-          agentAction: 'stop',
-          retryable: false,
-        });
-    return errorEnvelope(gateStepName, options.runId, run.version, e, `Failed to persist gate response.`);
+            code: 'ENGINE_STORE_FAILED',
+            category: 'ENGINE',
+            agentAction: 'stop',
+            retryable: false,
+          });
+    return errorEnvelope(
+      gateStepName,
+      options.runId,
+      run.version,
+      e,
+      `Failed to persist gate response.`,
+    );
   }
 
   // 6. Build response.
   const data = { ...run.pending_gate.preview, choice: options.choice };
   const nextActions = savedRun.terminal_state ? [] : buildNextActions(definition, savedRun);
-  const orientation =
-    savedRun.terminal_state
-      ? `Run completed (phase: '${savedRun.run_phase}'). Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`
-      : `Gate '${gateStepName}' resolved with choice '${options.choice}'. ${nextActions.length} step(s) now available.`;
+  const orientation = savedRun.terminal_state
+    ? `Run completed (phase: '${savedRun.run_phase}'). Call get_run_state with run_id '${options.runId}' to retrieve the full evidence record.`
+    : `Gate '${gateStepName}' resolved with choice '${options.choice}'. ${nextActions.length} step(s) now available.`;
 
   return {
     command: gateStepName,

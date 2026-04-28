@@ -224,7 +224,9 @@ describe('reliability', () => {
     // Slow dispatcher that yields — first call claims the step and holds it in_progress.
     let resolveFirst!: (v: Record<string, unknown>) => void;
     const firstDispatcher: StepDispatcher = () =>
-      new Promise<Record<string, unknown>>((r) => { resolveFirst = r; });
+      new Promise<Record<string, unknown>>((r) => {
+        resolveFirst = r;
+      });
 
     // Start first call (does not await yet).
     const firstPromise = executeStep(store, noTimeoutDef, {

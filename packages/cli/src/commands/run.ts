@@ -146,4 +146,3 @@ export const runCommand = new Command('run')
       rl.close();
     }
   });
-

@@ -107,7 +107,11 @@ describe('cleanupRuns', () => {
     vi.setSystemTime(now);
 
     const oldTime = new Date(now.getTime() - 2 * 86_400_000).toISOString();
-    const terminalRun = makeRun({ updated_at: oldTime, run_phase: 'completed', terminal_state: true });
+    const terminalRun = makeRun({
+      updated_at: oldTime,
+      run_phase: 'completed',
+      terminal_state: true,
+    });
     await injectRun(dir, terminalRun);
 
     const store = new JsonFileStore(dir);

@@ -119,6 +119,12 @@ steps:
       choices:
         - send
         - reject
+      message: |
+        {{ context.resources.analyze_cause.severity | upper }} — {{ context.resources.analyze_cause.root_cause }}
+        Impacted: {{ context.resources.analyze_cause.impacted_services | join }}
+        Confidence: {{ context.resources.analyze_cause.confidence }}
+
+        Draft: {{ context.resources.draft_response.headline }}
     prompt: |
       INCIDENT ANALYSIS
       Severity:  {{ context.resources.analyze_cause.severity }}

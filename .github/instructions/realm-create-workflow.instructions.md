@@ -71,13 +71,13 @@ Minimal call:
 
 Each step:
 
-| Field             | Required | Description                                                         |
-| ----------------- | -------- | ------------------------------------------------------------------- |
-| `id`              | Yes      | Unique identifier. Snake_case verb-noun. No spaces.                 |
-| `description`     | Yes      | What a correct output looks like (acceptance criterion).            |
-| `input_schema`    | No       | JSON Schema for the fields this step's output must include.         |
+| Field             | Required | Description                                                                           |
+| ----------------- | -------- | ------------------------------------------------------------------------------------- |
+| `id`              | Yes      | Unique identifier. Snake_case verb-noun. No spaces.                                   |
+| `description`     | Yes      | What a correct output looks like (acceptance criterion).                              |
+| `input_schema`    | No       | JSON Schema for the fields this step's output must include.                           |
 | `depends_on`      | No       | Array with **at most one** step ID this step depends on. Controls execution ordering. |
-| `timeout_seconds` | No       | Positive integer. If omitted, no timeout is enforced.               |
+| `timeout_seconds` | No       | Positive integer. If omitted, no timeout is enforced.                                 |
 
 ## Step Design Guidelines
 

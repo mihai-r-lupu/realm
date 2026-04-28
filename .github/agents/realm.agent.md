@@ -18,12 +18,12 @@ MCP protocol described in `.github/instructions/realm.instructions.md`.
 
 ## Workflow routing
 
-| Task | Workflow ID | `params.path` |
-|---|---|---|
-| Code review (diff, PR, patch) | `code-reviewer` | path to the diff file |
-| Support ticket (classify, triage) | `ticket-classifier` | path to the ticket text file |
-| Incident alert (triage, analyze) | `incident-response` | path to the alert JSON file |
-| Article enrichment (summarise, tag) | `content-pipeline` | path to the article text file |
+| Task                                | Workflow ID         | `params.path`                 |
+| ----------------------------------- | ------------------- | ----------------------------- |
+| Code review (diff, PR, patch)       | `code-reviewer`     | path to the diff file         |
+| Support ticket (classify, triage)   | `ticket-classifier` | path to the ticket text file  |
+| Incident alert (triage, analyze)    | `incident-response` | path to the alert JSON file   |
+| Article enrichment (summarise, tag) | `content-pipeline`  | path to the article text file |
 
 When the request does not match a known workflow, call `list_workflows` to discover
 what is registered before asking the user for clarification.

@@ -70,9 +70,13 @@ export function pollSlackThread(config: SlackPollConfig): void {
     }
 
     if (!signal?.aborted) {
-      setTimeout(() => { void poll(); }, intervalMs);
+      setTimeout(() => {
+        void poll();
+      }, intervalMs);
     }
   };
 
-  setTimeout(() => { void poll(); }, intervalMs);
+  setTimeout(() => {
+    void poll();
+  }, intervalMs);
 }

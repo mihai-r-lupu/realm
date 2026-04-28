@@ -74,8 +74,7 @@ export function startSlackGateServer(options: SlackGateServerOptions): { close()
       const expectedBuf = Buffer.from(expected, 'utf8');
       const receivedBuf = Buffer.from(signature, 'utf8');
       const signaturesMatch =
-        expectedBuf.length === receivedBuf.length &&
-        timingSafeEqual(expectedBuf, receivedBuf);
+        expectedBuf.length === receivedBuf.length && timingSafeEqual(expectedBuf, receivedBuf);
 
       if (!signaturesMatch) {
         res.writeHead(403);

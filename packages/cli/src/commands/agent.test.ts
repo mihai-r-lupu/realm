@@ -1,9 +1,7 @@
 // Tests for runAgent(), postGateNotificationToSlack(), resolveProvider(), and checkAdapterPrerequisites().
 // Uses InMemoryStore and MockLlmProvider to run the agent loop without real I/O.
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import {
-  InMemoryStore,
-} from '@sensigo/realm-testing';
+import { InMemoryStore } from '@sensigo/realm-testing';
 import {
   createDefaultRegistry,
   CURRENT_WORKFLOW_SCHEMA_VERSION,
@@ -14,7 +12,11 @@ import { runAgent, postGateNotificationToSlack } from '../agent/run-agent.js';
 import type { AgentDeps, AgentRunOptions } from '../agent/run-agent.js';
 import type { LlmProvider } from '../agent/llm-provider.js';
 import { resolveProvider } from '../agent/llm-provider.js';
-import { checkAdapterPrerequisites, formatPreflightError, checkSlackBidirectionalConfig } from '../agent/preflight.js';
+import {
+  checkAdapterPrerequisites,
+  formatPreflightError,
+  checkSlackBidirectionalConfig,
+} from '../agent/preflight.js';
 
 // ---------------------------------------------------------------------------
 // MockLlmProvider — queue-based: returns responses in order of callStep() calls.
@@ -28,7 +30,10 @@ class MockLlmProvider implements LlmProvider {
     this.responses = responses;
   }
 
-  async callStep(_prompt: string, _schema?: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async callStep(
+    _prompt: string,
+    _schema?: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
     const response = this.responses[this.callCount.value++];
     if (response instanceof Error) throw response;
     return response ?? {};
@@ -41,9 +46,13 @@ class MockLlmProvider implements LlmProvider {
 
 function makeWorkflowStore(): WorkflowRegistrar {
   return {
-    async register() { },
-    async get() { throw new Error('not used in these tests'); },
-    async list() { return []; },
+    async register() {},
+    async get() {
+      throw new Error('not used in these tests');
+    },
+    async list() {
+      return [];
+    },
   };
 }
 
@@ -139,10 +148,7 @@ describe('runAgent', () => {
   });
 
   it('retries the LLM call once then returns failed when both attempts throw', async () => {
-    const provider = new MockLlmProvider([
-      new Error('bad JSON'),
-      new Error('bad JSON again'),
-    ]);
+    const provider = new MockLlmProvider([new Error('bad JSON'), new Error('bad JSON again')]);
     const deps = makeDeps({ provider });
 
     const result = await runAgent(deps, makeOptions({ definition: agentOnlyWorkflow }));
@@ -152,10 +158,7 @@ describe('runAgent', () => {
   });
 
   it('succeeds when the LLM call fails on the first attempt but succeeds on the second', async () => {
-    const provider = new MockLlmProvider([
-      new Error('transient error'),
-      { summary: 'recovered' },
-    ]);
+    const provider = new MockLlmProvider([new Error('transient error'), { summary: 'recovered' }]);
     const deps = makeDeps({ provider });
 
     const result = await runAgent(deps, makeOptions({ definition: agentOnlyWorkflow }));
@@ -166,17 +169,15 @@ describe('runAgent', () => {
 
   it('pauses at a gate and continues after the onGate hook resolves it', async () => {
     const provider = new MockLlmProvider([{ output: 'step done' }]);
-    const onGate = vi.fn().mockImplementation(
-      async (runId: string, gate: PendingGate) => {
-        const run = await deps.store.get(runId);
-        await submitHumanResponse(deps.store, gateWorkflow, {
-          runId,
-          gateId: gate.gate_id,
-          choice: 'approve',
-        });
-        void run; // keep TS happy
-      },
-    );
+    const onGate = vi.fn().mockImplementation(async (runId: string, gate: PendingGate) => {
+      const run = await deps.store.get(runId);
+      await submitHumanResponse(deps.store, gateWorkflow, {
+        runId,
+        gateId: gate.gate_id,
+        choice: 'approve',
+      });
+      void run; // keep TS happy
+    });
     const deps = makeDeps({ provider, onGate });
 
     const result = await runAgent(deps, makeOptions({ definition: gateWorkflow }));
@@ -247,7 +248,11 @@ describe('postGateNotificationToSlack', () => {
       choices: ['approve'],
       opened_at: new Date().toISOString(),
     };
-    await postGateNotificationToSlack('https://hooks.slack.com/test', gate, 'realm run respond abc --gate gate-001 --choice approve');
+    await postGateNotificationToSlack(
+      'https://hooks.slack.com/test',
+      gate,
+      'realm run respond abc --gate gate-001 --choice approve',
+    );
 
     expect(mockFetch).toHaveBeenCalledOnce();
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -291,7 +296,13 @@ const githubWorkflow: WorkflowDefinition = {
     github: { adapter: 'github', trust: 'engine_delivered' },
   },
   steps: {
-    fetch: { description: 'Fetch', execution: 'auto', uses_service: 'github', service_method: 'fetch', operation: 'get_pr_diff' },
+    fetch: {
+      description: 'Fetch',
+      execution: 'auto',
+      uses_service: 'github',
+      service_method: 'fetch',
+      operation: 'get_pr_diff',
+    },
   },
 };
 
@@ -304,7 +315,13 @@ const slackWorkflow: WorkflowDefinition = {
     notifications: { adapter: 'slack', trust: 'engine_delivered' },
   },
   steps: {
-    notify: { description: 'Notify', execution: 'auto', uses_service: 'notifications', service_method: 'create', operation: 'post_message' },
+    notify: {
+      description: 'Notify',
+      execution: 'auto',
+      uses_service: 'notifications',
+      service_method: 'create',
+      operation: 'post_message',
+    },
   },
 };
 
@@ -318,7 +335,13 @@ const bothAdaptersWorkflow: WorkflowDefinition = {
     notifications: { adapter: 'slack', trust: 'engine_delivered' },
   },
   steps: {
-    fetch: { description: 'Fetch', execution: 'auto', uses_service: 'github', service_method: 'fetch', operation: 'get_pr_diff' },
+    fetch: {
+      description: 'Fetch',
+      execution: 'auto',
+      uses_service: 'github',
+      service_method: 'fetch',
+      operation: 'get_pr_diff',
+    },
   },
 };
 
@@ -364,7 +387,9 @@ describe('checkAdapterPrerequisites', () => {
 
 describe('checkSlackBidirectionalConfig', () => {
   it('warns when SLACK_WEBHOOK_URL is set but SLACK_BOT_TOKEN is absent', () => {
-    const warnings = checkSlackBidirectionalConfig({ SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test' });
+    const warnings = checkSlackBidirectionalConfig({
+      SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test',
+    });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]!.message).toContain('SLACK_WEBHOOK_URL');
     expect(warnings[0]!.message).toContain('SLACK_BOT_TOKEN');

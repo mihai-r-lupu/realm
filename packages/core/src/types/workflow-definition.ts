@@ -219,4 +219,3 @@ export interface WorkflowContextEntry {
 
 /** Wrapper format applied to {{ workflow.context.NAME }} template references. */
 export type ContextWrapperFormat = 'xml' | 'brackets' | 'none';
-

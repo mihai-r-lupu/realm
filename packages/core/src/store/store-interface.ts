@@ -37,4 +37,3 @@ export interface RunStore {
    */
   claimStep(runId: string, stepName: string, definition: WorkflowDefinition): Promise<RunRecord>;
 }
-

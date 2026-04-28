@@ -5,9 +5,7 @@ import type { WorkflowDefinition } from '@sensigo/realm';
 import { CURRENT_WORKFLOW_SCHEMA_VERSION } from '@sensigo/realm';
 
 /** Builds a minimal WorkflowDefinition for lint testing. */
-function makeDefinition(
-  overrides: Partial<WorkflowDefinition> = {},
-): WorkflowDefinition {
+function makeDefinition(overrides: Partial<WorkflowDefinition> = {}): WorkflowDefinition {
   return {
     id: 'lint-test',
     name: 'Lint Test',
@@ -22,7 +20,12 @@ describe('lintWorkflowContext', () => {
   it('returns empty array when workflow has no workflow_context', () => {
     const def = makeDefinition({
       steps: {
-        step_one: { description: 'Step one', execution: 'agent', depends_on: [], prompt: 'Do something' },
+        step_one: {
+          description: 'Step one',
+          execution: 'agent',
+          depends_on: [],
+          prompt: 'Do something',
+        },
       },
     });
     expect(lintWorkflowContext(def)).toEqual([]);
@@ -32,8 +35,18 @@ describe('lintWorkflowContext', () => {
     const def = makeDefinition({
       workflow_context: {},
       steps: {
-        step_one: { description: 'Step one', execution: 'agent', depends_on: [], prompt: 'Do something' },
-        step_two: { description: 'Step two', execution: 'agent', depends_on: ['step_one'], prompt: 'Do more' },
+        step_one: {
+          description: 'Step one',
+          execution: 'agent',
+          depends_on: [],
+          prompt: 'Do something',
+        },
+        step_two: {
+          description: 'Step two',
+          execution: 'agent',
+          depends_on: ['step_one'],
+          prompt: 'Do more',
+        },
       },
     });
     expect(lintWorkflowContext(def)).toEqual([]);
@@ -62,10 +75,30 @@ describe('lintWorkflowContext', () => {
         rules: { source: { path: '/abs/rules.md' } },
       },
       steps: {
-        step_a: { description: 'A', execution: 'agent', depends_on: [], prompt: 'Rules: {{ workflow.context.rules }}' },
-        step_b: { description: 'B', execution: 'agent', depends_on: ['step_a'], prompt: 'Rules: {{ workflow.context.rules }}' },
-        step_c: { description: 'C', execution: 'agent', depends_on: ['step_b'], prompt: 'No context here' },
-        step_d: { description: 'D', execution: 'agent', depends_on: ['step_c'], prompt: 'No context here' },
+        step_a: {
+          description: 'A',
+          execution: 'agent',
+          depends_on: [],
+          prompt: 'Rules: {{ workflow.context.rules }}',
+        },
+        step_b: {
+          description: 'B',
+          execution: 'agent',
+          depends_on: ['step_a'],
+          prompt: 'Rules: {{ workflow.context.rules }}',
+        },
+        step_c: {
+          description: 'C',
+          execution: 'agent',
+          depends_on: ['step_b'],
+          prompt: 'No context here',
+        },
+        step_d: {
+          description: 'D',
+          execution: 'agent',
+          depends_on: ['step_c'],
+          prompt: 'No context here',
+        },
       },
     });
     // 2 out of 4 steps reference rules — not > 2 (threshold), so no warning.
@@ -78,10 +111,30 @@ describe('lintWorkflowContext', () => {
         rules: { source: { path: '/abs/rules.md' } },
       },
       steps: {
-        step_a: { description: 'A', execution: 'agent', depends_on: [], prompt: 'Use {{ workflow.context.rules }}' },
-        step_b: { description: 'B', execution: 'agent', depends_on: ['step_a'], prompt: 'Use {{ workflow.context.rules }}' },
-        step_c: { description: 'C', execution: 'agent', depends_on: ['step_b'], prompt: 'Use {{ workflow.context.rules }}' },
-        step_d: { description: 'D', execution: 'agent', depends_on: ['step_c'], prompt: 'No context reference here' },
+        step_a: {
+          description: 'A',
+          execution: 'agent',
+          depends_on: [],
+          prompt: 'Use {{ workflow.context.rules }}',
+        },
+        step_b: {
+          description: 'B',
+          execution: 'agent',
+          depends_on: ['step_a'],
+          prompt: 'Use {{ workflow.context.rules }}',
+        },
+        step_c: {
+          description: 'C',
+          execution: 'agent',
+          depends_on: ['step_b'],
+          prompt: 'Use {{ workflow.context.rules }}',
+        },
+        step_d: {
+          description: 'D',
+          execution: 'agent',
+          depends_on: ['step_c'],
+          prompt: 'No context reference here',
+        },
       },
     });
     const warnings = lintWorkflowContext(def);
@@ -96,9 +149,24 @@ describe('lintWorkflowContext', () => {
         rules: { source: { path: '/abs/rules.md' } },
       },
       steps: {
-        step_a: { description: 'A', execution: 'agent', depends_on: [], prompt: 'Use {{ workflow.context.rules }}' },
-        step_b: { description: 'B', execution: 'agent', depends_on: ['step_a'], prompt: 'Use {{ workflow.context.rules }}' },
-        step_c: { description: 'C', execution: 'agent', depends_on: ['step_b'], prompt: 'Use {{ workflow.context.rules }}' },
+        step_a: {
+          description: 'A',
+          execution: 'agent',
+          depends_on: [],
+          prompt: 'Use {{ workflow.context.rules }}',
+        },
+        step_b: {
+          description: 'B',
+          execution: 'agent',
+          depends_on: ['step_a'],
+          prompt: 'Use {{ workflow.context.rules }}',
+        },
+        step_c: {
+          description: 'C',
+          execution: 'agent',
+          depends_on: ['step_b'],
+          prompt: 'Use {{ workflow.context.rules }}',
+        },
         auto_step: { description: 'Auto', execution: 'auto', depends_on: ['step_c'] },
       },
     });
@@ -114,9 +182,24 @@ describe('lintWorkflowContext', () => {
         rules: { source: { path: '/abs/rules.md' } },
       },
       steps: {
-        step_a: { description: 'A', execution: 'agent', depends_on: [], prompt: '{{ workflow.context.rules }}' },
-        step_b: { description: 'B', execution: 'agent', depends_on: ['step_a'], prompt: '{{ workflow.context.rules }}' },
-        step_c: { description: 'C', execution: 'agent', depends_on: ['step_b'], prompt: '{{ workflow.context.rules }}' },
+        step_a: {
+          description: 'A',
+          execution: 'agent',
+          depends_on: [],
+          prompt: '{{ workflow.context.rules }}',
+        },
+        step_b: {
+          description: 'B',
+          execution: 'agent',
+          depends_on: ['step_a'],
+          prompt: '{{ workflow.context.rules }}',
+        },
+        step_c: {
+          description: 'C',
+          execution: 'agent',
+          depends_on: ['step_b'],
+          prompt: '{{ workflow.context.rules }}',
+        },
       },
     });
     expect(() => lintWorkflowContext(def)).not.toThrow();
@@ -129,8 +212,18 @@ describe('lintWorkflowContext', () => {
         rules: { source: { path: '/abs/rules.md' } },
       },
       steps: {
-        step_a: { description: 'A', execution: 'agent', depends_on: [], prompt: '{{ workflow.context.rules }}' },
-        step_b: { description: 'B', execution: 'agent', depends_on: ['step_a'], prompt: '{{ workflow.context.rules }}' },
+        step_a: {
+          description: 'A',
+          execution: 'agent',
+          depends_on: [],
+          prompt: '{{ workflow.context.rules }}',
+        },
+        step_b: {
+          description: 'B',
+          execution: 'agent',
+          depends_on: ['step_a'],
+          prompt: '{{ workflow.context.rules }}',
+        },
         // step_c is an agent step but has no prompt — should not count.
         step_c: { description: 'C', execution: 'agent', depends_on: ['step_b'] },
         step_d: { description: 'D', execution: 'agent', depends_on: ['step_c'] },

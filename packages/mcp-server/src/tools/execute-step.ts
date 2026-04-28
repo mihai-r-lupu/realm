@@ -12,8 +12,10 @@ import type { HandleRunStores } from './start-run.js';
 
 // For agent steps, the agent's params represent their work output. The dispatcher
 // passes them through as the step output recorded in evidence.
-const makeParamsDispatcher = (params: Record<string, unknown>): StepDispatcher =>
-  async () => params;
+const makeParamsDispatcher =
+  (params: Record<string, unknown>): StepDispatcher =>
+  async () =>
+    params;
 
 /**
  * Business logic for the execute_step tool.
@@ -51,7 +53,12 @@ export async function handleExecuteStepTool(
   try {
     const result = await handleExecuteStep(args, stores);
     return {
-      content: [{ type: 'text' as const, text: JSON.stringify({ ...result, data: {}, evidence: [] }, null, 2) }],
+      content: [
+        {
+          type: 'text' as const,
+          text: JSON.stringify({ ...result, data: {}, evidence: [] }, null, 2),
+        },
+      ],
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

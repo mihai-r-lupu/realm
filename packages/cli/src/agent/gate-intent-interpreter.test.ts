@@ -9,7 +9,11 @@ function makeMockProvider(returnValue: Record<string, unknown>): LlmProvider {
 
 describe('interpretGateIntent', () => {
   it('returns the LLM choice when confidence is high', async () => {
-    const provider = makeMockProvider({ choice: 'approve', confidence: 'high', reason: 'User said approve' });
+    const provider = makeMockProvider({
+      choice: 'approve',
+      confidence: 'high',
+      reason: 'User said approve',
+    });
 
     const result = await interpretGateIntent({
       llmClient: provider,
@@ -25,7 +29,11 @@ describe('interpretGateIntent', () => {
   });
 
   it('returns unclear when LLM returns unclear', async () => {
-    const provider = makeMockProvider({ choice: 'unclear', confidence: 'low', reason: 'Cannot determine intent' });
+    const provider = makeMockProvider({
+      choice: 'unclear',
+      confidence: 'low',
+      reason: 'Cannot determine intent',
+    });
 
     const result = await interpretGateIntent({
       llmClient: provider,
@@ -40,7 +48,9 @@ describe('interpretGateIntent', () => {
   });
 
   it('sends a prompt containing stepName, userMessage, and allowedChoices', async () => {
-    const mockCallStep = vi.fn().mockResolvedValue({ choice: 'reject', confidence: 'high', reason: 'No' });
+    const mockCallStep = vi
+      .fn()
+      .mockResolvedValue({ choice: 'reject', confidence: 'high', reason: 'No' });
     const provider: LlmProvider = { callStep: mockCallStep };
 
     await interpretGateIntent({
@@ -59,7 +69,11 @@ describe('interpretGateIntent', () => {
   });
 
   it('returns low confidence structure when LLM returns low confidence', async () => {
-    const provider = makeMockProvider({ choice: 'approve', confidence: 'low', reason: 'Uncertain' });
+    const provider = makeMockProvider({
+      choice: 'approve',
+      confidence: 'low',
+      reason: 'Uncertain',
+    });
 
     const result = await interpretGateIntent({
       llmClient: provider,

@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { loadWorkflowFromString, loadWorkflowFromFile, CURRENT_WORKFLOW_SCHEMA_VERSION } from './yaml-loader.js';
+import {
+  loadWorkflowFromString,
+  loadWorkflowFromFile,
+  CURRENT_WORKFLOW_SCHEMA_VERSION,
+} from './yaml-loader.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -454,17 +458,14 @@ steps:
     writeFileSync(
       join(tmpDir, 'workflow.yaml'),
       baseYaml +
-      `\ncontext_wrapper: brackets\nworkflow_context:\n  rules:\n    source:\n      path: ./rules.md\n`,
+        `\ncontext_wrapper: brackets\nworkflow_context:\n  rules:\n    source:\n      path: ./rules.md\n`,
     );
     const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
     expect(def.context_wrapper).toBe('brackets');
   });
 
   it('invalid context_wrapper value throws a descriptive WorkflowError', () => {
-    writeFileSync(
-      join(tmpDir, 'workflow.yaml'),
-      baseYaml + `\ncontext_wrapper: markdown\n`,
-    );
+    writeFileSync(join(tmpDir, 'workflow.yaml'), baseYaml + `\ncontext_wrapper: markdown\n`);
     expect(() => loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'))).toThrow(WorkflowError);
     try {
       loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
@@ -500,12 +501,10 @@ steps:
     writeFileSync(
       join(tmpDir, 'workflow.yaml'),
       baseYaml +
-      `\nworkflow_context:\n  schema:\n    source:\n      path: ./explicit-schema.json\n`,
+        `\nworkflow_context:\n  schema:\n    source:\n      path: ./explicit-schema.json\n`,
     );
     const def = loadWorkflowFromFile(join(tmpDir, 'workflow.yaml'));
-    expect(def.workflow_context!['schema']!.source.path).toBe(
-      join(tmpDir, 'explicit-schema.json'),
-    );
+    expect(def.workflow_context!['schema']!.source.path).toBe(join(tmpDir, 'explicit-schema.json'));
   });
 
   it('schema.json absent → workflow_context.schema not created', () => {

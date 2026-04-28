@@ -77,7 +77,13 @@ describe('JsonWorkflowStore', () => {
   });
 
   it('get throws STATE_LEGACY_FORMAT when schema_version is outdated', async () => {
-    const stale = JSON.stringify({ id: 'wf-old', name: 'Old', version: 1, schema_version: 0, steps: {} });
+    const stale = JSON.stringify({
+      id: 'wf-old',
+      name: 'Old',
+      version: 1,
+      schema_version: 0,
+      steps: {},
+    });
     await writeFile(join(dir, 'wf-old.json'), stale, 'utf8');
     await expect(store.get('wf-old')).rejects.toMatchObject({
       code: 'STATE_LEGACY_FORMAT',

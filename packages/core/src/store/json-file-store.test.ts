@@ -108,7 +108,9 @@ describe('JsonFileStore', () => {
     await store.update({ ...created, completed_steps: ['step-one'] });
 
     // Second update with old version should fail
-    await expect(store.update({ ...created, completed_steps: ['other-step'] })).rejects.toMatchObject({
+    await expect(
+      store.update({ ...created, completed_steps: ['other-step'] }),
+    ).rejects.toMatchObject({
       code: 'STATE_SNAPSHOT_MISMATCH',
     });
   });

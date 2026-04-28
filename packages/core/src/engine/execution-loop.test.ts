@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { executeStep, executeChain, buildNextActions, submitHumanResponse } from './execution-loop.js';
+import {
+  executeStep,
+  executeChain,
+  buildNextActions,
+  submitHumanResponse,
+} from './execution-loop.js';
 import { JsonFileStore } from '../store/json-file-store.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import { ExtensionRegistry } from '../extensions/registry.js';
@@ -864,13 +869,19 @@ describe('executeStep', () => {
       const action = actions[0]!;
       expect(action.instruction).not.toBeNull();
       expect(action.instruction!.tool).toBe('execute_step');
-      expect((action.instruction!.params as Record<string, unknown>)['command']).toBe('review-code');
+      expect((action.instruction!.params as Record<string, unknown>)['command']).toBe(
+        'review-code',
+      );
       expect((action.instruction!.params as Record<string, unknown>)['run_id']).toBe(run.id);
       expect(action.input_schema).toEqual(agentStepDef.steps['review-code']?.input_schema);
-      expect((action.instruction!.params as Record<string, unknown>)['input_schema']).toBeUndefined();
+      expect(
+        (action.instruction!.params as Record<string, unknown>)['input_schema'],
+      ).toBeUndefined();
       expect(action.instruction!.call_with).toBeDefined();
       expect((action.instruction!.call_with as Record<string, unknown>)['run_id']).toBe(run.id);
-      expect((action.instruction!.call_with as Record<string, unknown>)['command']).toBe('review-code');
+      expect((action.instruction!.call_with as Record<string, unknown>)['command']).toBe(
+        'review-code',
+      );
       // input_schema is present → call_with.params is a skeleton object
       const callWithParams = (action.instruction!.call_with as Record<string, unknown>)['params'];
       expect(typeof callWithParams).toBe('object');

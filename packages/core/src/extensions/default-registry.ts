@@ -24,8 +24,12 @@ import { SlackAdapter } from '../adapters/slack-adapter.js';
 export function createDefaultRegistry(): ExtensionRegistry {
   const r = new ExtensionRegistry();
   r.register('adapter', 'filesystem', new FileSystemAdapter('filesystem'));
-  r.register('adapter', 'slack', new SlackAdapter('slack', {
-    webhook_url: process.env['SLACK_WEBHOOK_URL'] ?? '',
-  }));
+  r.register(
+    'adapter',
+    'slack',
+    new SlackAdapter('slack', {
+      webhook_url: process.env['SLACK_WEBHOOK_URL'] ?? '',
+    }),
+  );
   return r;
 }

@@ -1,7 +1,11 @@
 // DAG eligibility predicate — determines which workflow steps are eligible to execute
 // based on the completed, in-progress, failed, and skipped step sets in the run record.
 // Also exports propagateSkips, which marks steps whose trigger_rule can never be satisfied.
-import type { WorkflowDefinition, StepDefinition, TriggerRule } from '../types/workflow-definition.js';
+import type {
+  WorkflowDefinition,
+  StepDefinition,
+  TriggerRule,
+} from '../types/workflow-definition.js';
 import type { RunRecord } from '../types/run-record.js';
 import type { RunPhase } from '../types/run-record.js';
 import { resolvePath } from './render-template.js';
@@ -144,9 +148,7 @@ export function evaluateWhenCondition(
  * Merges gate_response snapshots on top of execution snapshots so that
  * the human's choice is accessible via context.resources.<step>.choice in when expressions.
  */
-export function buildEvidenceByStep(
-  run: RunRecord,
-): Record<string, Record<string, unknown>> {
+export function buildEvidenceByStep(run: RunRecord): Record<string, Record<string, unknown>> {
   const evidenceByStep: Record<string, Record<string, unknown>> = {};
   for (const snap of run.evidence) {
     if (snap.kind === 'gate_response') {
@@ -235,15 +237,11 @@ function canTriggerRuleEverBeSatisfied(step: StepDefinition, run: RunRecord): bo
   switch (rule) {
     case 'all_success':
       // Needs every dep to succeed — impossible if any dep already failed or is skipped.
-      return deps.every(
-        (d) => !run.failed_steps.includes(d) && !run.skipped_steps.includes(d),
-      );
+      return deps.every((d) => !run.failed_steps.includes(d) && !run.skipped_steps.includes(d));
 
     case 'all_failed':
       // Needs every dep to fail — impossible if any dep already completed or is skipped.
-      return deps.every(
-        (d) => !run.completed_steps.includes(d) && !run.skipped_steps.includes(d),
-      );
+      return deps.every((d) => !run.completed_steps.includes(d) && !run.skipped_steps.includes(d));
 
     case 'all_done':
       // Always eventually satisfiable — all deps will settle (complete, fail, or be skipped)
@@ -255,8 +253,8 @@ function canTriggerRuleEverBeSatisfied(step: StepDefinition, run: RunRecord): bo
       // (none can ever fail). A dep that is still unsettled might yet fail.
       return deps.some(
         (d) =>
-          run.failed_steps.includes(d) ||  // already satisfied
-          (!run.completed_steps.includes(d) && !run.skipped_steps.includes(d)),  // might still fail
+          run.failed_steps.includes(d) || // already satisfied
+          (!run.completed_steps.includes(d) && !run.skipped_steps.includes(d)), // might still fail
       );
 
     case 'one_success':
@@ -264,8 +262,8 @@ function canTriggerRuleEverBeSatisfied(step: StepDefinition, run: RunRecord): bo
       // (none can ever succeed). A dep that is still unsettled might yet succeed.
       return deps.some(
         (d) =>
-          run.completed_steps.includes(d) ||  // already satisfied
-          (!run.failed_steps.includes(d) && !run.skipped_steps.includes(d)),  // might still succeed
+          run.completed_steps.includes(d) || // already satisfied
+          (!run.failed_steps.includes(d) && !run.skipped_steps.includes(d)), // might still succeed
       );
 
     case 'none_failed':
@@ -282,10 +280,7 @@ function canTriggerRuleEverBeSatisfied(step: StepDefinition, run: RunRecord): bo
  * Returns the updated skipped_steps array, which may be larger than run.skipped_steps.
  * Does not mutate the run record — callers apply the result before writing.
  */
-export function propagateSkips(
-  run: RunRecord,
-  definition: WorkflowDefinition,
-): string[] {
+export function propagateSkips(run: RunRecord, definition: WorkflowDefinition): string[] {
   const skipped = [...run.skipped_steps];
   let changed = true;
 

@@ -11,10 +11,18 @@ automatically, an AI agent writes a structured summary, a human approves
 
 ## Prerequisites
 
-Set the following environment variables:
+Create a `.env` file in the repo root (the CLI loads it automatically):
 
 ```bash
-export OPENAI_API_KEY=sk-...           # or ANTHROPIC_API_KEY
+OPENAI_API_KEY=sk-...           # or ANTHROPIC_API_KEY
+GITHUB_TOKEN=ghp_...
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+Alternatively, export them in your shell session:
+
+```bash
+export OPENAI_API_KEY=sk-...
 export GITHUB_TOKEN=ghp_...
 export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
@@ -77,11 +85,14 @@ before the run.
    diff in the run evidence.
 2. **`write_summary` (agent)** — The LLM receives the diff and produces a
    structured JSON summary (`title`, `risk`, `key_changes`, `recommendation`).
-3. **`human_review` (gate)** — The run pauses. `realm agent` prints:
+3. **`human_review` (gate)** — The run pauses. `realm agent` prints the resolved
+   `gate.message` — the summary title, risk level, and AI recommendation:
 
    ```
    ⏸  Gate: human_review | ID: gate-abc123
-      Preview: { "title": "...", ... }
+
+      PR #42 — Fix authentication timeout in OAuth flow
+      Risk: MEDIUM | AI: request_changes
 
       Approve: realm run respond <run-id> --gate gate-abc123 --choice approve
       Reject:  realm run respond <run-id> --gate gate-abc123 --choice reject
@@ -127,6 +138,51 @@ before the run.
 
 6. **Run complete** — `realm agent` prints the run ID, the `write_summary` result as
    formatted JSON, and exits 0.
+
+## Slack modes
+
+Three modes are available. The active mode is selected automatically from which env vars are
+set. For full setup instructions including step-by-step Slack app creation, see
+[Slack Gate Modes reference](../docs/reference/realm-agent-slack.md).
+
+| Mode                    | Env vars                               | Resolution                               |
+| ----------------------- | -------------------------------------- | ---------------------------------------- |
+| **Mode 1** — Webhook    | `SLACK_WEBHOOK_URL`                    | `realm run respond` in terminal          |
+| **Mode 2** — Bot token  | `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` | Reply in Slack thread (polls every 10 s) |
+| **Mode 3** — Events API | Mode 2 + `SLACK_SIGNING_SECRET`        | Reply in Slack thread (real-time push)   |
+
+### Mode 1 — quick start (~2 min)
+
+In Slack: **Apps → Incoming Webhooks → Add to Slack** → pick channel → copy URL.
+
+```
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+### Mode 2 — quick start (~5 min)
+
+Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps), add `chat:write` and
+`channels:history` scopes, install to your workspace, invite the bot to the channel, then:
+
+```
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_CHANNEL_ID=C...
+```
+
+See the [full Mode 2 setup guide](../docs/reference/realm-agent-slack.md#mode-2----bot-token-bidirectional-no-public-url) for every step.
+
+### Mode 3 — quick start (~15 min)
+
+Complete Mode 2 setup, copy your app’s Signing Secret (Basic Information → App Credentials),
+install ngrok, and add:
+
+```
+SLACK_SIGNING_SECRET=...
+```
+
+The Events API endpoint must be configured in Slack while `realm agent` is paused at a gate
+(that’s when the HTTP server is running). See the
+[full Mode 3 setup guide](../docs/reference/realm-agent-slack.md#mode-3----events-api-bidirectional-real-time) for every step including ngrok.
 
 ## Inspect the run
 

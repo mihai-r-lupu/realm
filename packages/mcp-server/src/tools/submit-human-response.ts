@@ -42,7 +42,14 @@ export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunS
     async (args) => {
       try {
         const result = await handleSubmitHumanResponse(args, opts);
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...result, data: {}, evidence: [] }, null, 2) }] };
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ ...result, data: {}, evidence: [] }, null, 2),
+            },
+          ],
+        };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -73,4 +80,3 @@ export function registerSubmitHumanResponse(server: McpServer, opts?: HandleRunS
     },
   );
 }
-
