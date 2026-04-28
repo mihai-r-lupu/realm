@@ -46,15 +46,12 @@ export async function resumeRun(
   }
 
   if (!run.failed_steps.includes(stepName)) {
-    throw new WorkflowError(
-      `Step '${stepName}' is not in failed_steps for run '${runId}'.`,
-      {
-        code: 'STATE_TRANSITION_DENIED',
-        category: 'STATE',
-        agentAction: 'report_to_user',
-        retryable: false,
-      },
-    );
+    throw new WorkflowError(`Step '${stepName}' is not in failed_steps for run '${runId}'.`, {
+      code: 'STATE_TRANSITION_DENIED',
+      category: 'STATE',
+      agentAction: 'report_to_user',
+      retryable: false,
+    });
   }
 
   await runStore.update({
@@ -79,4 +76,3 @@ export const resumeCommand = new Command('resume')
       process.exit(1);
     }
   });
-

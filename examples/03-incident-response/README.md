@@ -45,7 +45,7 @@ approves or rejects based on what the drafter actually received, not what the dr
 | Human gate with real stakes      | `confirm_and_send` blocks until engineer chooses `send` or `reject`                      |
 | Gate choice recorded in evidence | Both `send` and `reject` produce `completed` — the choice is in the evidence audit trail |
 | Idempotency                      | A completed step cannot re-execute — duplicate retries cannot re-post                    |
-| Chained agent steps              | `draft_response` reads `context.resources.analyze_cause` — drafter gets verified data   |
+| Chained agent steps              | `draft_response` reads `context.resources.analyze_cause` — drafter gets verified data    |
 | Evidence chain                   | Analysis, draft, and gate choice all captured with timing and hash                       |
 | `FileSystemAdapter`              | Reads alert JSON from disk — zero auth, zero network                                     |
 | Swap-readiness                   | Replace the filesystem service with a Slack or PagerDuty adapter — zero YAML changes     |
@@ -66,6 +66,23 @@ approves or rejects based on what the drafter actually received, not what the dr
 ```bash
 npm install  # from repo root — installs all workspace packages
 ```
+
+## Prerequisites
+
+Create a `.env` file in the repo root (the CLI loads it automatically):
+
+```bash
+OPENAI_API_KEY=sk-...       # or ANTHROPIC_API_KEY
+```
+
+Alternatively, export it in your shell session:
+
+```bash
+export OPENAI_API_KEY=sk-...
+```
+
+For the Slack gate notification (optional), add `SLACK_WEBHOOK_URL` to the same `.env` file —
+see the Slack section below.
 
 ## Run fixture tests
 
@@ -143,9 +160,26 @@ realm agent \
   --params "{\"path\":\"$(pwd)/examples/03-incident-response/alerts/high-latency.json\"}"
 ```
 
-Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers.
+Requires `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` — set it in `.env` or export it in your shell. Use `--provider anthropic` to switch providers.
 
-When the run reaches `confirm_and_send`, `realm agent` pauses and prints the gate ID and a `realm run respond` command. In a second terminal, run the printed command to approve or reject:
+When the run reaches `confirm_and_send`, `realm agent` pauses and prints the resolved
+`gate.message` — severity, root cause, impacted services, confidence, and the draft headline:
+
+```
+⏸  Gate: confirm_and_send | ID: gate-abc123
+
+   P2 — LOG_ROTATION_DISABLED
+   Impacted: prod-db-1
+   Confidence: high
+
+   Draft: SEV-2 on prod-db-1: log rotation was disabled causing disk accumulation
+
+   Send: realm run respond <run-id> --gate <gate-id> --choice send
+   Reject: realm run respond <run-id> --gate <gate-id> --choice reject
+   Waiting for approval...
+```
+
+In a separate terminal, run the printed command to approve or reject:
 
 ```bash
 # To send:
@@ -157,37 +191,50 @@ realm run respond <run-id> --gate <gate-id> --choice reject
 
 `realm agent` detects the resolved gate and continues automatically. When the run completes it prints the `draft_response` result as formatted JSON.
 
-### Slack bidirectional approval (Option C — team channel)
+### Slack gate modes
 
-When `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are set, any team member watching the channel can
-reply in the gate's Slack thread to approve or reject — no terminal required.
+Three modes are available. The active mode is selected automatically from which env vars are
+set. For full setup instructions including step-by-step Slack app creation, see
+[Slack Gate Modes reference](../../docs/reference/realm-agent-slack.md).
 
-**Required environment variables:**
+| Mode                    | Env vars                               | Resolution                               |
+| ----------------------- | -------------------------------------- | ---------------------------------------- |
+| **Mode 1** — Webhook    | `SLACK_WEBHOOK_URL`                    | `realm run respond` in terminal          |
+| **Mode 2** — Bot token  | `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` | Reply in Slack thread (polls every 10 s) |
+| **Mode 3** — Events API | Mode 2 + `SLACK_SIGNING_SECRET`        | Reply in Slack thread (real-time push)   |
 
-```bash
-export SLACK_BOT_TOKEN=xoxb-...      # Slack bot token with chat:write scope
-export SLACK_CHANNEL_ID=C...         # Target channel ID
-export SLACK_SIGNING_SECRET=...      # From Slack app → Event Subscriptions → Signing Secret
+#### Mode 1 — quick start (~2 min)
+
+In Slack: **Apps → Incoming Webhooks → Add to Slack** → pick channel → copy URL.
+
+```
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
-**How it works:** `realm agent` posts the gate details as a message to the channel, anchoring a
-reply thread. When an engineer replies (e.g. "send it" or "reject — root cause unclear"), the
-agent interprets the reply using the LLM and submits the matching choice automatically.
-Messages that are ambiguous trigger a clarification reply (at most twice per gate). After
-that, a terminal command is still accepted as a fallback.
+#### Mode 2 — quick start (~5 min)
 
-Two timers run while the gate is open:
-- **Reminder** (default 10 min) — posts a reminder to the thread.
-- **Escalation** (default 30 min) — pings the gate owner (if `gate.owner` is set) or posts a generic prompt.
+Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps), add `chat:write` and
+`channels:history` scopes, install to your workspace, invite the bot to the channel, then:
 
-**Fallback behavior:**
-- If `SLACK_SIGNING_SECRET` is absent, `realm agent` falls back to polling the thread directly
-  (`conversations.replies`) on a configurable interval (default 10 s).
-- If `SLACK_BOT_TOKEN` is absent, the one-way webhook path (`SLACK_WEBHOOK_URL`) is used and
-  the terminal command is always required.
+```
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_CHANNEL_ID=C...
+```
 
-A preflight advisory is printed at startup when the configuration is incomplete but non-blocking
-(e.g. webhook-only, or bot token without signing secret).
+See the [full Mode 2 setup guide](../../docs/reference/realm-agent-slack.md#mode-2----bot-token-bidirectional-no-public-url) for every step.
+
+#### Mode 3 — quick start (~15 min)
+
+Complete Mode 2 setup, copy your app’s Signing Secret (Basic Information → App Credentials),
+install ngrok, and add:
+
+```
+SLACK_SIGNING_SECRET=...
+```
+
+The Events API endpoint must be configured in Slack while `realm agent` is paused at a gate
+(that’s when the HTTP server is running). See the
+[full Mode 3 setup guide](../../docs/reference/realm-agent-slack.md#mode-3----events-api-bidirectional-real-time) for every step including ngrok.
 
 The workspace instruction file (`.github/instructions/realm.instructions.md`) gives your agent
 the generic Realm protocol. The `realm-incident-response.md` skill layers the workflow-specific

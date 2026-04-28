@@ -48,11 +48,19 @@ export class JsonWorkflowStore implements WorkflowRegistrar {
       });
     }
     const parsed = JSON.parse(raw) as WorkflowDefinition;
-    if (parsed.schema_version === undefined || parsed.schema_version < CURRENT_WORKFLOW_SCHEMA_VERSION) {
+    if (
+      parsed.schema_version === undefined ||
+      parsed.schema_version < CURRENT_WORKFLOW_SCHEMA_VERSION
+    ) {
       throw new WorkflowError(
         'This workflow was registered with an older version of Realm. ' +
           'Re-register it with: realm workflow register <path-to-workflow>',
-        { code: 'STATE_LEGACY_FORMAT', category: 'STATE', agentAction: 'report_to_user', retryable: false },
+        {
+          code: 'STATE_LEGACY_FORMAT',
+          category: 'STATE',
+          agentAction: 'report_to_user',
+          retryable: false,
+        },
       );
     }
     return parsed;

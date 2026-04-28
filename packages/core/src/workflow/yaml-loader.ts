@@ -3,7 +3,11 @@ import { readFileSync, existsSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { load } from 'js-yaml';
-import type { WorkflowDefinition, TemplateDefinition, TriggerRule } from '../types/workflow-definition.js';
+import type {
+  WorkflowDefinition,
+  TemplateDefinition,
+  TriggerRule,
+} from '../types/workflow-definition.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import { resolveTemplates } from './template-resolver.js';
 

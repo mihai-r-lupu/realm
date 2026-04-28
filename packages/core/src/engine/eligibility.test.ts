@@ -63,27 +63,69 @@ describe('deriveRunPhase', () => {
       opened_at: new Date().toISOString(),
       preview: {},
     };
-    expect(deriveRunPhase({ pending_gate: gate, terminal_state: false, failed_steps: [], terminal_reason: undefined })).toBe('gate_waiting');
+    expect(
+      deriveRunPhase({
+        pending_gate: gate,
+        terminal_state: false,
+        failed_steps: [],
+        terminal_reason: undefined,
+      }),
+    ).toBe('gate_waiting');
   });
 
   it('returns running when not terminal', () => {
-    expect(deriveRunPhase({ pending_gate: undefined, terminal_state: false, failed_steps: [], terminal_reason: undefined })).toBe('running');
+    expect(
+      deriveRunPhase({
+        pending_gate: undefined,
+        terminal_state: false,
+        failed_steps: [],
+        terminal_reason: undefined,
+      }),
+    ).toBe('running');
   });
 
   it('returns completed when terminal_reason is Workflow completed.', () => {
-    expect(deriveRunPhase({ pending_gate: undefined, terminal_state: true, failed_steps: [], terminal_reason: 'Workflow completed.' })).toBe('completed');
+    expect(
+      deriveRunPhase({
+        pending_gate: undefined,
+        terminal_state: true,
+        failed_steps: [],
+        terminal_reason: 'Workflow completed.',
+      }),
+    ).toBe('completed');
   });
 
   it('returns completed even when failed_steps is non-empty if terminal_reason is Workflow completed. (recovery workflow)', () => {
-    expect(deriveRunPhase({ pending_gate: undefined, terminal_state: true, failed_steps: ['main_step'], terminal_reason: 'Workflow completed.' })).toBe('completed');
+    expect(
+      deriveRunPhase({
+        pending_gate: undefined,
+        terminal_state: true,
+        failed_steps: ['main_step'],
+        terminal_reason: 'Workflow completed.',
+      }),
+    ).toBe('completed');
   });
 
   it('returns failed when terminal and failed_steps is non-empty without Workflow completed. reason', () => {
-    expect(deriveRunPhase({ pending_gate: undefined, terminal_state: true, failed_steps: ['step-a'], terminal_reason: "Step 'step-a' failed: error" })).toBe('failed');
+    expect(
+      deriveRunPhase({
+        pending_gate: undefined,
+        terminal_state: true,
+        failed_steps: ['step-a'],
+        terminal_reason: "Step 'step-a' failed: error",
+      }),
+    ).toBe('failed');
   });
 
   it('returns abandoned when terminal, no failed steps, and reason is not Workflow completed.', () => {
-    expect(deriveRunPhase({ pending_gate: undefined, terminal_state: true, failed_steps: [], terminal_reason: 'Marked abandoned by realm cleanup' })).toBe('abandoned');
+    expect(
+      deriveRunPhase({
+        pending_gate: undefined,
+        terminal_state: true,
+        failed_steps: [],
+        terminal_reason: 'Marked abandoned by realm cleanup',
+      }),
+    ).toBe('abandoned');
   });
 });
 
@@ -330,7 +372,7 @@ describe('findEligibleSteps — skip propagation', () => {
 
   it('when-condition prevents step eligibility when evidence does not match', () => {
     const definition = makeWorkflow({
-      'classify': { depends_on: [] },
+      classify: { depends_on: [] },
       'billing-handler': {
         depends_on: ['classify'],
         when: "classify.category == 'billing'",

@@ -50,7 +50,9 @@ export class OpenAIProvider implements LlmProvider {
 
     const makeRequest = async (msgs: Message[]): Promise<string> => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response = await (client.chat.completions.create as (opts: Record<string, unknown>) => Promise<any>)({
+      const response = await (
+        client.chat.completions.create as (opts: Record<string, unknown>) => Promise<any>
+      )({
         model: this.model,
         response_format: { type: 'json_object' },
         messages: msgs,

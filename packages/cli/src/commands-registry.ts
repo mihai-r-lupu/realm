@@ -21,29 +21,25 @@ import { agentCommand } from './commands/agent.js';
 
 /** Commands that operate on workflow definitions (realm workflow <cmd>). */
 export const workflowCommands = [
-    initCommand,
-    validateCommand,
-    registerCommand,
-    watchCommand,
-    runCommand,
-    testCommand,
-    migrateCommand,
+  initCommand,
+  validateCommand,
+  registerCommand,
+  watchCommand,
+  runCommand,
+  testCommand,
+  migrateCommand,
 ];
 
 /** Commands that operate on run instances (realm run <cmd>). */
 export const runCommands = [
-    listCommand,
-    inspectCommand,
-    replayCommand,
-    diffCommand,
-    resumeCommand,
-    respondCommand,
-    cleanupCommand,
+  listCommand,
+  inspectCommand,
+  replayCommand,
+  diffCommand,
+  resumeCommand,
+  respondCommand,
+  cleanupCommand,
 ];
 
 /** Top-level commands not nested under a subgroup. */
-export const topLevelCommands = [
-    mcpCommand,
-    serveCommand,
-    agentCommand,
-];
+export const topLevelCommands = [mcpCommand, serveCommand, agentCommand];

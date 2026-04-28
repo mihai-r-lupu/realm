@@ -5,7 +5,9 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 
 export const migrateCommand = new Command('migrate')
-  .description('Back-fill origin field on local workflow definitions that predate provenance tracking')
+  .description(
+    'Back-fill origin field on local workflow definitions that predate provenance tracking',
+  )
   .action(() => {
     const workflowsDir = join(homedir(), '.realm', 'workflows');
     if (!existsSync(workflowsDir)) {
@@ -28,7 +30,9 @@ export const migrateCommand = new Command('migrate')
       try {
         definition = JSON.parse(readFileSync(filePath, 'utf8')) as Record<string, unknown>;
       } catch (err) {
-        console.warn(`Skipping ${file}: could not parse JSON — ${err instanceof Error ? err.message : String(err)}`);
+        console.warn(
+          `Skipping ${file}: could not parse JSON — ${err instanceof Error ? err.message : String(err)}`,
+        );
         continue;
       }
 

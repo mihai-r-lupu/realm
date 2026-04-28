@@ -70,7 +70,7 @@ export class JsonFileStore implements RunStore {
     if ('state' in parsed && !('completed_steps' in parsed)) {
       throw new WorkflowError(
         'This run was created with an older version of Realm that used a state-machine model. ' +
-        'Delete ~/.realm/runs/ and start fresh.',
+          'Delete ~/.realm/runs/ and start fresh.',
         {
           code: 'STATE_LEGACY_FORMAT',
           category: 'STATE',
@@ -218,7 +218,11 @@ export class JsonFileStore implements RunStore {
           category: 'STATE',
           agentAction: 'report_to_user',
           retryable: false,
-          details: { runId: record.id, localVersion: stored.version, incomingVersion: record.version },
+          details: {
+            runId: record.id,
+            localVersion: stored.version,
+            incomingVersion: record.version,
+          },
         },
       );
     }
@@ -243,4 +247,3 @@ export class JsonFileStore implements RunStore {
     return records;
   }
 }
-

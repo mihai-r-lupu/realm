@@ -180,7 +180,12 @@ describe('postGateViaApi — resolved_message', () => {
       opened_at: new Date().toISOString(),
       resolved_message: 'Approve this draft?',
     };
-    await postGateViaApi('xoxb-test', 'C123', gate, 'realm run respond r1 --gate gv1 --choice send');
+    await postGateViaApi(
+      'xoxb-test',
+      'C123',
+      gate,
+      'realm run respond r1 --gate gv1 --choice send',
+    );
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     const bodyStr = init.body as string;
@@ -203,7 +208,12 @@ describe('postGateViaApi — resolved_message', () => {
       opened_at: new Date().toISOString(),
       // no resolved_message
     };
-    await postGateViaApi('xoxb-test', 'C123', gate, 'realm run respond r1 --gate gv2 --choice send');
+    await postGateViaApi(
+      'xoxb-test',
+      'C123',
+      gate,
+      'realm run respond r1 --gate gv2 --choice send',
+    );
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     const bodyStr = init.body as string;
@@ -255,8 +265,8 @@ describe('startGateReminderTimers', () => {
       'C123',
       '1234567890.000',
       gate,
-      500,   // reminderIntervalMs
-      5000,  // escalationThresholdMs
+      500, // reminderIntervalMs
+      5000, // escalationThresholdMs
     );
 
     await vi.advanceTimersByTimeAsync(600);
@@ -283,8 +293,8 @@ describe('startGateReminderTimers', () => {
       'C123',
       '1234567890.000',
       gate,
-      10,   // reminderIntervalMs — fires fast
-      20,   // escalationThresholdMs — fires even faster for escalation
+      10, // reminderIntervalMs — fires fast
+      20, // escalationThresholdMs — fires even faster for escalation
     );
 
     await vi.advanceTimersByTimeAsync(50);
@@ -360,7 +370,7 @@ describe('postSlackReply', () => {
 
   it('does not throw when the fetch call fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     // Should not throw — postSlackReply is best-effort.
     await expect(
@@ -425,7 +435,7 @@ describe('handleBidirectionalGate', () => {
   });
 
   it('emits fallback notice when gateThreadTs is undefined', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     await handleBidirectionalGate(makeGateParams({ gateThreadTs: undefined }));
 
@@ -462,8 +472,8 @@ describe('handleBidirectionalGate', () => {
       ts: '1234567890.001',
     };
 
-    capturedOnEvent!(event);          // first delivery
-    capturedOnEvent!(event);          // duplicate — must be ignored
+    capturedOnEvent!(event); // first delivery
+    capturedOnEvent!(event); // duplicate — must be ignored
 
     await new Promise<void>((r) => setTimeout(r, 50));
     await promise;

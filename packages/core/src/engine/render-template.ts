@@ -219,7 +219,8 @@ export function applyFilter(value: unknown, filterName: string, args: string[]):
       if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
       const search = args[0];
       const replacement = args[1];
-      if (search === undefined || replacement === undefined) return { ok: false, reason: 'type_mismatch' };
+      if (search === undefined || replacement === undefined)
+        return { ok: false, reason: 'type_mismatch' };
       if (search === '') return { ok: false, reason: 'type_mismatch' };
       return { ok: true, value: value.replaceAll(search, replacement) };
     }
@@ -280,7 +281,8 @@ export function applyFilter(value: unknown, filterName: string, args: string[]):
     case 'split': {
       if (typeof value !== 'string') return { ok: false, reason: 'type_mismatch' };
       const delimiter = args[0];
-      if (delimiter === undefined || delimiter === '') return { ok: false, reason: 'type_mismatch' };
+      if (delimiter === undefined || delimiter === '')
+        return { ok: false, reason: 'type_mismatch' };
       return { ok: true, value: value.split(delimiter) };
     }
 
@@ -399,8 +401,16 @@ function splitOnUnquotedDelimiter(input: string, delimiter: string): string[] {
   let inSingle = false;
   let inDouble = false;
   for (const ch of input) {
-    if (ch === '"' && !inSingle) { inDouble = !inDouble; current += ch; continue; }
-    if (ch === "'" && !inDouble) { inSingle = !inSingle; current += ch; continue; }
+    if (ch === '"' && !inSingle) {
+      inDouble = !inDouble;
+      current += ch;
+      continue;
+    }
+    if (ch === "'" && !inDouble) {
+      inSingle = !inSingle;
+      current += ch;
+      continue;
+    }
     if (ch === delimiter && !inSingle && !inDouble) {
       segments.push(current);
       current = '';
@@ -486,9 +496,10 @@ export function renderTemplate(
       context: { resources: context.evidenceByStep },
       run: { params: context.runParams },
     };
-    const rawValue = rawPath.startsWith('workflow.context.') && context.workflowContext
-      ? resolveWorkflowContextRef(rawPath, context.workflowContext)
-      : resolvePath(rawPath, root);
+    const rawValue =
+      rawPath.startsWith('workflow.context.') && context.workflowContext
+        ? resolveWorkflowContextRef(rawPath, context.workflowContext)
+        : resolvePath(rawPath, root);
 
     if (!hasFilters) {
       // Original coercion behaviour.
@@ -552,5 +563,3 @@ function wrapContent(name: string, content: string, wrapper: ContextWrapperForma
       return content;
   }
 }
-
-

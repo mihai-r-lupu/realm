@@ -220,5 +220,4 @@ export async function runFixtureTests(options: RunFixtureTestsOptions): Promise<
   return Promise.all(fixtures.map((fixture) => runSingleFixture(fixture, definition, options)));
 }
 
-
 /** Result of a single fixture test run. */

@@ -107,6 +107,49 @@ expected_final_state: completed
 
 ---
 
+## Standalone agent
+
+---
+
+### `realm agent`
+
+Runs a workflow end-to-end using a real LLM — no MCP client, no IDE, no running server.
+Auto steps execute immediately; agent steps are driven by the LLM; human gates pause until
+a choice is submitted.
+
+```bash
+realm agent \
+  --workflow ./my-workflow \
+  --params '{"key":"value"}'
+```
+
+| Option              | Default    | Description                                                                            |
+| ------------------- | ---------- | -------------------------------------------------------------------------------------- |
+| `--workflow <path>` | (required) | Path to `workflow.yaml` or its containing directory                                    |
+| `--params <json>`   | `{}`       | Run params as a JSON string                                                            |
+| `--provider <name>` | `openai`   | LLM provider. Values: `openai`, `anthropic`                                            |
+| `--register`        | off        | Persist the workflow to `~/.realm/workflows/` so `realm run inspect` resolves it by ID |
+
+**LLM key:** set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in your shell or `.env` file. The
+CLI loads `.env` automatically on startup.
+
+**Gate handling:** when the run reaches a human gate, `realm agent` prints the gate message
+and a `realm run respond` command. Optionally configure Slack so the message is delivered
+there and the gate can be resolved from a Slack thread reply. The active Slack mode is
+selected automatically from the env vars that are present:
+
+| Env vars set                           | Gate mode                                                                                    |
+| -------------------------------------- | -------------------------------------------------------------------------------------------- |
+| (none)                                 | Terminal-only. Gate message printed to stdout. Respond with `realm run respond`.             |
+| `SLACK_WEBHOOK_URL`                    | **Mode 1** — gate notification posted to Slack. Terminal command required to respond.        |
+| `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` | **Mode 2** — bidirectional via thread polling. Reply in Slack thread; resolves within ~10 s. |
+| above + `SLACK_SIGNING_SECRET`         | **Mode 3** — bidirectional via Events API. Real-time push; resolves in < 1 s.                |
+
+For step-by-step Slack app setup and the full env var reference, see
+[Slack Gate Modes](./realm-agent-slack.md).
+
+---
+
 ## Run commands
 
 Operations on workflow run instances stored in `~/.realm/runs/`.
@@ -411,9 +454,9 @@ realm login
 realm login --url https://your-realm-instance.example.com
 ```
 
-| Option        | Default                    | Description           |
-| ------------- | -------------------------- | --------------------- |
-| `--url <url>` | `https://app.realm.dev`    | Cloud base URL        |
+| Option        | Default                 | Description    |
+| ------------- | ----------------------- | -------------- |
+| `--url <url>` | `https://app.realm.dev` | Cloud base URL |
 
 ---
 
@@ -441,10 +484,10 @@ realm push --all                    # push all local workflows
 realm push --all --strategy keep-local   # overwrite cloud with local on divergence
 ```
 
-| Option                   | Default    | Description                                                   |
-| ------------------------ | ---------- | ------------------------------------------------------------- |
-| `--all`                  | off        | Push all locally registered workflows                         |
-| `--strategy <strategy>`  | `manual`   | Conflict resolution: `manual`, `keep-local`, `keep-cloud`     |
+| Option                  | Default  | Description                                               |
+| ----------------------- | -------- | --------------------------------------------------------- |
+| `--all`                 | off      | Push all locally registered workflows                     |
+| `--strategy <strategy>` | `manual` | Conflict resolution: `manual`, `keep-local`, `keep-cloud` |
 
 Exit code 1 if any workflow is blocked or fails.
 
@@ -463,10 +506,10 @@ realm pull --all                             # pull all cloud workflows
 realm pull --all --strategy keep-cloud       # overwrite local with cloud on divergence
 ```
 
-| Option                   | Default    | Description                                                   |
-| ------------------------ | ---------- | ------------------------------------------------------------- |
-| `--all`                  | off        | Pull all cloud workflows                                      |
-| `--strategy <strategy>`  | `manual`   | Conflict resolution: `manual`, `keep-local`, `keep-cloud`     |
+| Option                  | Default  | Description                                               |
+| ----------------------- | -------- | --------------------------------------------------------- |
+| `--all`                 | off      | Pull all cloud workflows                                  |
+| `--strategy <strategy>` | `manual` | Conflict resolution: `manual`, `keep-local`, `keep-cloud` |
 
 Exit code 1 if any workflow is blocked or fails.
 
@@ -479,11 +522,11 @@ By default this is a **dry-run** — it prints the plan without making any chang
 
 Workflows are classified into four buckets:
 
-| Classification | Meaning                                              |
-| -------------- | ---------------------------------------------------- |
-| `only_local`   | Exists locally, not in cloud → planned action: push  |
-| `only_cloud`   | Exists in cloud, not locally → planned action: pull  |
-| `identical`    | Both stores have the same definition → skip          |
+| Classification | Meaning                                                                                 |
+| -------------- | --------------------------------------------------------------------------------------- |
+| `only_local`   | Exists locally, not in cloud → planned action: push                                     |
+| `only_cloud`   | Exists in cloud, not locally → planned action: pull                                     |
+| `identical`    | Both stores have the same definition → skip                                             |
 | `diverged`     | Both stores have the workflow but they differ → blocked unless `--strategy` resolves it |
 
 ```bash
@@ -494,11 +537,11 @@ realm sync --json                               # output plan as JSON (dry-run)
 realm sync --apply --json                       # output plan + result as JSON
 ```
 
-| Option                   | Default    | Description                                                            |
-| ------------------------ | ---------- | ---------------------------------------------------------------------- |
-| `--apply`                | off        | Execute the sync plan (mutations enabled)                              |
-| `--strategy <strategy>`  | `manual`   | Conflict resolution for diverged workflows: `manual`, `keep-local`, `keep-cloud` |
-| `--json`                 | off        | Output plan (and result if `--apply`) as JSON for machine consumption  |
+| Option                  | Default  | Description                                                                      |
+| ----------------------- | -------- | -------------------------------------------------------------------------------- |
+| `--apply`               | off      | Execute the sync plan (mutations enabled)                                        |
+| `--strategy <strategy>` | `manual` | Conflict resolution for diverged workflows: `manual`, `keep-local`, `keep-cloud` |
+| `--json`                | off      | Output plan (and result if `--apply`) as JSON for machine consumption            |
 
 Exit code 1 if any workflow is blocked or has errors.
 
@@ -516,9 +559,9 @@ realm run push abc123               # push a single run by ID
 realm run push --all                # push all local-only runs to cloud
 ```
 
-| Option  | Default | Description                             |
-| ------- | ------- | --------------------------------------- |
-| `--all` | off     | Push all local-only runs to cloud       |
+| Option  | Default | Description                       |
+| ------- | ------- | --------------------------------- |
+| `--all` | off     | Push all local-only runs to cloud |
 
 Exit code 1 if any run is diverged or the push fails.
 
@@ -553,11 +596,11 @@ Run sync uses **union semantics** — no strategy parameter is needed. Runs are 
 records. Diverged runs (same ID, different content in both stores) are always flagged and
 never auto-resolved.
 
-| Classification | Meaning                                                         |
-| -------------- | --------------------------------------------------------------- |
-| `only_local`   | Exists locally, not in cloud → planned action: push             |
-| `only_cloud`   | Exists in cloud, not locally → planned action: pull             |
-| `identical`    | Both stores have the same record → skip                         |
+| Classification | Meaning                                                          |
+| -------------- | ---------------------------------------------------------------- |
+| `only_local`   | Exists locally, not in cloud → planned action: push              |
+| `only_cloud`   | Exists in cloud, not locally → planned action: pull              |
+| `identical`    | Both stores have the same record → skip                          |
 | `diverged`     | Both stores have the run but they differ → flagged (no strategy) |
 
 ```bash
@@ -567,9 +610,9 @@ realm run sync --json           # output plan as JSON (dry-run)
 realm run sync --apply --json   # output plan + result as JSON
 ```
 
-| Option    | Default | Description                                         |
-| --------- | ------- | --------------------------------------------------- |
-| `--apply` | off     | Execute the sync plan (mutations enabled)           |
-| `--json`  | off     | Output plan (and result if `--apply`) as JSON       |
+| Option    | Default | Description                                   |
+| --------- | ------- | --------------------------------------------- |
+| `--apply` | off     | Execute the sync plan (mutations enabled)     |
+| `--json`  | off     | Output plan (and result if `--apply`) as JSON |
 
 Exit code 1 if any run is diverged or has errors.

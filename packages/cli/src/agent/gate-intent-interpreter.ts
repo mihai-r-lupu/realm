@@ -34,8 +34,7 @@ export async function interpretGateIntent(
 ): Promise<GateInterpretation> {
   const { userMessage, allowedChoices, gateStepName, previewSummary, llmClient } = options;
 
-  const contextLine =
-    previewSummary !== undefined ? `\nGate context: ${previewSummary}` : '';
+  const contextLine = previewSummary !== undefined ? `\nGate context: ${previewSummary}` : '';
   const choiceList = allowedChoices.map((c) => `"${c}"`).join(', ');
 
   const prompt =

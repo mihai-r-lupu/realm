@@ -3,9 +3,7 @@
     "realm": {
       "type": "stdio",
       "command": "realm",
-      "args": [
-        "mcp"
-      ],
+      "args": ["mcp"],
       "autoStart": true,
       "autoApprove": [
         "list_workflows",

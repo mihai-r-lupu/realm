@@ -135,9 +135,7 @@ describe('mcp tool handlers', () => {
     );
     expect(startResult.status).toBe('ok');
     // The auto step ran silently during start_run — it must be reported.
-    expect(startResult.chained_auto_steps).toEqual([
-      { step: 'step-auto', run_phase: 'running' },
-    ]);
+    expect(startResult.chained_auto_steps).toEqual([{ step: 'step-auto', run_phase: 'running' }]);
 
     // Run is now waiting for the agent step.
     const midRun = await runStore.get(startResult.run_id);

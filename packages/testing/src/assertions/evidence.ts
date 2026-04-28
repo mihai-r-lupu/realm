@@ -57,7 +57,7 @@ export function assertStepOutput(
     if (snap.output_summary[key] !== value) {
       throw new Error(
         `assertStepOutput: step '${stepId}' output_summary.${key} expected ${JSON.stringify(value)} ` +
-        `but got ${JSON.stringify(snap.output_summary[key])}`,
+          `but got ${JSON.stringify(snap.output_summary[key])}`,
       );
     }
   }

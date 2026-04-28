@@ -6,45 +6,45 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 
 ## Top-level fields
 
-| Field           | Type    | Required | Description                                                                                                                  |
-| --------------- | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `id`            | string  | Yes      | Unique workflow identifier. Used in all CLI commands and MCP tool calls.                                                     |
-| `name`          | string  | Yes      | Human-readable workflow name.                                                                                                |
-| `version`       | integer | Yes      | Workflow version number. Incremented on each `realm workflow register`.                                                      |
-| `params_schema` | object  | No       | JSON Schema for the params accepted by `start_run`. The agent's `call_with.params` skeleton is derived from this at runtime. |
-| `services`      | object  | No       | Named service definitions. Referenced by steps via `uses_service`.                                                           |
-| `steps`         | object  | Yes      | Map of step name → step definition.                                                                                          |
+| Field              | Type    | Required | Description                                                                                                                  |
+| ------------------ | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `id`               | string  | Yes      | Unique workflow identifier. Used in all CLI commands and MCP tool calls.                                                     |
+| `name`             | string  | Yes      | Human-readable workflow name.                                                                                                |
+| `version`          | integer | Yes      | Workflow version number. Incremented on each `realm workflow register`.                                                      |
+| `params_schema`    | object  | No       | JSON Schema for the params accepted by `start_run`. The agent's `call_with.params` skeleton is derived from this at runtime. |
+| `services`         | object  | No       | Named service definitions. Referenced by steps via `uses_service`.                                                           |
+| `steps`            | object  | Yes      | Map of step name → step definition.                                                                                          |
 | `protocol`         | object  | No       | Optional protocol customisations. See [Protocol](#protocol-customisation).                                                   |
 | `profiles_dir`     | string  | No       | Path to agent profile files, relative to the workflow YAML. Defaults to `profiles/` in the same directory.                   |
-| `workflow_context` | object  | No       | Named file entries loaded once at run start and available in all step prompts. See [Workflow context](#workflow-context).     |
+| `workflow_context` | object  | No       | Named file entries loaded once at run start and available in all step prompts. See [Workflow context](#workflow-context).    |
 | `context_wrapper`  | string  | No       | Wrapper format applied to `{{ workflow.context.NAME }}` references. One of `xml` (default), `brackets`, `none`.              |
 
 ---
 
 ## Step fields
 
-| Field                 | Type                            | Required | Description                                                                                                                                                                                                                                                                                                    |
-| --------------------- | ------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `description`         | string                          | Yes      | Human-readable step description. Appears in the agent protocol.                                                                                                                                                                                                                                                |
-| `execution`           | `agent` \| `auto`               | Yes      | Who executes this step.                                                                                                                                                                                                                                                                                        |
-| `depends_on`          | string[]                        | No       | Step IDs this step waits for. Empty array or omitted means eligible from run start.                                                                                                                                                                                                                            |
-| `trigger_rule`        | string                          | No       | When to evaluate dependency satisfaction. Default: `all_success`. See [`trigger_rule`](#trigger_rule).                                                                                                                                                                                                         |
-| `when`                | string                          | No       | Expression evaluated against prior step evidence. A step is ineligible until this is truthy. See [`when` condition](#when-condition).                                                                                                                                                                          |
-| `uses_service`        | string                          | No       | Name of a service declared in `services`. Only valid on `execution: auto` steps.                                                                                                                                                                                                                               |
-| `service_method`      | `fetch` \| `create` \| `update` | No       | Adapter method to call. Defaults to `fetch`.                                                                                                                                                                                                                                                                   |
-| `operation`           | string                          | No       | Operation name passed to the adapter. Defaults to the step name.                                                                                                                                                                                                                                               |
-| `handler`             | string                          | No       | Name of a registered `StepHandler` to invoke. Only valid on `execution: auto` steps.                                                                                                                                                                                                                           |
-| `config`              | object                          | No       | Static key-value configuration passed to the handler via `context.config`. Only meaningful on `execution: auto` steps with a `handler`.                                                                                                                                                                        |
-| `input_schema`        | object                          | No       | JSON Schema validated against the agent's submitted `params` before execution.                                                                                                                                                                                                                                 |
-| `preconditions`       | string[]                        | No       | Boolean expressions evaluated before the step runs. See [Preconditions](#preconditions).                                                                                                                                                                                                                       |
-| `trust`               | string                          | No       | Human oversight level. See [Trust levels](#trust-levels).                                                                                                                                                                                                                                                      |
-| `timeout_seconds`     | integer                         | No       | Step execution timeout in seconds. On expiry the run fails with `STEP_TIMEOUT`.                                                                                                                                                                                                                                |
-| `retry`               | object                          | No       | Retry configuration. See [Retry](#retry).                                                                                                                                                                                                                                                                      |
-| `instructions`        | string                          | No       | Agent-facing instructions. Delivered as `gate.agent_hint` when a gate is open.                                                                                                                                                                                                                                 |
-| `prompt`              | string                          | No       | Template-resolved task prompt delivered via `next_actions[].prompt`. On human gate steps, delivered as `gate.display`. Supports `{{ context.resources.STEP.FIELD }}` and `{{ run.params.FIELD }}`.                                                                                                             |
-| `gate`                | object                          | No       | Gate configuration. `gate.choices` lists the valid human response values. `gate.message` is a developer-authored template string shown to the human reviewer. See [Gate message](#gate-message).                                                                                                                 |
-| `input_map`           | `Record<string, string>`        | No       | Maps param names the service adapter receives to dot-path values from the run context. Only valid on `execution: auto` steps with `uses_service`. Each value is a dot-path: `run.params.<key>` reads from the run's start params; `context.resources.<step>.<field>` reads a field from a prior step's output. |
-| `agent_profile`       | string                          | No       | Agent profile name. Only valid on `execution: agent` steps. Must match a file in `profiles_dir`.                                                                                                                                                                                                               |
+| Field             | Type                            | Required | Description                                                                                                                                                                                                                                                                                                    |
+| ----------------- | ------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `description`     | string                          | Yes      | Human-readable step description. Appears in the agent protocol.                                                                                                                                                                                                                                                |
+| `execution`       | `agent` \| `auto`               | Yes      | Who executes this step.                                                                                                                                                                                                                                                                                        |
+| `depends_on`      | string[]                        | No       | Step IDs this step waits for. Empty array or omitted means eligible from run start.                                                                                                                                                                                                                            |
+| `trigger_rule`    | string                          | No       | When to evaluate dependency satisfaction. Default: `all_success`. See [`trigger_rule`](#trigger_rule).                                                                                                                                                                                                         |
+| `when`            | string                          | No       | Expression evaluated against prior step evidence. A step is ineligible until this is truthy. See [`when` condition](#when-condition).                                                                                                                                                                          |
+| `uses_service`    | string                          | No       | Name of a service declared in `services`. Only valid on `execution: auto` steps.                                                                                                                                                                                                                               |
+| `service_method`  | `fetch` \| `create` \| `update` | No       | Adapter method to call. Defaults to `fetch`.                                                                                                                                                                                                                                                                   |
+| `operation`       | string                          | No       | Operation name passed to the adapter. Defaults to the step name.                                                                                                                                                                                                                                               |
+| `handler`         | string                          | No       | Name of a registered `StepHandler` to invoke. Only valid on `execution: auto` steps.                                                                                                                                                                                                                           |
+| `config`          | object                          | No       | Static key-value configuration passed to the handler via `context.config`. Only meaningful on `execution: auto` steps with a `handler`.                                                                                                                                                                        |
+| `input_schema`    | object                          | No       | JSON Schema validated against the agent's submitted `params` before execution.                                                                                                                                                                                                                                 |
+| `preconditions`   | string[]                        | No       | Boolean expressions evaluated before the step runs. See [Preconditions](#preconditions).                                                                                                                                                                                                                       |
+| `trust`           | string                          | No       | Human oversight level. See [Trust levels](#trust-levels).                                                                                                                                                                                                                                                      |
+| `timeout_seconds` | integer                         | No       | Step execution timeout in seconds. On expiry the run fails with `STEP_TIMEOUT`.                                                                                                                                                                                                                                |
+| `retry`           | object                          | No       | Retry configuration. See [Retry](#retry).                                                                                                                                                                                                                                                                      |
+| `instructions`    | string                          | No       | Agent-facing instructions. Delivered as `gate.agent_hint` when a gate is open.                                                                                                                                                                                                                                 |
+| `prompt`          | string                          | No       | Template-resolved task prompt delivered via `next_actions[].prompt`. On human gate steps, delivered as `gate.display`. Supports `{{ context.resources.STEP.FIELD }}` and `{{ run.params.FIELD }}`.                                                                                                             |
+| `gate`            | object                          | No       | Gate configuration. `gate.choices` lists the valid human response values. `gate.message` is a developer-authored template string shown to the human reviewer. See [Gate message](#gate-message).                                                                                                               |
+| `input_map`       | `Record<string, string>`        | No       | Maps param names the service adapter receives to dot-path values from the run context. Only valid on `execution: auto` steps with `uses_service`. Each value is a dot-path: `run.params.<key>` reads from the run's start params; `context.resources.<step>.<field>` reads a field from a prior step's output. |
+| `agent_profile`   | string                          | No       | Agent profile name. Only valid on `execution: agent` steps. Must match a file in `profiles_dir`.                                                                                                                                                                                                               |
 
 ---
 
@@ -82,14 +82,14 @@ steps:
   read_data:
     description: Load data from disk
     execution: auto
-    depends_on: []      # eligible immediately
+    depends_on: [] # eligible immediately
     uses_service: source
     operation: read
 
   analyze:
     description: Analyze the loaded data
     execution: agent
-    depends_on: [read_data]   # waits for read_data to complete
+    depends_on: [read_data] # waits for read_data to complete
 ```
 
 The engine evaluates `depends_on` after every step settles. A step becomes eligible when its `trigger_rule` is satisfied given the current state of its dependencies.
@@ -100,14 +100,14 @@ The engine evaluates `depends_on` after every step settles. A step becomes eligi
 
 Controls when a step becomes eligible based on how its dependencies settled. Default: `all_success`.
 
-| Value         | Eligible when…                                                               |
-| ------------- | ---------------------------------------------------------------------------- |
-| `all_success` | All deps completed successfully. Skipped if any dep fails. **(default)**     |
-| `all_failed`  | All deps failed. Use for recovery steps.                                     |
-| `all_done`    | All deps settled (completed, failed, or skipped in any combination).         |
-| `one_failed`  | At least one dep failed. Use for fallback steps.                             |
-| `one_success` | At least one dep completed successfully.                                     |
-| `none_failed` | All deps completed or were skipped — none failed.                            |
+| Value         | Eligible when…                                                           |
+| ------------- | ------------------------------------------------------------------------ |
+| `all_success` | All deps completed successfully. Skipped if any dep fails. **(default)** |
+| `all_failed`  | All deps failed. Use for recovery steps.                                 |
+| `all_done`    | All deps settled (completed, failed, or skipped in any combination).     |
+| `one_failed`  | At least one dep failed. Use for fallback steps.                         |
+| `one_success` | At least one dep completed successfully.                                 |
+| `none_failed` | All deps completed or were skipped — none failed.                        |
 
 ### Recovery pattern
 
@@ -125,13 +125,13 @@ steps:
     description: Validate the extracted fields
     execution: auto
     handler: validate_fields_handler
-    depends_on: [extract_fields]      # runs only when extraction succeeds
+    depends_on: [extract_fields] # runs only when extraction succeeds
 
   handle_extraction_error:
     description: Notify team — extraction failed
     execution: agent
     depends_on: [extract_fields]
-    trigger_rule: one_failed          # runs only when extraction fails
+    trigger_rule: one_failed # runs only when extraction fails
 ```
 
 ### Skip propagation
@@ -144,7 +144,7 @@ When a step fails (or is skipped), all downstream steps whose `trigger_rule` can
 
 ## `when` condition
 
-An optional expression evaluated against prior step evidence. A step is eligible only when both its `trigger_rule` is satisfied *and* its `when` expression is truthy:
+An optional expression evaluated against prior step evidence. A step is eligible only when both its `trigger_rule` is satisfied _and_ its `when` expression is truthy:
 
 ```yaml
 steps:
@@ -234,22 +234,22 @@ The path is resolved first. Each filter in the chain receives the current value 
 
 ### Tier 1 filters
 
-| Filter | Arg | Input | Output |
-|---|---|---|---|
-| `bullets` | — | `string[]` | `• item\n• item\n…` — empty array → placeholder |
-| `join` | separator (default `", "`) | `string[]` | items joined by separator |
-| `default` | fallback value (default `""`) | any | fallback when value is `null` or `undefined`; passes through `""`, `0`, `false` unchanged |
-| `upper` | — | `string` | uppercased string |
-| `lower` | — | `string` | lowercased string |
-| `capitalize` | — | `string` | first character uppercased, remaining characters unchanged |
-| `truncate` | max length (integer) | `string` | string cut at word boundary ≤ N + `…`; unchanged if already short enough |
+| Filter       | Arg                           | Input      | Output                                                                                    |
+| ------------ | ----------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| `bullets`    | —                             | `string[]` | `• item\n• item\n…` — empty array → placeholder                                           |
+| `join`       | separator (default `", "`)    | `string[]` | items joined by separator                                                                 |
+| `default`    | fallback value (default `""`) | any        | fallback when value is `null` or `undefined`; passes through `""`, `0`, `false` unchanged |
+| `upper`      | —                             | `string`   | uppercased string                                                                         |
+| `lower`      | —                             | `string`   | lowercased string                                                                         |
+| `capitalize` | —                             | `string`   | first character uppercased, remaining characters unchanged                                |
+| `truncate`   | max length (integer)          | `string`   | string cut at word boundary ≤ N + `…`; unchanged if already short enough                  |
 
 `truncate` does not auto-stringify numbers; ensure the value is a string in the step's output if truncation is needed.
 
 > `capitalize` uppercases only the first character; remaining characters are not modified.
 > `"DATABASE_UNAVAILABLE" | capitalize` → `"DATABASE_UNAVAILABLE"`, not `"Database_unavailable"`.
 
-**Arg quoting and multi-arg syntax:** Filter arguments follow the filter name after a colon. Multiple arguments are separated by commas. String arguments containing spaces or commas must be quoted with double or single quotes; the outer quotes are stripped. Unquoted arguments are trimmed. Examples: `join: " / "` (one quoted arg, passes ` / `); `replace: ",", " / "` (two quoted args); `truncate: 80` (one unquoted integer arg); `yesno: "Active", "Inactive"` (two quoted args).
+**Arg quoting and multi-arg syntax:** Filter arguments follow the filter name after a colon. Multiple arguments are separated by commas. String arguments containing spaces or commas must be quoted with double or single quotes; the outer quotes are stripped. Unquoted arguments are trimmed. Examples: `join: " / "` (one quoted arg, passes `/`); `replace: ",", " / "` (two quoted args); `truncate: 80` (one unquoted integer arg); `yesno: "Active", "Inactive"` (two quoted args).
 
 **`default:` fires on `null` or `undefined` only — not on filter errors.** A short-circuit from a prior `ok: false` result (type mismatch or unknown filter in lenient mode) leaves the placeholder intact; `default:` is not reached. For example, `{{ items | pluck: "name" | default: "none" }}` where `pluck` produces a type mismatch short-circuits before `default:` — the result is the placeholder, not `"none"`.
 
@@ -273,35 +273,35 @@ gate:
 
 ### Tier 2 filters
 
-| Filter | Arg | Input | Output |
-|---|---|---|---|
-| `pluck` | key (string) | `object[]` | array of values for key; absent keys and non-object items omitted |
-| `count` | — | `array` | array length as string; empty array → `"0"` |
-| `limit` | max items (integer) | `array` | first N items; `limit: 0` → `[]` |
-| `compact` | — | `array` | array with `null`/`undefined` entries removed |
-| `replace` | search, replacement (both required) | `string` | replaces all occurrences of search with replacement; case-sensitive; empty search → placeholder |
-| `round` | decimals (integer, default `0`) | `number` | rounded string |
-| `floor` | — | `number` | largest integer ≤ input, as string |
-| `ceil` | — | `number` | smallest integer ≥ input, as string |
-| `abs` | — | `number` | absolute value as string |
-| `number_format` | decimals (integer, default `0`) | `number` | locale-formatted string with thousands separator; locale is `en-US` |
-| `percent` | decimals (integer, default `0`) | `number` [0, 1] | e.g. `"85.7%"` — input is a fraction, multiplied by 100 |
-| `yesno` | yes label, no label (both optional) | `boolean` | `"yes"` / `"no"` by default; custom labels when two args provided; one arg falls back to defaults |
-| `and_join` | — | `unknown[]` | Oxford comma join; empty array → placeholder |
-| `trim` | — | `string` | leading and trailing whitespace removed |
-| `first` | — | `array` | first element; empty array → placeholder |
-| `last` | — | `array` | last element; empty array → placeholder |
-| `sum` | — | `number[]` | sum of elements as string; empty array → `"0"`; non-number element → placeholder |
-| `flatten` | — | `array` | one level deep flatten; does not recurse |
-| `split` | delimiter (required) | `string` | splits on delimiter string (any non-empty string); produces `string[]`; empty delimiter → placeholder |
-| `sort` | — | `array` | lexicographically sorted copy; elements coerced via `String()` for comparison; stable sort |
-| `unique` | — | `array` | deduplicated array; equality by `JSON.stringify`; property order in objects matters |
-| `title` | — | `string` | first character of each whitespace-separated word uppercased; remaining characters unchanged; hyphens are not word boundaries |
-| `code` | — | `string` | wraps value in single backticks for Markdown/Slack inline code; inner backticks not escaped — values containing backticks may produce malformed output; intended for single-line values |
-| `indent` | spaces (integer, required) | `string` | prefixes each non-empty line with N spaces; empty lines not indented |
-| `date` | preset (`short`, `long`, `iso`, `time`, `datetime`) — default `short` | `string` (ISO 8601) | formatted date in UTC; `short` → `"Jan 28, 2026"`; unparseable string → placeholder |
-| `from_now` | — | `string` (ISO 8601) | relative time string, e.g. `"3 minutes ago"` or `"in 5 minutes"`; uses `Intl.RelativeTimeFormat` |
-| `duration` | — | `number` (milliseconds) | duration string, e.g. `"1m 23s"` or `"45s"`; negative → placeholder |
+| Filter          | Arg                                                                   | Input                   | Output                                                                                                                                                                                  |
+| --------------- | --------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pluck`         | key (string)                                                          | `object[]`              | array of values for key; absent keys and non-object items omitted                                                                                                                       |
+| `count`         | —                                                                     | `array`                 | array length as string; empty array → `"0"`                                                                                                                                             |
+| `limit`         | max items (integer)                                                   | `array`                 | first N items; `limit: 0` → `[]`                                                                                                                                                        |
+| `compact`       | —                                                                     | `array`                 | array with `null`/`undefined` entries removed                                                                                                                                           |
+| `replace`       | search, replacement (both required)                                   | `string`                | replaces all occurrences of search with replacement; case-sensitive; empty search → placeholder                                                                                         |
+| `round`         | decimals (integer, default `0`)                                       | `number`                | rounded string                                                                                                                                                                          |
+| `floor`         | —                                                                     | `number`                | largest integer ≤ input, as string                                                                                                                                                      |
+| `ceil`          | —                                                                     | `number`                | smallest integer ≥ input, as string                                                                                                                                                     |
+| `abs`           | —                                                                     | `number`                | absolute value as string                                                                                                                                                                |
+| `number_format` | decimals (integer, default `0`)                                       | `number`                | locale-formatted string with thousands separator; locale is `en-US`                                                                                                                     |
+| `percent`       | decimals (integer, default `0`)                                       | `number` [0, 1]         | e.g. `"85.7%"` — input is a fraction, multiplied by 100                                                                                                                                 |
+| `yesno`         | yes label, no label (both optional)                                   | `boolean`               | `"yes"` / `"no"` by default; custom labels when two args provided; one arg falls back to defaults                                                                                       |
+| `and_join`      | —                                                                     | `unknown[]`             | Oxford comma join; empty array → placeholder                                                                                                                                            |
+| `trim`          | —                                                                     | `string`                | leading and trailing whitespace removed                                                                                                                                                 |
+| `first`         | —                                                                     | `array`                 | first element; empty array → placeholder                                                                                                                                                |
+| `last`          | —                                                                     | `array`                 | last element; empty array → placeholder                                                                                                                                                 |
+| `sum`           | —                                                                     | `number[]`              | sum of elements as string; empty array → `"0"`; non-number element → placeholder                                                                                                        |
+| `flatten`       | —                                                                     | `array`                 | one level deep flatten; does not recurse                                                                                                                                                |
+| `split`         | delimiter (required)                                                  | `string`                | splits on delimiter string (any non-empty string); produces `string[]`; empty delimiter → placeholder                                                                                   |
+| `sort`          | —                                                                     | `array`                 | lexicographically sorted copy; elements coerced via `String()` for comparison; stable sort                                                                                              |
+| `unique`        | —                                                                     | `array`                 | deduplicated array; equality by `JSON.stringify`; property order in objects matters                                                                                                     |
+| `title`         | —                                                                     | `string`                | first character of each whitespace-separated word uppercased; remaining characters unchanged; hyphens are not word boundaries                                                           |
+| `code`          | —                                                                     | `string`                | wraps value in single backticks for Markdown/Slack inline code; inner backticks not escaped — values containing backticks may produce malformed output; intended for single-line values |
+| `indent`        | spaces (integer, required)                                            | `string`                | prefixes each non-empty line with N spaces; empty lines not indented                                                                                                                    |
+| `date`          | preset (`short`, `long`, `iso`, `time`, `datetime`) — default `short` | `string` (ISO 8601)     | formatted date in UTC; `short` → `"Jan 28, 2026"`; unparseable string → placeholder                                                                                                     |
+| `from_now`      | —                                                                     | `string` (ISO 8601)     | relative time string, e.g. `"3 minutes ago"` or `"in 5 minutes"`; uses `Intl.RelativeTimeFormat`                                                                                        |
+| `duration`      | —                                                                     | `number` (milliseconds) | duration string, e.g. `"1m 23s"` or `"45s"`; negative → placeholder                                                                                                                     |
 
 > All `date` output is in UTC. `timeZone: 'UTC'` is used in every `Intl.DateTimeFormat`
 > call — output is deterministic regardless of server timezone.
@@ -515,12 +515,12 @@ The profile name and its SHA-256 hash are recorded in the evidence snapshot for 
 
 The `prompt` field supports template references resolved at runtime:
 
-| Syntax                                   | Resolves to                                                                      |
-| ---------------------------------------- | -------------------------------------------------------------------------------- |
-| `{{ context.resources.STEP.FIELD }}`     | Value of `FIELD` in the evidence output of `STEP`                                |
-| `{{ run.params.FIELD }}`                 | Value of `FIELD` in the run's `params`                                           |
-| `{{ workflow.context.NAME }}`            | Content of the named workflow context entry, wrapped per `context_wrapper`       |
-| `{{ workflow.context.NAME.raw }}`        | Raw content of the named workflow context entry, no wrapping                     |
+| Syntax                               | Resolves to                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| `{{ context.resources.STEP.FIELD }}` | Value of `FIELD` in the evidence output of `STEP`                          |
+| `{{ run.params.FIELD }}`             | Value of `FIELD` in the run's `params`                                     |
+| `{{ workflow.context.NAME }}`        | Content of the named workflow context entry, wrapped per `context_wrapper` |
+| `{{ workflow.context.NAME.raw }}`    | Raw content of the named workflow context entry, no wrapping               |
 
 Unresolved references are left as literal strings.
 
@@ -537,14 +537,14 @@ configuration — canonical schemas, output format rules, domain glossaries, bra
 workflow_context:
   canonical_schema:
     source:
-      path: ./schema.json       # relative to the workflow YAML file
-    description: "Field definitions and output rules"  # optional
+      path: ./schema.json # relative to the workflow YAML file
+    description: 'Field definitions and output rules' # optional
 
   brand_guidelines:
     source:
       path: ./guidelines.md
 
-context_wrapper: xml  # optional; default is xml
+context_wrapper: xml # optional; default is xml
 ```
 
 In a step prompt:
@@ -580,18 +580,18 @@ prompt: |
 
 ### Entry fields
 
-| Field               | Type   | Required | Description                                                          |
-| ------------------- | ------ | -------- | -------------------------------------------------------------------- |
-| `source.path`       | string | Yes      | File path relative to the workflow YAML. Resolved to absolute at registration time. |
-| `description`       | string | No       | Human-readable description of what the file contains.               |
+| Field         | Type   | Required | Description                                                                         |
+| ------------- | ------ | -------- | ----------------------------------------------------------------------------------- |
+| `source.path` | string | Yes      | File path relative to the workflow YAML. Resolved to absolute at registration time. |
+| `description` | string | No       | Human-readable description of what the file contains.                               |
 
 ### `context_wrapper` values
 
-| Value      | Result for `{{ workflow.context.NAME }}`         |
-| ---------- | ------------------------------------------------ |
-| `xml`      | `<NAME>\n{content}\n</NAME>` **(default)**      |
-| `brackets` | `[NAME]\n{content}\n[/NAME]`                    |
-| `none`     | Raw content, same as `.raw`                      |
+| Value      | Result for `{{ workflow.context.NAME }}`   |
+| ---------- | ------------------------------------------ |
+| `xml`      | `<NAME>\n{content}\n</NAME>` **(default)** |
+| `brackets` | `[NAME]\n{content}\n[/NAME]`               |
+| `none`     | Raw content, same as `.raw`                |
 
 `{{ workflow.context.NAME.raw }}` always returns raw content regardless of `context_wrapper`.
 

@@ -54,9 +54,7 @@ describe('loadWorkflowContext', () => {
     expect(result['schema']).toBeDefined();
     expect(result['schema']!.source_path).toBe(filePath);
     expect(result['schema']!.content).toBe(content);
-    expect(result['schema']!.content_hash).toBe(
-      createHash('sha256').update(content).digest('hex'),
-    );
+    expect(result['schema']!.content_hash).toBe(createHash('sha256').update(content).digest('hex'));
     expect(result['schema']!.error).toBeUndefined();
     // loaded_at should be a valid ISO timestamp
     expect(() => new Date(result['schema']!.loaded_at)).not.toThrow();

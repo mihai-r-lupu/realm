@@ -53,7 +53,7 @@ steps:
   step_one:
     description: '...'
     execution: agent # the AI agent executes this step
-    depends_on: []   # no dependencies — starts immediately
+    depends_on: [] # no dependencies — starts immediately
     input_schema: # the engine validates agent output against this schema
       type: object
       required: [result]
@@ -131,7 +131,9 @@ Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anth
 
 `realm agent` registers the workflow temporarily, starts a run, and drives every `execution: agent` step. Auto steps run without any LLM call. Schema validation applies exactly as in the interactive run — if the LLM returns invalid output, the engine rejects it, the agent retries, and the run only advances when the schema passes.
 
-If the workflow contains a human gate, `realm agent` pauses and prints the `realm run respond` command to use. Run it in a second terminal to approve or reject. `realm agent` detects the resolved gate and continues automatically.
+If the workflow contains a human gate, `realm agent` pauses and prints the gate message and the `realm run respond` command. Run it in a second terminal to approve or reject. `realm agent` detects the resolved gate and continues automatically.
+
+**Slack gate notifications:** instead of responding in the terminal, you can have `realm agent` post the gate message to Slack. Set `SLACK_WEBHOOK_URL` for a one-way notification (terminal command still required), or `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` for full bidirectional resolution — reply in the Slack thread and the gate resolves automatically. A third mode using the Slack Events API gives real-time push delivery for production deployments. For setup instructions, see [Slack Gate Modes](reference/realm-agent-slack.md).
 
 When the run completes, `realm agent` prints the last agent step's output directly to the terminal:
 

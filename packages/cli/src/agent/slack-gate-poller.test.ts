@@ -10,10 +10,7 @@ function makeRepliesResponse(messages: Array<Record<string, unknown>>) {
 }
 
 function stubFetch(data: unknown) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue({ json: async () => data }),
-  );
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => data }));
 }
 
 describe('pollSlackThread', () => {

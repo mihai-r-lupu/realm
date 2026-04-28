@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @sensigo/realm-cli — command-line interface for Realm
+import 'dotenv/config';
 import { Command } from 'commander';
 import { workflowCommands, runCommands, topLevelCommands } from './commands-registry.js';
 

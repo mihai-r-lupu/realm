@@ -9,7 +9,7 @@ and no side effects are re-fired.
 ## Pain points addressed
 
 - **State management / no checkpoint resume (#4)** — `realm run resume <run-id> --from
-  tag_content` continues from step 3; `fetch_content` and `summarise` are not re-run. Their
+tag_content` continues from step 3; `fetch_content` and `summarise` are not re-run. Their
   validated outputs are already in the evidence chain.
 - **LLM provider reliability / timeouts (#10)** — a timeout at `tag_content` pauses the run
   in the step's pending state; the run is not lost. The evidence chain preserves everything

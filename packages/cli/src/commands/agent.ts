@@ -13,7 +13,11 @@ import {
 import type { ProviderName } from '../agent/llm-provider.js';
 import { resolveProvider } from '../agent/llm-provider.js';
 import { runAgent } from '../agent/run-agent.js';
-import { checkAdapterPrerequisites, formatPreflightError, checkSlackBidirectionalConfig } from '../agent/preflight.js';
+import {
+  checkAdapterPrerequisites,
+  formatPreflightError,
+  checkSlackBidirectionalConfig,
+} from '../agent/preflight.js';
 
 export const agentCommand = new Command('agent')
   .description('Run a workflow autonomously using an LLM provider')
@@ -21,60 +25,103 @@ export const agentCommand = new Command('agent')
   .option('--params <json>', 'Initial run parameters as JSON string', '{}')
   .option('--provider <provider>', 'LLM provider: openai or anthropic (auto-detected from env)')
   .option('--model <model>', 'Model name override (default: gpt-4o / claude-sonnet-4-5)')
-  .option('--register', 'Persist the workflow definition to ~/.realm/workflows/ (same as realm workflow register)')
-  .action(async (opts: { workflow: string; params: string; provider?: string; model?: string; register?: boolean }) => {
-    try {
-      const params = JSON.parse(opts.params) as Record<string, unknown>;
+  .option(
+    '--register',
+    'Persist the workflow definition to ~/.realm/workflows/ (same as realm workflow register)',
+  )
+  .action(
+    async (opts: {
+      workflow: string;
+      params: string;
+      provider?: string;
+      model?: string;
+      register?: boolean;
+    }) => {
+      try {
+        const params = JSON.parse(opts.params) as Record<string, unknown>;
 
-      // Resolve and load workflow definition before starting a run.
-      const inputPath = opts.workflow;
-      const filePath =
-        inputPath.endsWith('.yaml') || inputPath.endsWith('.yml')
-          ? inputPath
-          : join(inputPath, 'workflow.yaml');
-      const definition = loadWorkflowFromFile(filePath);
+        // Resolve and load workflow definition before starting a run.
+        const inputPath = opts.workflow;
+        const filePath =
+          inputPath.endsWith('.yaml') || inputPath.endsWith('.yml')
+            ? inputPath
+            : join(inputPath, 'workflow.yaml');
+        const definition = loadWorkflowFromFile(filePath);
 
-      // Fail fast if required adapter env vars are missing.
-      const preflightFindings = checkAdapterPrerequisites(definition);
-      if (preflightFindings.length > 0) {
-        console.error(formatPreflightError(preflightFindings));
+        // Fail fast if required adapter env vars are missing.
+        const preflightFindings = checkAdapterPrerequisites(definition);
+        if (preflightFindings.length > 0) {
+          console.error(formatPreflightError(preflightFindings));
+          process.exit(1);
+        }
+
+        // Print advisory warnings for incomplete Slack bidirectional config.
+        const slackWarnings = checkSlackBidirectionalConfig();
+        for (const warning of slackWarnings) {
+          console.warn(`  ⚠  ${warning.message}`);
+        }
+
+        const workflowStore = new JsonWorkflowStore();
+        const store = new JsonFileStore();
+        const provider = await resolveProvider(
+          opts.provider as ProviderName | undefined,
+          opts.model,
+        );
+        const registry = createDefaultRegistry();
+        if (process.env['GITHUB_TOKEN'] !== undefined)
+          registry.register(
+            'adapter',
+            'github',
+            new GitHubAdapter('github', { auth: { token: process.env['GITHUB_TOKEN'] } }),
+          );
+        if (process.env['SLACK_WEBHOOK_URL'] !== undefined)
+          registry.register(
+            'adapter',
+            'slack',
+            new SlackAdapter('slack', { webhook_url: process.env['SLACK_WEBHOOK_URL'] }),
+          );
+        const result = await runAgent(
+          { store, workflowStore, provider, registry },
+          {
+            definition,
+            params,
+            register: opts.register === true,
+            ...(process.env['SLACK_WEBHOOK_URL'] !== undefined && {
+              slackWebhookUrl: process.env['SLACK_WEBHOOK_URL'],
+            }),
+            ...(process.env['SLACK_BOT_TOKEN'] !== undefined && {
+              slackBotToken: process.env['SLACK_BOT_TOKEN'],
+            }),
+            ...(process.env['SLACK_CHANNEL_ID'] !== undefined && {
+              slackChannelId: process.env['SLACK_CHANNEL_ID'],
+            }),
+            ...(process.env['SLACK_SIGNING_SECRET'] !== undefined && {
+              slackSigningSecret: process.env['SLACK_SIGNING_SECRET'],
+            }),
+            ...(process.env['SLACK_EVENTS_PORT'] !== undefined && {
+              slackEventsPort: parseInt(process.env['SLACK_EVENTS_PORT'], 10),
+            }),
+            ...(process.env['SLACK_POLL_INTERVAL_MS'] !== undefined && {
+              slackPollIntervalMs: parseInt(process.env['SLACK_POLL_INTERVAL_MS'], 10),
+            }),
+            ...(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'] !== undefined && {
+              slackGateReminderIntervalMs: parseInt(
+                process.env['SLACK_GATE_REMINDER_INTERVAL_MS'],
+                10,
+              ),
+            }),
+            ...(process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'] !== undefined && {
+              slackGateEscalationThresholdMs: parseInt(
+                process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'],
+                10,
+              ),
+            }),
+          },
+        );
+        process.exit(result === 'completed' ? 0 : 1);
+      } catch (err) {
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
       }
-
-      // Print advisory warnings for incomplete Slack bidirectional config.
-      const slackWarnings = checkSlackBidirectionalConfig();
-      for (const warning of slackWarnings) {
-        console.warn(`  ⚠  ${warning.message}`);
-      }
-
-      const workflowStore = new JsonWorkflowStore();
-      const store = new JsonFileStore();
-      const provider = await resolveProvider(opts.provider as ProviderName | undefined, opts.model);
-      const registry = createDefaultRegistry();
-      if (process.env['GITHUB_TOKEN'] !== undefined)
-        registry.register('adapter', 'github', new GitHubAdapter('github', { auth: { token: process.env['GITHUB_TOKEN'] } }));
-      if (process.env['SLACK_WEBHOOK_URL'] !== undefined)
-        registry.register('adapter', 'slack', new SlackAdapter('slack', { webhook_url: process.env['SLACK_WEBHOOK_URL'] }));
-      const result = await runAgent(
-        { store, workflowStore, provider, registry },
-        {
-          definition,
-          params,
-          register: opts.register === true,
-          ...(process.env['SLACK_WEBHOOK_URL'] !== undefined && { slackWebhookUrl: process.env['SLACK_WEBHOOK_URL'] }),
-          ...(process.env['SLACK_BOT_TOKEN'] !== undefined && { slackBotToken: process.env['SLACK_BOT_TOKEN'] }),
-          ...(process.env['SLACK_CHANNEL_ID'] !== undefined && { slackChannelId: process.env['SLACK_CHANNEL_ID'] }),
-          ...(process.env['SLACK_SIGNING_SECRET'] !== undefined && { slackSigningSecret: process.env['SLACK_SIGNING_SECRET'] }),
-          ...(process.env['SLACK_EVENTS_PORT'] !== undefined && { slackEventsPort: parseInt(process.env['SLACK_EVENTS_PORT'], 10) }),
-          ...(process.env['SLACK_POLL_INTERVAL_MS'] !== undefined && { slackPollIntervalMs: parseInt(process.env['SLACK_POLL_INTERVAL_MS'], 10) }),
-          ...(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'] !== undefined && { slackGateReminderIntervalMs: parseInt(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'], 10) }),
-          ...(process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'] !== undefined && { slackGateEscalationThresholdMs: parseInt(process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'], 10) }),
-        },
-      );
-      process.exit(result === 'completed' ? 0 : 1);
-    } catch (err) {
-      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-      process.exit(1);
-    }
-  });
-
+    },
+  );

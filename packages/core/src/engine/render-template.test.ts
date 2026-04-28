@@ -18,10 +18,10 @@ describe('renderTemplate', () => {
   });
 
   it('resolves context.resources reference to an object (JSON stringified)', () => {
-    const result = renderTemplate(
-      'Findings: {{ context.resources.review_security.findings }}',
-      { evidenceByStep: evidence, runParams: {} },
-    );
+    const result = renderTemplate('Findings: {{ context.resources.review_security.findings }}', {
+      evidenceByStep: evidence,
+      runParams: {},
+    });
     expect(result).toContain('SQL injection');
     expect(result).toContain('critical');
   });
@@ -177,7 +177,10 @@ describe('applyFilter — bullets', () => {
   });
 
   it('returns type_mismatch for non-array input', () => {
-    expect(applyFilter('not an array', 'bullets', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+    expect(applyFilter('not an array', 'bullets', [])).toEqual({
+      ok: false,
+      reason: 'type_mismatch',
+    });
     expect(applyFilter(42, 'bullets', [])).toEqual({ ok: false, reason: 'type_mismatch' });
   });
 });
@@ -264,11 +267,17 @@ describe('applyFilter — lower', () => {
 
 describe('applyFilter — capitalize', () => {
   it('uppercases the first character, leaves the rest unchanged', () => {
-    expect(applyFilter('hello world', 'capitalize', [])).toEqual({ ok: true, value: 'Hello world' });
+    expect(applyFilter('hello world', 'capitalize', [])).toEqual({
+      ok: true,
+      value: 'Hello world',
+    });
   });
 
   it('all-caps rest remains unchanged', () => {
-    expect(applyFilter('DATABASE_UNAVAILABLE', 'capitalize', [])).toEqual({ ok: true, value: 'DATABASE_UNAVAILABLE' });
+    expect(applyFilter('DATABASE_UNAVAILABLE', 'capitalize', [])).toEqual({
+      ok: true,
+      value: 'DATABASE_UNAVAILABLE',
+    });
   });
 
   it('already capitalized string is unchanged', () => {
@@ -312,7 +321,10 @@ describe('applyFilter — truncate', () => {
   });
 
   it('returns type_mismatch when arg is non-numeric', () => {
-    expect(applyFilter('hello', 'truncate', ['abc'])).toEqual({ ok: false, reason: 'type_mismatch' });
+    expect(applyFilter('hello', 'truncate', ['abc'])).toEqual({
+      ok: false,
+      reason: 'type_mismatch',
+    });
   });
 });
 
@@ -363,11 +375,17 @@ describe('applyFilter — pluck', () => {
   });
 
   it('returns type_mismatch when arg is missing', () => {
-    expect(applyFilter([{ name: 'a' }], 'pluck', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+    expect(applyFilter([{ name: 'a' }], 'pluck', [])).toEqual({
+      ok: false,
+      reason: 'type_mismatch',
+    });
   });
 
   it('returns type_mismatch when arg is empty string', () => {
-    expect(applyFilter([{ name: 'a' }], 'pluck', [''])).toEqual({ ok: false, reason: 'type_mismatch' });
+    expect(applyFilter([{ name: 'a' }], 'pluck', [''])).toEqual({
+      ok: false,
+      reason: 'type_mismatch',
+    });
   });
 });
 
@@ -530,7 +548,10 @@ describe('applyFilter — number_format', () => {
   });
 
   it('formats with decimal places', () => {
-    expect(applyFilter(1234567.891, 'number_format', ['2'])).toEqual({ ok: true, value: '1,234,567.89' });
+    expect(applyFilter(1234567.891, 'number_format', ['2'])).toEqual({
+      ok: true,
+      value: '1,234,567.89',
+    });
   });
 
   it('explicit 0 decimals formats with thousands separator only', () => {
@@ -542,11 +563,17 @@ describe('applyFilter — number_format', () => {
   });
 
   it('returns type_mismatch for non-number input', () => {
-    expect(applyFilter('1234', 'number_format', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+    expect(applyFilter('1234', 'number_format', [])).toEqual({
+      ok: false,
+      reason: 'type_mismatch',
+    });
   });
 
   it('returns type_mismatch for invalid arg', () => {
-    expect(applyFilter(1234, 'number_format', ['abc'])).toEqual({ ok: false, reason: 'type_mismatch' });
+    expect(applyFilter(1234, 'number_format', ['abc'])).toEqual({
+      ok: false,
+      reason: 'type_mismatch',
+    });
   });
 });
 
@@ -612,7 +639,10 @@ describe('applyFilter — replace', () => {
   });
 
   it('returns type_mismatch for empty search string', () => {
-    expect(applyFilter('hello', 'replace', ['', 'x'])).toEqual({ ok: false, reason: 'type_mismatch' });
+    expect(applyFilter('hello', 'replace', ['', 'x'])).toEqual({
+      ok: false,
+      reason: 'type_mismatch',
+    });
   });
 
   it('returns type_mismatch when replacement arg is missing (one arg)', () => {
@@ -654,7 +684,10 @@ describe('applyFilter — yesno', () => {
   });
 
   it('three args ignored beyond first two', () => {
-    expect(applyFilter(true, 'yesno', ['Active', 'Off', 'extra'])).toEqual({ ok: true, value: 'Active' });
+    expect(applyFilter(true, 'yesno', ['Active', 'Off', 'extra'])).toEqual({
+      ok: true,
+      value: 'Active',
+    });
   });
 
   it('returns type_mismatch for non-boolean input', () => {
@@ -677,7 +710,10 @@ describe('applyFilter — and_join', () => {
   });
 
   it('joins three items with Oxford comma', () => {
-    expect(applyFilter(['a', 'b', 'c'], 'and_join', [])).toEqual({ ok: true, value: 'a, b, and c' });
+    expect(applyFilter(['a', 'b', 'c'], 'and_join', [])).toEqual({
+      ok: true,
+      value: 'a, b, and c',
+    });
   });
 
   it('joins four items with Oxford comma', () => {
@@ -886,8 +922,21 @@ describe('applyFilter — unique', () => {
   });
 
   it('keeps objects with different property order as distinct', () => {
-    const result = applyFilter([{ a: 1, b: 2 }, { b: 2, a: 1 }], 'unique', []);
-    expect(result).toEqual({ ok: true, value: [{ a: 1, b: 2 }, { b: 2, a: 1 }] });
+    const result = applyFilter(
+      [
+        { a: 1, b: 2 },
+        { b: 2, a: 1 },
+      ],
+      'unique',
+      [],
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: [
+        { a: 1, b: 2 },
+        { b: 2, a: 1 },
+      ],
+    });
   });
 
   it('empty array returns empty array', () => {
@@ -1114,7 +1163,10 @@ describe('renderTemplate — pipe filter syntax', () => {
 
   it('applies bullets filter to an array', () => {
     const result = renderTemplate('Items:\n{{ context.resources.step_a.items | bullets }}', {
-      evidenceByStep: { step_a: { items: ['one', 'two', 'three'] } } as unknown as Record<string, Record<string, unknown>>,
+      evidenceByStep: { step_a: { items: ['one', 'two', 'three'] } } as unknown as Record<
+        string,
+        Record<string, unknown>
+      >,
       runParams: {},
     });
     expect(result).toBe('Items:\n• one\n• two\n• three');
@@ -1122,7 +1174,10 @@ describe('renderTemplate — pipe filter syntax', () => {
 
   it('leaves placeholder intact when bullets receives empty array', () => {
     const result = renderTemplate('{{ context.resources.step_a.items | bullets }}', {
-      evidenceByStep: { step_a: { items: [] } } as unknown as Record<string, Record<string, unknown>>,
+      evidenceByStep: { step_a: { items: [] } } as unknown as Record<
+        string,
+        Record<string, unknown>
+      >,
       runParams: {},
     });
     expect(result).toBe('{{ context.resources.step_a.items | bullets }}');
@@ -1130,7 +1185,10 @@ describe('renderTemplate — pipe filter syntax', () => {
 
   it('applies join with quoted separator arg', () => {
     const result = renderTemplate('Tags: {{ context.resources.step_a.tags | join: " / " }}', {
-      evidenceByStep: { step_a: { tags: ['bug', 'urgent'] } } as unknown as Record<string, Record<string, unknown>>,
+      evidenceByStep: { step_a: { tags: ['bug', 'urgent'] } } as unknown as Record<
+        string,
+        Record<string, unknown>
+      >,
       runParams: {},
     });
     expect(result).toBe('Tags: bug / urgent');
@@ -1194,15 +1252,12 @@ describe('renderTemplate — pipe filter syntax', () => {
   });
 
   it('chains pluck and and_join over a step output array', () => {
-    const result = renderTemplate(
-      '{{ context.resources.step.items | pluck: "name" | and_join }}',
-      {
-        evidenceByStep: {
-          step: { items: [{ name: 'alpha' }, { name: 'beta' }, { name: 'gamma' }] },
-        } as unknown as Record<string, Record<string, unknown>>,
-        runParams: {},
-      },
-    );
+    const result = renderTemplate('{{ context.resources.step.items | pluck: "name" | and_join }}', {
+      evidenceByStep: {
+        step: { items: [{ name: 'alpha' }, { name: 'beta' }, { name: 'gamma' }] },
+      } as unknown as Record<string, Record<string, unknown>>,
+      runParams: {},
+    });
     expect(result).toBe('alpha, beta, and gamma');
   });
 
@@ -1268,19 +1323,27 @@ describe('renderTemplate — pipe filter syntax', () => {
 describe('renderTemplate — strict mode', () => {
   it('throws UnknownFilterError for unknown filter when strict: true', () => {
     expect(() =>
-      renderTemplate('{{ run.params.x | bogus }}', {
-        evidenceByStep: {},
-        runParams: { x: 'hello' },
-      }, { strict: true }),
+      renderTemplate(
+        '{{ run.params.x | bogus }}',
+        {
+          evidenceByStep: {},
+          runParams: { x: 'hello' },
+        },
+        { strict: true },
+      ),
     ).toThrow(UnknownFilterError);
   });
 
   it('thrown UnknownFilterError carries the filter name', () => {
     try {
-      renderTemplate('{{ run.params.x | bogus }}', {
-        evidenceByStep: {},
-        runParams: { x: 'hello' },
-      }, { strict: true });
+      renderTemplate(
+        '{{ run.params.x | bogus }}',
+        {
+          evidenceByStep: {},
+          runParams: { x: 'hello' },
+        },
+        { strict: true },
+      );
       expect.fail('should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(UnknownFilterError);
@@ -1289,20 +1352,26 @@ describe('renderTemplate — strict mode', () => {
   });
 
   it('does NOT throw for type_mismatch even in strict mode — leaves placeholder intact', () => {
-    const result = renderTemplate('{{ run.params.num | upper }}', {
-      evidenceByStep: {},
-      runParams: { num: 42 },
-    }, { strict: true });
+    const result = renderTemplate(
+      '{{ run.params.num | upper }}',
+      {
+        evidenceByStep: {},
+        runParams: { num: 42 },
+      },
+      { strict: true },
+    );
     expect(result).toBe('{{ run.params.num | upper }}');
   });
 
   it('resolves known filters successfully in strict mode', () => {
-    const result = renderTemplate('{{ run.params.env | upper }}', {
-      evidenceByStep: {},
-      runParams: { env: 'staging' },
-    }, { strict: true });
+    const result = renderTemplate(
+      '{{ run.params.env | upper }}',
+      {
+        evidenceByStep: {},
+        runParams: { env: 'staging' },
+      },
+      { strict: true },
+    );
     expect(result).toBe('STAGING');
   });
 });
-
-

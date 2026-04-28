@@ -4,7 +4,12 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resumeRun } from './resume.js';
-import { JsonFileStore, JsonWorkflowStore, WorkflowError, CURRENT_WORKFLOW_SCHEMA_VERSION } from '@sensigo/realm';
+import {
+  JsonFileStore,
+  JsonWorkflowStore,
+  WorkflowError,
+  CURRENT_WORKFLOW_SCHEMA_VERSION,
+} from '@sensigo/realm';
 import type { WorkflowDefinition } from '@sensigo/realm';
 
 const testWorkflow: WorkflowDefinition = {
@@ -91,12 +96,12 @@ describe('resumeRun', () => {
       terminal_reason: 'Something went wrong',
     });
 
-    await expect(
-      resumeRun(run.id, 'nonexistent-step', runStore, workflowStore),
-    ).rejects.toThrow(WorkflowError);
+    await expect(resumeRun(run.id, 'nonexistent-step', runStore, workflowStore)).rejects.toThrow(
+      WorkflowError,
+    );
 
-    await expect(
-      resumeRun(run.id, 'nonexistent-step', runStore, workflowStore),
-    ).rejects.toThrow('not found');
+    await expect(resumeRun(run.id, 'nonexistent-step', runStore, workflowStore)).rejects.toThrow(
+      'not found',
+    );
   });
 });

@@ -91,6 +91,9 @@ steps:
       choices:
         - approve
         - reject
+      message: |
+        PR #{{ run.params.pr_number }} — {{ context.resources.write_summary.title }}
+        Risk: {{ context.resources.write_summary.risk | upper }} | AI: {{ context.resources.write_summary.recommendation }}
 
   post_to_slack:
     description: Post the approved PR summary title to the team Slack channel.

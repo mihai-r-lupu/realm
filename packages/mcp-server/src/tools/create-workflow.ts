@@ -249,7 +249,12 @@ export function registerCreateWorkflow(server: McpServer, opts?: HandleRunStores
       try {
         const result = await handleCreateWorkflow(args as CreateWorkflowArgs, opts);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ ...result, command: 'create_workflow' }, null, 2) }],
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ ...result, command: 'create_workflow' }, null, 2),
+            },
+          ],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
