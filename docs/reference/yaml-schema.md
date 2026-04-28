@@ -266,6 +266,33 @@ gate:
 
 **Author note:** If you need a fallback for optional fields that may also be the wrong type, ensure the step always outputs the field as a string or omits it — don't rely on `| default:` to cover upstream type errors.
 
+### Tier 2 filters
+
+| Filter | Arg | Input | Output |
+|---|---|---|---|
+| `pluck` | key (string) | `object[]` | array of values for key; absent keys and non-object items omitted |
+| `count` | — | `array` | array length as string; empty array → `"0"` |
+| `limit` | max items (integer) | `array` | first N items; `limit: 0` → `[]` |
+| `compact` | — | `array` | array with `null`/`undefined` entries removed |
+| `round` | decimals (integer, default `0`) | `number` | rounded string |
+| `percent` | decimals (integer, default `0`) | `number` [0, 1] | e.g. `"85.7%"` — input is a fraction, multiplied by 100 |
+| `yesno` | — | `boolean` | `"yes"` or `"no"` |
+| `and_join` | — | `unknown[]` | Oxford comma join; empty array → placeholder |
+
+**Tier 2 filter example:**
+
+```yaml
+gate:
+  message: |
+    Review required for {{ run.params.repo | upper }}.
+    {{ context.resources.scan.findings | pluck: "title" | limit: 5 | bullets }}
+
+    Issues found: {{ context.resources.scan.findings | count }}
+    Confidence: {{ context.resources.scan.confidence | percent: 1 }}
+    Auto-fixable: {{ context.resources.scan.auto_fixable | yesno }}
+    Affected modules: {{ context.resources.scan.modules | compact | and_join }}
+```
+
 ---
 
 ## Retry
