@@ -45,16 +45,13 @@ export class AnthropicProvider implements LlmProvider {
     const systemPrompt = buildSystemPrompt(inputSchema);
 
     const makeRequest = async (userContent: string): Promise<string> => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response = await (
-        client.messages.create as (opts: Record<string, unknown>) => Promise<any>
-      )({
+      const response = await // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (client.messages.create as (opts: Record<string, unknown>) => Promise<any>)({
         model: this.model,
         max_tokens: 4096,
         system: systemPrompt,
         messages: [{ role: 'user', content: userContent }],
       });
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       const block = (response.content as unknown[]).find(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (b: any) => (b as { type?: string }).type === 'text',

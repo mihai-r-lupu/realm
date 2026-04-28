@@ -349,21 +349,20 @@ describe('fan-out: multiple steps eligible simultaneously', () => {
         'step-c': { description: 'Branch 2', execution: 'agent', depends_on: ['step-a'] },
       },
     };
-    const store2 = new JsonFileStore(dir);
-    const run = await store2.create({
+    const run = await store.create({
       workflowId: definition.id,
       workflowVersion: 1,
       params: {},
     });
 
-    await executeStep(store2, definition, {
+    await executeStep(store, definition, {
       runId: run.id,
       command: 'step-a',
       input: {},
       dispatcher: passthroughDispatcher,
     });
 
-    const updatedRun = await store2.get(run.id);
+    const updatedRun = await store.get(run.id);
     const eligible = findEligibleSteps(definition, updatedRun);
     expect(eligible).toContain('step-b');
     expect(eligible).toContain('step-c');

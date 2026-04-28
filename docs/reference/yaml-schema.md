@@ -224,6 +224,84 @@ Cross-step references also work: `{{ context.resources.prior_step.field }}`.
 
 **Slack path:** when `gate.message` is present, the resolved text is used in the Slack notification in place of the raw JSON preview. When absent, the existing `formatGatePreviewForSlack(preview)` fallback applies.
 
+### Authoring guidelines
+
+`gate.message` is a **decision card** — the minimal set of facts an operator needs to make their choice confidently. It is not a status report, not a content preview, and not a dump of the step's output.
+
+**Structure pattern:**
+
+```
+LINE 1     — Identity + the most important signal (severity, risk, category)
+LINES 2–N  — 2–4 scannable key facts (label: value format)
+[blank line]
+[action line — only when choices are not self-evident]
+```
+
+- **Target: 3–5 lines. Maximum: 8 lines.** Beyond this, operators skim to the choices and miss the context.
+- Line 1 must uniquely identify what is being reviewed and surface its urgency signal. In Slack it renders as bold when wrapped in `*...*`.
+- Lines 2–N are for impact scope, confidence level, counts, or the one-line summary of the pending action.
+- The runtime appends the response instructions (`realm run respond ...`) automatically — do **not** include them.
+
+**What to include:**
+
+| Include                                              | Reason                                            |
+| ---------------------------------------------------- | ------------------------------------------------- |
+| Identity — what specific thing this is               | Without this, every gate looks the same           |
+| Severity, risk, or confidence signal                 | Tells the operator how carefully to review        |
+| Impact scope — services, users, count                | Tells the operator how much they're committing to |
+| The pending action in one clause                     | What will happen if they approve                  |
+| Breaking constraints or flags that affect the choice | Things they'd want to know before saying yes      |
+
+**What to omit:**
+
+| Omit                                            | Reason                                                    |
+| ----------------------------------------------- | --------------------------------------------------------- |
+| Response instructions (`Reply 'approve' to...`) | The runtime appends these automatically                   |
+| Full document or report body                    | Put that content in `prompt`; `gate.message` is a summary |
+| Raw JSON arrays or objects                      | Use `\| join`, `\| bullets`, or `\| count` instead        |
+| Long strings without truncation                 | Bind with `\| truncate: N` to prevent layout blowout      |
+| Confidence notes when confidence is obvious     | Don't clutter high-signal messages with noise             |
+
+**Anti-patterns:**
+
+```yaml
+# BAD: omits identity — impossible to tell what's being approved
+message: |
+  Review this? Confirm to proceed or reject to cancel.
+
+# BAD: dumps the content body — gate.message is a summary, not the content
+message: |
+  Summary: {{ context.resources.write_summary.full_summary }}
+
+# BAD: includes response instructions — the runtime appends these
+message: |
+  PR #{{ run.params.pr_number }} detected.
+  Reply 'approve' to merge or 'reject' to discard.
+
+# BAD: raw array value — renders as ["src/index.ts","src/utils.ts",...]
+message: |
+  Changed files: {{ context.resources.scan.changed_files }}
+
+# GOOD: shaped for reading
+message: |
+  Changed files ({{ context.resources.scan.changed_files | count }}):
+  {{ context.resources.scan.changed_files | bullets }}
+```
+
+**Channel rendering:** the terminal renders `gate.message` as plain text — `*bold*` and other mrkdwn syntax appear literally. Keep messages plain text unless Slack is the primary surface. When Slack rendering matters, bold the headline only: `*{{ context.resources.step.title }}*`.
+
+**Checklist before shipping a gate:**
+
+- [ ] Line 1 uniquely identifies what is being reviewed
+- [ ] Severity, risk, or confidence signal is on line 1 or 2 — not buried
+- [ ] All array fields are formatted with `| join`, `| bullets`, or `| count`
+- [ ] All long strings are bounded with `| truncate: N`
+- [ ] Optional fields use `| default:` or are guaranteed present by the step's `input_schema`
+- [ ] No response instructions included
+- [ ] Total length is ≤ 8 lines
+- [ ] If content is truncated or capped (`| limit:`, `| truncate:`), the reviewer can either consult a primary source (URL, PR number, ticket) or — once bidirectional gate messaging is available — ask the agent for more detail in the same thread. Do not hide information that exists nowhere else and has no reachable primary source.
+- [ ] Tested in terminal rendering, not only previewed as Slack Markdown
+
 ---
 
 ## Template filters
