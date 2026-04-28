@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderTemplate, applyFilter, UnknownFilterError } from './render-template.js';
+import { renderTemplate, applyFilter, parseFilterArgs, UnknownFilterError } from './render-template.js';
 
 const evidence = {
   review_security: {
@@ -160,6 +160,50 @@ describe('renderTemplate — workflow.context namespace', () => {
       },
     );
     expect(result).toBe('Repo: acme/app\nCtx: Be concise.');
+  });
+});
+
+// ─── parseFilterArgs ────────────────────────────────────────────────────────
+
+describe('parseFilterArgs', () => {
+  it('returns [] for empty string', () => {
+    expect(parseFilterArgs('')).toEqual([]);
+  });
+
+  it('returns [] for whitespace-only string', () => {
+    expect(parseFilterArgs('   ')).toEqual([]);
+  });
+
+  it('parses single unquoted arg', () => {
+    expect(parseFilterArgs('80')).toEqual(['80']);
+  });
+
+  it('parses single double-quoted string arg with spaces', () => {
+    expect(parseFilterArgs('" / "')).toEqual([' / ']);
+  });
+
+  it('trims unquoted tokens with surrounding spaces', () => {
+    expect(parseFilterArgs(' a , b ')).toEqual(['a', 'b']);
+  });
+
+  it('parses two double-quoted args', () => {
+    expect(parseFilterArgs('"Error", "Issue"')).toEqual(['Error', 'Issue']);
+  });
+
+  it('does not split on comma inside a quoted arg', () => {
+    expect(parseFilterArgs('","')).toEqual([',']);
+  });
+
+  it('parses quoted empty string as empty string arg', () => {
+    expect(parseFilterArgs('""')).toEqual(['']);
+  });
+
+  it('parses single-quoted arg', () => {
+    expect(parseFilterArgs("'hello'")).toEqual(['hello']);
+  });
+
+  it('treats comma inside single quotes as part of token', () => {
+    expect(parseFilterArgs("','")).toEqual([',']);
   });
 });
 
@@ -447,6 +491,54 @@ describe('applyFilter — percent', () => {
   });
 });
 
+describe('applyFilter — replace', () => {
+  it('replaces all occurrences of a substring', () => {
+    expect(applyFilter('hello world', 'replace', ['world', 'there'])).toEqual({
+      ok: true,
+      value: 'hello there',
+    });
+  });
+
+  it('replaces all occurrences (multiple matches)', () => {
+    expect(applyFilter('aaa', 'replace', ['a', 'b'])).toEqual({ ok: true, value: 'bbb' });
+  });
+
+  it('returns input unchanged when search string not found', () => {
+    expect(applyFilter('hello', 'replace', ['xyz', 'abc'])).toEqual({ ok: true, value: 'hello' });
+  });
+
+  it('deletes occurrences when replacement is empty string', () => {
+    expect(applyFilter('hello', 'replace', ['l', ''])).toEqual({ ok: true, value: 'heo' });
+  });
+
+  it('handles quoted comma as search arg', () => {
+    expect(applyFilter('a,b,c', 'replace', [',', ' / '])).toEqual({
+      ok: true,
+      value: 'a / b / c',
+    });
+  });
+
+  it('is case-sensitive (no match on wrong case)', () => {
+    expect(applyFilter('Error', 'replace', ['error', 'x'])).toEqual({ ok: true, value: 'Error' });
+  });
+
+  it('returns type_mismatch for empty search string', () => {
+    expect(applyFilter('hello', 'replace', ['', 'x'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch when replacement arg is missing (one arg)', () => {
+    expect(applyFilter('hello', 'replace', ['l'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for empty args array', () => {
+    expect(applyFilter('hello', 'replace', [])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+
+  it('returns type_mismatch for non-string input', () => {
+    expect(applyFilter(42, 'replace', [',', '.'])).toEqual({ ok: false, reason: 'type_mismatch' });
+  });
+});
+
 describe('applyFilter — yesno', () => {
   it('returns "yes" for true', () => {
     expect(applyFilter(true, 'yesno', [])).toEqual({ ok: true, value: 'yes' });
@@ -456,8 +548,24 @@ describe('applyFilter — yesno', () => {
     expect(applyFilter(false, 'yesno', [])).toEqual({ ok: true, value: 'no' });
   });
 
-  it('ignores args without error', () => {
+  it('one arg, true → falls back to default "yes"', () => {
     expect(applyFilter(true, 'yesno', ['Active'])).toEqual({ ok: true, value: 'yes' });
+  });
+
+  it('one arg, false → falls back to default "no"', () => {
+    expect(applyFilter(false, 'yesno', ['Active'])).toEqual({ ok: true, value: 'no' });
+  });
+
+  it('two args, true → first arg', () => {
+    expect(applyFilter(true, 'yesno', ['Active', 'Off'])).toEqual({ ok: true, value: 'Active' });
+  });
+
+  it('two args, false → second arg', () => {
+    expect(applyFilter(false, 'yesno', ['Active', 'Off'])).toEqual({ ok: true, value: 'Off' });
+  });
+
+  it('three args ignored beyond first two', () => {
+    expect(applyFilter(true, 'yesno', ['Active', 'Off', 'extra'])).toEqual({ ok: true, value: 'Active' });
   });
 
   it('returns type_mismatch for non-boolean input', () => {
@@ -610,6 +718,14 @@ describe('renderTemplate — pipe filter syntax', () => {
       runParams: { score: 0.857 },
     });
     expect(result).toBe('Confidence: 85.7%');
+  });
+
+  it('applies replace filter with quoted comma in arg', () => {
+    const result = renderTemplate('{{ run.params.csv | replace: ",", " | " }}', {
+      evidenceByStep: {},
+      runParams: { csv: 'a,b,c' },
+    });
+    expect(result).toBe('a | b | c');
   });
 });
 

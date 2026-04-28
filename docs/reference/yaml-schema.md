@@ -244,7 +244,7 @@ The path is resolved first. Each filter in the chain receives the current value 
 
 `truncate` does not auto-stringify numbers; ensure the value is a string in the step's output if truncation is needed.
 
-**Arg quoting:** a single quoted argument follows the filter name after a colon. Quoted args strip the outer quote characters: `join: " / "` passes ` / ` as the separator.
+**Arg quoting and multi-arg syntax:** Filter arguments follow the filter name after a colon. Multiple arguments are separated by commas. String arguments containing spaces or commas must be quoted with double or single quotes; the outer quotes are stripped. Unquoted arguments are trimmed. Examples: `join: " / "` (one quoted arg, passes ` / `); `replace: ",", " / "` (two quoted args); `truncate: 80` (one unquoted integer arg); `yesno: "Active", "Inactive"` (two quoted args).
 
 **`default:` fires on `null` or `undefined` only — not on filter errors.** A short-circuit from a prior `ok: false` result (type mismatch or unknown filter in lenient mode) leaves the placeholder intact; `default:` is not reached. For example, `{{ items | pluck: "name" | default: "none" }}` where `pluck` produces a type mismatch short-circuits before `default:` — the result is the placeholder, not `"none"`.
 
@@ -274,9 +274,10 @@ gate:
 | `count` | — | `array` | array length as string; empty array → `"0"` |
 | `limit` | max items (integer) | `array` | first N items; `limit: 0` → `[]` |
 | `compact` | — | `array` | array with `null`/`undefined` entries removed |
+| `replace` | search, replacement (both required) | `string` | replaces all occurrences of search with replacement; case-sensitive; empty search → placeholder |
 | `round` | decimals (integer, default `0`) | `number` | rounded string |
 | `percent` | decimals (integer, default `0`) | `number` [0, 1] | e.g. `"85.7%"` — input is a fraction, multiplied by 100 |
-| `yesno` | — | `boolean` | `"yes"` or `"no"` |
+| `yesno` | yes label, no label (both optional) | `boolean` | `"yes"` / `"no"` by default; custom labels when two args provided; one arg falls back to defaults |
 | `and_join` | — | `unknown[]` | Oxford comma join; empty array → placeholder |
 
 **Tier 2 filter example:**
