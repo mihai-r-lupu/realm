@@ -240,9 +240,14 @@ The path is resolved first. Each filter in the chain receives the current value 
 | `join` | separator (default `", "`) | `string[]` | items joined by separator |
 | `default` | fallback value (default `""`) | any | fallback when value is `null` or `undefined`; passes through `""`, `0`, `false` unchanged |
 | `upper` | — | `string` | uppercased string |
+| `lower` | — | `string` | lowercased string |
+| `capitalize` | — | `string` | first character uppercased, remaining characters unchanged |
 | `truncate` | max length (integer) | `string` | string cut at word boundary ≤ N + `…`; unchanged if already short enough |
 
 `truncate` does not auto-stringify numbers; ensure the value is a string in the step's output if truncation is needed.
+
+> `capitalize` uppercases only the first character; remaining characters are not modified.
+> `"DATABASE_UNAVAILABLE" | capitalize` → `"DATABASE_UNAVAILABLE"`, not `"Database_unavailable"`.
 
 **Arg quoting and multi-arg syntax:** Filter arguments follow the filter name after a colon. Multiple arguments are separated by commas. String arguments containing spaces or commas must be quoted with double or single quotes; the outer quotes are stripped. Unquoted arguments are trimmed. Examples: `join: " / "` (one quoted arg, passes ` / `); `replace: ",", " / "` (two quoted args); `truncate: 80` (one unquoted integer arg); `yesno: "Active", "Inactive"` (two quoted args).
 
@@ -276,9 +281,33 @@ gate:
 | `compact` | — | `array` | array with `null`/`undefined` entries removed |
 | `replace` | search, replacement (both required) | `string` | replaces all occurrences of search with replacement; case-sensitive; empty search → placeholder |
 | `round` | decimals (integer, default `0`) | `number` | rounded string |
+| `floor` | — | `number` | largest integer ≤ input, as string |
+| `ceil` | — | `number` | smallest integer ≥ input, as string |
+| `abs` | — | `number` | absolute value as string |
+| `number_format` | decimals (integer, default `0`) | `number` | locale-formatted string with thousands separator; locale is `en-US` |
 | `percent` | decimals (integer, default `0`) | `number` [0, 1] | e.g. `"85.7%"` — input is a fraction, multiplied by 100 |
 | `yesno` | yes label, no label (both optional) | `boolean` | `"yes"` / `"no"` by default; custom labels when two args provided; one arg falls back to defaults |
 | `and_join` | — | `unknown[]` | Oxford comma join; empty array → placeholder |
+| `trim` | — | `string` | leading and trailing whitespace removed |
+| `first` | — | `array` | first element; empty array → placeholder |
+| `last` | — | `array` | last element; empty array → placeholder |
+| `sum` | — | `number[]` | sum of elements as string; empty array → `"0"`; non-number element → placeholder |
+| `flatten` | — | `array` | one level deep flatten; does not recurse |
+| `split` | delimiter (required) | `string` | splits on delimiter string (any non-empty string); produces `string[]`; empty delimiter → placeholder |
+| `sort` | — | `array` | lexicographically sorted copy; elements coerced via `String()` for comparison; stable sort |
+| `unique` | — | `array` | deduplicated array; equality by `JSON.stringify`; property order in objects matters |
+| `title` | — | `string` | first character of each whitespace-separated word uppercased; remaining characters unchanged; hyphens are not word boundaries |
+| `code` | — | `string` | wraps value in single backticks for Markdown/Slack inline code; inner backticks not escaped — values containing backticks may produce malformed output; intended for single-line values |
+| `indent` | spaces (integer, required) | `string` | prefixes each non-empty line with N spaces; empty lines not indented |
+| `date` | preset (`short`, `long`, `iso`, `time`, `datetime`) — default `short` | `string` (ISO 8601) | formatted date in UTC; `short` → `"Jan 28, 2026"`; unparseable string → placeholder |
+| `from_now` | — | `string` (ISO 8601) | relative time string, e.g. `"3 minutes ago"` or `"in 5 minutes"`; uses `Intl.RelativeTimeFormat` |
+| `duration` | — | `number` (milliseconds) | duration string, e.g. `"1m 23s"` or `"45s"`; negative → placeholder |
+
+> All `date` output is in UTC. `timeZone: 'UTC'` is used in every `Intl.DateTimeFormat`
+> call — output is deterministic regardless of server timezone.
+
+> `split` is the only Tier 2 filter that changes the value type from `string` to `string[]`.
+> It enables chains like `{{ run.params.csv | split: "," | compact | and_join }}`.
 
 **Tier 2 filter example:**
 
