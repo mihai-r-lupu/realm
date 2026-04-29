@@ -142,6 +142,16 @@ export interface StepDefinition {
      * and the MCP path falls back to step.prompt resolution (existing behavior).
      */
     message?: string;
+    /**
+     * Per-choice messages posted to the Slack thread when the gate resolves via Slack.
+     * Keys must match entries in `choices`. Values are plain text (not mrkdwn templates).
+     * Optional — when absent or when a choice has no entry, the generic fallback is used.
+     * Example:
+     *   resolution_messages:
+     *     send: "✅ Incident report sent to #incidents."
+     *     reject: "❌ Draft discarded. Run will not continue."
+     */
+    resolution_messages?: Record<string, string>;
   };
   /** Name of the agent profile for this step. Only valid on execution: 'agent' steps. */
   agent_profile?: string;
