@@ -55,7 +55,7 @@ const DATE_PRESETS: Record<string, (d: Date) => string> = {
     new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false,
+      hourCycle: 'h23',
       timeZone: 'UTC',
     }).format(d),
   datetime: (d) =>
@@ -65,7 +65,7 @@ const DATE_PRESETS: Record<string, (d: Date) => string> = {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false,
+      hourCycle: 'h23',
       timeZone: 'UTC',
     }).format(d),
 };
