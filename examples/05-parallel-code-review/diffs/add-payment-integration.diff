@@ -1,0 +1,58 @@
+diff --git a/src/payments/processor.ts b/src/payments/processor.ts
+new file mode 100644
+index 0000000..7f3b2a1
+--- /dev/null
++++ b/src/payments/processor.ts
+@@ -0,0 +1,48 @@
++import { db } from '../db/client';
++import Stripe from 'stripe';
++
++// TODO: move to environment variables
++const STRIPE_SECRET_KEY = 'sk_live_51KzT8XGJkLm9pQ7...';
++const client = new Stripe(STRIPE_SECRET_KEY);
++
++export async function processPayment(
++  orderId: string,
++  amount: number,
++): Promise<string> {
++  const order = await db.query(
++    `SELECT * FROM orders WHERE id = '${orderId}'`
++  );
++
++  if (!order.rows[0]) {
++    throw new Error('Order not found');
++  }
++
++  const charge = await client.charges.create({
++    amount: amount * 100,
++    currency: 'usd',
++    source: order.rows[0].payment_token,
++    description: `Order ${orderId}`,
++  });
++
++  await db.query(
++    `UPDATE orders SET stripe_charge_id = '${charge.id}'` +
++    ` WHERE id = '${orderId}'`
++  );
++
++  return charge.id;
++}
++
++export async function getOrderSummaries(
++  customerEmail: string,
++): Promise<object[]> {
++  const orders = await db.query(
++    `SELECT id, total FROM orders WHERE customer_email = '${customerEmail}'`
++  );
++
++  const summaries = [];
++  for (const row of orders.rows) {
++    const items = await db.query(
++      `SELECT name, qty, unit_price FROM order_items` +
++      ` WHERE order_id = '${row.id}'`
++    );
++    summaries.push({ id: row.id, total: row.total, items: items.rows });
++  }
++
++  return summaries;
++}

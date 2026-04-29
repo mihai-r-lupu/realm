@@ -1,0 +1,82 @@
+name: fan-out pass — payment integration diff
+params:
+  path: /fake/diffs/add-payment-integration.diff
+mocks:
+  diffs:
+    read:
+      status: 200
+      data:
+        path: /fake/diffs/add-payment-integration.diff
+        content: |
+          diff --git a/src/payments/processor.ts b/src/payments/processor.ts
+          new file mode 100644
+          index 0000000..7f3b2a1
+          --- /dev/null
+          +++ b/src/payments/processor.ts
+          @@ -0,0 +1,48 @@
+          +import { db } from '../db/client';
+          +import Stripe from 'stripe';
+          +
+          +const STRIPE_SECRET_KEY = 'sk_live_51KzT8XGJkLm9pQ7...';
+          +const client = new Stripe(STRIPE_SECRET_KEY);
+          +
+          +export async function processPayment(orderId: string, amount: number): Promise<string> {
+          +  const order = await db.query(`SELECT * FROM orders WHERE id = '${orderId}'`);
+          +  const charge = await client.charges.create({ amount: amount * 100, currency: 'usd',
+          +    source: order.rows[0].payment_token, description: `Order ${orderId}` });
+          +  await db.query(`UPDATE orders SET stripe_charge_id = '${charge.id}' WHERE id = '${orderId}'`);
+          +  return charge.id;
+          +}
+          +
+          +export async function getOrderSummaries(customerEmail: string): Promise<object[]> {
+          +  const orders = await db.query(`SELECT id, total FROM orders WHERE customer_email = '${customerEmail}'`);
+          +  const summaries = [];
+          +  for (const row of orders.rows) {
+          +    const items = await db.query(`SELECT name, qty, unit_price FROM order_items WHERE order_id = '${row.id}'`);
+          +    summaries.push({ id: row.id, total: row.total, items: items.rows });
+          +  }
+          +  return summaries;
+          +}
+        line_count: 27
+        size_bytes: 1180
+agent_responses:
+  review_security:
+    findings:
+      - '`processPayment`: uses string interpolation in SQL query — susceptible to SQL injection via `orderId`.'
+      - '`processPayment`: UPDATE query also uses string interpolation — same SQL injection risk.'
+      - '`STRIPE_SECRET_KEY` is hardcoded in source — any repository reader can extract a live key.'
+      - '`getOrderSummaries`: SELECT query interpolates `customerEmail` — SQL injection via caller input.'
+    risk_level: critical
+    confidence: 0.97
+  review_performance:
+    findings:
+      - '`getOrderSummaries`: issues one `db.query` per order row inside a for-loop — classic N+1 pattern.'
+    risk_level: medium
+    confidence: 0.95
+  synthesize_review:
+    agreed_risk_level: critical
+    security_concerns: >
+      Three SQL injection vulnerabilities exist across processPayment and getOrderSummaries —
+      all three queries interpolate caller-supplied strings directly. A hardcoded live Stripe
+      secret key in source is an immediate credential exposure risk.
+    performance_concerns: >
+      getOrderSummaries executes one database query per order inside a loop. For a customer
+      with many orders this becomes O(n) sequential round-trips to the database.
+    recommendation: >
+      Block this diff — the hardcoded secret and SQL injection vulnerabilities must be
+      resolved before merge. Replace string interpolation with parameterised queries,
+      move STRIPE_SECRET_KEY to an environment variable, and rewrite getOrderSummaries
+      to use a single JOIN query.
+expected:
+  final_state: completed
+  evidence:
+    - step_id: read_diff
+      status: success
+    - step_id: review_security
+      status: success
+    - step_id: review_performance
+      status: success
+    - step_id: synthesize_review
+      status: success
+    - step_id: record_review
+      status: success
