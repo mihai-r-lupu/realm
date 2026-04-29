@@ -37,6 +37,11 @@ export interface EvidenceSnapshot {
   agent_profile?: string;
   /** SHA-256 hash of the profile content at register time. Auditable even if the file changes. */
   agent_profile_hash?: string;
+  /**
+   * Present only when the step used input_map. Records the concrete params the engine
+   * derived from run state and passed to the service adapter. Absent for all other step types.
+   */
+  resolved_params?: Record<string, unknown>;
 }
 
 export interface PendingGate {
@@ -57,6 +62,12 @@ export interface PendingGate {
    * Preserved into EvidenceSnapshot.gate_message at gate resolution for audit purposes.
    */
   resolved_message?: string;
+  /**
+   * Per-choice messages for Slack thread resolution confirmation.
+   * Copied verbatim from gate.resolution_messages on the step definition.
+   * The CLI reads the message for the chosen key and posts it to the thread.
+   */
+  resolution_messages?: Record<string, string>;
 }
 
 /**

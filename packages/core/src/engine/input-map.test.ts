@@ -222,4 +222,85 @@ describe('input_map', () => {
 
     expect(fetchSpy).toHaveBeenCalledWith('fetch', { x: undefined }, expect.any(Object), undefined);
   });
+
+  it('input_map step records resolved_params in evidence snapshot', async () => {
+    const def: WorkflowDefinition = {
+      id: 'imap-wf',
+      name: 'InputMap Workflow',
+      version: 1,
+      services: { svc: { adapter: 'mock', trust: 'engine_delivered' } },
+      steps: {
+        'call-api': {
+          description: 'Auto step using run.params via input_map',
+          execution: 'auto',
+          depends_on: [],
+          uses_service: 'svc',
+          input_map: { repo: 'run.params.repo' },
+        },
+      },
+    };
+    const adapter = new MockAdapter('mock', { 'call-api': { status: 200, data: { result: 1 } } });
+    const registry = new ExtensionRegistry();
+    registry.register('adapter', 'mock', adapter);
+    const store = new JsonFileStore(dir);
+
+    const run = await store.create({
+      workflowId: 'imap-wf',
+      workflowVersion: 1,
+      params: { repo: 'acme/api' },
+    });
+
+    await executeStep(store, def, {
+      runId: run.id,
+      command: 'call-api',
+      input: {},
+      dispatcher: noOpDispatcher,
+      registry,
+    });
+
+    const updatedRun = await store.get(run.id);
+    const snap = updatedRun.evidence.find((e) => e.step_id === 'call-api');
+    expect(snap).toBeDefined();
+    expect(snap!.resolved_params).toEqual({ repo: 'acme/api' });
+  });
+
+  it('step without input_map does NOT have resolved_params in evidence snapshot', async () => {
+    const def: WorkflowDefinition = {
+      id: 'imap-wf',
+      name: 'InputMap Workflow',
+      version: 1,
+      services: { svc: { adapter: 'mock', trust: 'engine_delivered' } },
+      steps: {
+        fetch: {
+          description: 'Auto step without input_map',
+          execution: 'auto',
+          depends_on: [],
+          uses_service: 'svc',
+        },
+      },
+    };
+    const adapter = new MockAdapter('mock', { fetch: { status: 200, data: { ok: true } } });
+    const registry = new ExtensionRegistry();
+    registry.register('adapter', 'mock', adapter);
+    const store = new JsonFileStore(dir);
+
+    const run = await store.create({
+      workflowId: 'imap-wf',
+      workflowVersion: 1,
+      params: {},
+    });
+
+    await executeStep(store, def, {
+      runId: run.id,
+      command: 'fetch',
+      input: { doc_id: 'xyz' },
+      dispatcher: noOpDispatcher,
+      registry,
+    });
+
+    const updatedRun = await store.get(run.id);
+    const snap = updatedRun.evidence.find((e) => e.step_id === 'fetch');
+    expect(snap).toBeDefined();
+    expect(Object.prototype.hasOwnProperty.call(snap, 'resolved_params')).toBe(false);
+  });
 });
