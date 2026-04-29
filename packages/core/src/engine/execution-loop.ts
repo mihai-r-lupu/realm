@@ -756,10 +756,6 @@ export async function executeStep(
       resolvedGateMessage = raw;
     }
 
-    // Extract gate config to a stable local ref — repeated stepDef!.gate?. accesses in spread
-    // conditionals cause TS 5.9 control-flow narrowing to drop resolution_messages from the type.
-    const gateConfig = stepDef!.gate;
-
     let gateRun: RunRecord;
     try {
       gateRun = await store.update({
@@ -772,10 +768,10 @@ export async function executeStep(
           preview: output,
           choices,
           opened_at: new Date().toISOString(),
-          ...(gateConfig?.owner !== undefined ? { owner: gateConfig.owner } : {}),
+          ...(stepDef!.gate?.owner !== undefined ? { owner: stepDef!.gate.owner } : {}),
           ...(resolvedGateMessage !== undefined ? { resolved_message: resolvedGateMessage } : {}),
-          ...(gateConfig?.resolution_messages !== undefined
-            ? { resolution_messages: gateConfig.resolution_messages }
+          ...(stepDef!.gate?.resolution_messages !== undefined
+            ? { resolution_messages: stepDef!.gate.resolution_messages }
             : {}),
         },
       });
