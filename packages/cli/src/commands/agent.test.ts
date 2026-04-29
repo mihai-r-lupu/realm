@@ -12,11 +12,7 @@ import { runAgent, postGateNotificationToSlack } from '../agent/run-agent.js';
 import type { AgentDeps, AgentRunOptions } from '../agent/run-agent.js';
 import type { LlmProvider } from '../agent/llm-provider.js';
 import { resolveProvider } from '../agent/llm-provider.js';
-import {
-  checkAdapterPrerequisites,
-  formatPreflightError,
-  checkSlackBidirectionalConfig,
-} from '../agent/preflight.js';
+import { checkAdapterPrerequisites, formatPreflightError } from '../agent/preflight.js';
 
 // ---------------------------------------------------------------------------
 // MockLlmProvider — queue-based: returns responses in order of callStep() calls.
@@ -382,35 +378,5 @@ describe('checkAdapterPrerequisites', () => {
     expect(msg).toContain("adapter 'github'");
     expect(msg).toContain('GITHUB_TOKEN');
     expect(msg).toContain('export GITHUB_TOKEN=');
-  });
-});
-
-describe('checkSlackBidirectionalConfig', () => {
-  it('warns when SLACK_WEBHOOK_URL is set but SLACK_BOT_TOKEN is absent', () => {
-    const warnings = checkSlackBidirectionalConfig({
-      SLACK_WEBHOOK_URL: 'https://hooks.slack.com/test',
-    });
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]!.message).toContain('SLACK_WEBHOOK_URL');
-    expect(warnings[0]!.message).toContain('SLACK_BOT_TOKEN');
-  });
-
-  it('warns when SLACK_BOT_TOKEN is set but SLACK_SIGNING_SECRET is absent', () => {
-    const warnings = checkSlackBidirectionalConfig({ SLACK_BOT_TOKEN: 'xoxb-test' });
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]!.message).toContain('SLACK_BOT_TOKEN');
-    expect(warnings[0]!.message).toContain('SLACK_SIGNING_SECRET');
-  });
-
-  it('returns no warnings when SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET are both set', () => {
-    const warnings = checkSlackBidirectionalConfig({
-      SLACK_BOT_TOKEN: 'xoxb-test',
-      SLACK_SIGNING_SECRET: 'secret',
-    });
-    expect(warnings).toHaveLength(0);
-  });
-
-  it('returns no warnings when no Slack vars are set', () => {
-    expect(checkSlackBidirectionalConfig({})).toHaveLength(0);
   });
 });

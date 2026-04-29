@@ -17,7 +17,7 @@ import {
 import type { WorkflowRegistrar } from '@sensigo/realm';
 import type { LlmProvider } from './llm-provider.js';
 import { startSlackGateServer } from './slack-gate-server.js';
-import { pollSlackThread } from './slack-gate-poller.js';
+import { connectSocketMode } from './slack-socket-client.js';
 import { interpretGateIntent } from './gate-intent-interpreter.js';
 
 export type AgentRunResult = 'completed' | 'failed';
@@ -49,8 +49,8 @@ export interface AgentRunOptions {
   slackSigningSecret?: string;
   /** SLACK_EVENTS_PORT — port for the Events API server. Defaults to 3100. */
   slackEventsPort?: number;
-  /** SLACK_POLL_INTERVAL_MS — thread polling interval. Defaults to 10000. */
-  slackPollIntervalMs?: number;
+  /** SLACK_APP_TOKEN — App-level token (xapp-...) for Socket Mode gate resolution. */
+  slackAppToken?: string;
   /** SLACK_GATE_REMINDER_INTERVAL_MS — delay before first reminder. Defaults to 600000 (10 min). */
   slackGateReminderIntervalMs?: number;
   /** SLACK_GATE_ESCALATION_THRESHOLD_MS — delay before escalation. Defaults to 1800000 (30 min). */
@@ -291,7 +291,8 @@ export interface BidirectionalGateParams {
   gateThreadTs: string | undefined;
   slackSigningSecret?: string;
   slackEventsPort: number;
-  slackPollIntervalMs: number;
+  /** SLACK_APP_TOKEN — enables Socket Mode when set. */
+  slackAppToken?: string;
   gateReminderIntervalMs: number;
   gateEscalationThresholdMs: number;
   pollIntervalMs: number;
@@ -299,7 +300,7 @@ export interface BidirectionalGateParams {
 
 /**
  * Handles a gate using Slack bidirectional resolution:
- * - Events API (when signing secret is present) or thread polling as fallback
+ * - Events API (when signing secret is present) or Socket Mode (when app token is present)
  * - LLM intent interpretation of Slack replies
  * - Reminder and escalation timers
  * - Falls back to store polling for terminal-command gate resolution
@@ -316,7 +317,7 @@ export async function handleBidirectionalGate(params: BidirectionalGateParams): 
     gateThreadTs,
     slackSigningSecret,
     slackEventsPort,
-    slackPollIntervalMs,
+    slackAppToken,
     gateReminderIntervalMs,
     gateEscalationThresholdMs,
     pollIntervalMs,
@@ -348,6 +349,12 @@ export async function handleBidirectionalGate(params: BidirectionalGateParams): 
           gateId: gate.gate_id,
           choice: interpretation.choice,
         });
+        if (gateThreadTs !== undefined) {
+          const confirmationText =
+            gate.resolution_messages?.[interpretation.choice] ??
+            `✅ Gate resolved: \`${interpretation.choice}\` — run continuing.`;
+          await postSlackReply(slackBotToken, slackChannelId, gateThreadTs, confirmationText);
+        }
         abortController.abort();
       } catch (err) {
         console.warn(
@@ -365,12 +372,29 @@ export async function handleBidirectionalGate(params: BidirectionalGateParams): 
     }
   };
 
-  // Set up candidate intake — Events API or polling fallback.
-  // Dedup set is scoped to this gate session — prevents duplicate LLM calls from Slack's
-  // at-least-once delivery guarantee.
+  // Set up candidate intake — Socket Mode (preferred), Events API, or none.
+  // Dedup set prevents duplicate onEvent calls. Socket Mode (preferred) and Events API both
+  // have at-least-once delivery — the same event can arrive more than once.
   const seenEventIds = new Set<string>();
   let serverHandle: { close(): void } | undefined;
-  if (slackSigningSecret !== undefined && gateThreadTs !== undefined) {
+  if (slackAppToken !== undefined && gateThreadTs !== undefined) {
+    // Mode 2 — Socket Mode (WebSocket push, no public URL required)
+    serverHandle = connectSocketMode({
+      appToken: slackAppToken,
+      threadTs: gateThreadTs,
+      onEvent: (event) => {
+        if (seenEventIds.has(event.event_id)) return;
+        seenEventIds.add(event.event_id);
+        processCandidate(event.text).catch((err) => {
+          console.warn(
+            `Candidate processing failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+      },
+      signal: abortController.signal,
+    });
+  } else if (slackSigningSecret !== undefined && gateThreadTs !== undefined) {
+    // Mode 3 — Events API (HTTP push, requires public URL)
     serverHandle = startSlackGateServer({
       port: slackEventsPort,
       signingSecret: slackSigningSecret,
@@ -386,21 +410,10 @@ export async function handleBidirectionalGate(params: BidirectionalGateParams): 
       },
     });
   } else if (gateThreadTs !== undefined) {
-    pollSlackThread({
-      botToken: slackBotToken,
-      channelId: slackChannelId,
-      threadTs: gateThreadTs,
-      gateOpenedAt: new Date(gate.opened_at),
-      intervalMs: slackPollIntervalMs,
-      onCandidate: (text) => {
-        processCandidate(text).catch((err) => {
-          console.warn(
-            `Candidate processing failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        });
-      },
-      signal: abortController.signal,
-    });
+    // Gate notification posted but no listener configured.
+    console.log(
+      '  ℹ  Gate notification posted. Set SLACK_APP_TOKEN (Socket Mode) or SLACK_SIGNING_SECRET (Events API) to resolve via Slack. Using terminal command fallback.',
+    );
   }
 
   // Notify when neither Events nor polling can be used — no thread anchor available.
@@ -515,7 +528,7 @@ export async function runAgent(deps: AgentDeps, options: AgentRunOptions): Promi
             ? { slackSigningSecret: options.slackSigningSecret }
             : {}),
           slackEventsPort: options.slackEventsPort ?? 3100,
-          slackPollIntervalMs: options.slackPollIntervalMs ?? 10_000,
+          ...(options.slackAppToken !== undefined ? { slackAppToken: options.slackAppToken } : {}),
           gateReminderIntervalMs: options.slackGateReminderIntervalMs ?? 600_000,
           gateEscalationThresholdMs: options.slackGateEscalationThresholdMs ?? 1_800_000,
           pollIntervalMs: options.pollIntervalMs ?? 3000,

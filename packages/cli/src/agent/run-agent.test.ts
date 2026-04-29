@@ -14,15 +14,16 @@ import type { PendingGate, RunStore, WorkflowDefinition } from '@sensigo/realm';
 import type { LlmProvider } from './llm-provider.js';
 import { startSlackGateServer } from './slack-gate-server.js';
 import type { SlackGateEvent } from './slack-gate-server.js';
+import { connectSocketMode } from './slack-socket-client.js';
 import { interpretGateIntent } from './gate-intent-interpreter.js';
 
 // Module-level mocks are hoisted by vitest — run-agent.ts will receive these stubs for its
-// internal imports of slack-gate-server, slack-gate-poller, and gate-intent-interpreter.
+// internal imports of slack-gate-server, slack-socket-client, and gate-intent-interpreter.
 vi.mock('./slack-gate-server.js', () => ({
   startSlackGateServer: vi.fn().mockReturnValue({ close: vi.fn() }),
 }));
-vi.mock('./slack-gate-poller.js', () => ({
-  pollSlackThread: vi.fn(),
+vi.mock('./slack-socket-client.js', () => ({
+  connectSocketMode: vi.fn().mockReturnValue({ close: vi.fn() }),
 }));
 vi.mock('./gate-intent-interpreter.js', () => ({
   interpretGateIntent: vi.fn(),
@@ -414,7 +415,6 @@ function makeGateParams(overrides: Partial<BidirectionalGateParams> = {}): Bidir
     gateThreadTs: '1234567890.000',
     slackSigningSecret: 'secret',
     slackEventsPort: 3100,
-    slackPollIntervalMs: 10,
     gateReminderIntervalMs: 999_999,
     gateEscalationThresholdMs: 999_999,
     pollIntervalMs: 0,
@@ -479,5 +479,27 @@ describe('handleBidirectionalGate', () => {
     await promise;
 
     expect(interpretGateIntent).toHaveBeenCalledOnce();
+  });
+
+  it('selects Socket Mode (connectSocketMode) when slackAppToken is set and slackSigningSecret is absent', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+
+    await handleBidirectionalGate(
+      makeGateParams({ slackSigningSecret: undefined, slackAppToken: 'xapp-test' }),
+    );
+
+    expect(connectSocketMode).toHaveBeenCalledOnce();
+    expect(startSlackGateServer).not.toHaveBeenCalled();
+  });
+
+  it('selects Socket Mode over Events API when both slackAppToken and slackSigningSecret are set', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+
+    await handleBidirectionalGate(
+      makeGateParams({ slackSigningSecret: 'secret', slackAppToken: 'xapp-test' }),
+    );
+
+    expect(connectSocketMode).toHaveBeenCalledOnce();
+    expect(startSlackGateServer).not.toHaveBeenCalled();
   });
 });

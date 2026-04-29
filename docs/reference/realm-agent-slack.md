@@ -12,17 +12,21 @@ available, each with different setup requirements and interaction patterns.
 
 ## Mode comparison
 
-|                         | Mode 1 — Webhook                | Mode 2 — Bot token                     | Mode 3 — Events API             |
-| ----------------------- | ------------------------------- | -------------------------------------- | ------------------------------- |
-| **Env vars**            | `SLACK_WEBHOOK_URL`             | `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` | Mode 2 + `SLACK_SIGNING_SECRET` |
-| **Gate notification**   | Posted to channel               | Posted to channel                      | Posted to channel               |
-| **Resolution**          | `realm run respond` in terminal | Reply in Slack thread                  | Reply in Slack thread           |
-| **Latency**             | Instant (terminal)              | ~10 s (polling)                        | < 1 s (push event)              |
-| **Public URL required** | No                              | No                                     | Yes (ngrok for local dev)       |
-| **Setup time**          | ~2 min                          | ~5 min                                 | ~15 min                         |
-| **Best for**            | Local dev, scripts              | Local dev, team use                    | Production deployments          |
+|                         | Mode 1 — Webhook                | Mode 2 — Socket Mode                                       | Mode 3 — Events API                                             |
+| ----------------------- | ------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------- |
+| **Env vars**            | `SLACK_WEBHOOK_URL`             | `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` + `SLACK_APP_TOKEN` | `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` + `SLACK_SIGNING_SECRET` |
+| **Gate notification**   | Posted to channel               | Posted to channel                                          | Posted to channel                                               |
+| **Resolution**          | `realm run respond` in terminal | Reply in Slack thread                                      | Reply in Slack thread                                           |
+| **Latency**             | Instant (terminal)              | < 1 s (WebSocket push)                                     | < 1 s (push event)                                              |
+| **Public URL required** | No                              | No                                                         | Yes (ngrok for local dev)                                       |
+| **App Token required**  | No                              | Yes (`xapp-...`)                                           | No                                                              |
+| **Setup time**          | ~2 min                          | ~10 min                                                    | ~15 min                                                         |
+| **Best for**            | Local dev, scripts              | Local dev, team use                                        | Production deployments                                          |
 
 The active mode is selected automatically based on which env vars are set. No flag required.
+
+When both `SLACK_APP_TOKEN` and `SLACK_SIGNING_SECRET` are set, Socket Mode (Mode 2) takes
+precedence. To use Events API, remove `SLACK_APP_TOKEN` from your environment.
 
 ---
 
@@ -53,16 +57,20 @@ command. Run that command in a separate terminal to submit your choice.
 
 ---
 
-## Mode 2 — Bot token (bidirectional, no public URL)
+## Mode 2 — Socket Mode (bidirectional, no public URL)
 
-`realm agent` posts the gate message via your bot's `chat.postMessage` API, then polls the
-thread (`conversations.replies`) every 10 seconds for replies. The LLM interprets reply text
-and submits the matching gate choice — no terminal command needed.
+`realm agent` posts the gate message via your bot's `chat.postMessage` API, then opens a
+persistent WebSocket connection to Slack using your App Token. Slack pushes thread reply
+events over this WebSocket in real time — no polling, no public URL, sub-second latency.
+The LLM interprets the reply and submits the matching gate choice. Ambiguous replies get a
+clarification thread reply (at most twice). The terminal command is always accepted as a fallback.
 
-Ambiguous replies get a clarification thread reply (at most twice per gate). After that, the
-terminal command is always accepted as a fallback.
+Unlike the Events API (Mode 3), Socket Mode opens an outbound WebSocket connection from
+the CLI to Slack — no inbound port, no public URL, and no ngrok required. This makes
+Socket Mode the right choice for local development and most production deployments where
+inbound HTTP from Slack is impractical.
 
-### Setup (~5 minutes)
+### Setup (~10 minutes)
 
 **Step 1.** Create a Slack app — go to [api.slack.com/apps](https://api.slack.com/apps) →
 **Create New App → From scratch** → give it a name (e.g. "Realm") → select your workspace.
@@ -87,11 +95,19 @@ Allow**. Copy the **Bot User OAuth Token** (starts with `xoxb-`).
 
 **Step 5.** Invite the bot to the channel — in the channel, type `/invite @YourAppName`.
 
-**Step 6.** Add to `.env`:
+**Step 6.** Enable Socket Mode and get an App Token — in your Slack app, go to **Settings →
+Socket Mode** and toggle **Enable Socket Mode** on.
+
+Then go to **Settings → Basic Information → App-Level Tokens** →
+**Generate Token and Scopes**. Give it a name (e.g. "realm-socket"), add the
+`connections:write` scope, and click **Generate**. Copy the token (starts with `xapp-`).
+
+**Step 7.** Add to `.env`:
 
 ```
 SLACK_BOT_TOKEN=xoxb-...
 SLACK_CHANNEL_ID=C...
+SLACK_APP_TOKEN=xapp-...
 ```
 
 ### What you see
@@ -104,16 +120,18 @@ defines). The bot resolves it and the run continues.
 
 ## Mode 3 — Events API (bidirectional, real-time)
 
-Same experience as Mode 2, but Slack pushes events to `realm agent` in real time instead of
-polling. Requires a URL reachable by Slack — use ngrok for local development.
+Same experience as Mode 2, but Slack pushes events to `realm agent` over HTTP rather than the
+persistent WebSocket connection. Requires a URL reachable by Slack — use ngrok for local
+development.
 
-**When to prefer Mode 3 over Mode 2:** Mode 2 has ~10 s latency and works in any environment.
-Mode 3 responds in under 1 second. Use Mode 3 when deploying `realm agent` as a long-running
-service or when gate response latency matters.
+**When to prefer Mode 3 over Mode 2:** Both modes respond in under 1 second. Use Mode 3 when
+deploying `realm agent` as a long-running service behind a stable public URL, or when your
+infrastructure already expects inbound webhooks from Slack.
 
 ### Setup — local dev with ngrok (~15 minutes)
 
-**Step 1.** Complete the full Mode 2 setup above (steps 1–6).
+**Step 1.** Complete the full Mode 2 setup above (steps 1--5 and step 7, skipping step 6 ---
+Socket Mode is not required for Mode 3; `SLACK_APP_TOKEN` is not needed).
 
 **Step 2.** Get your Signing Secret — in your Slack app, go to **Settings → Basic Information
 → App Credentials → Signing Secret** and copy it.
@@ -187,16 +205,16 @@ gate and verifies every incoming payload using HMAC-SHA256 with the signing secr
 
 ## Environment variable reference
 
-| Variable                             | Required by          | Description                                                                                                          |
-| ------------------------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `SLACK_WEBHOOK_URL`                  | Mode 1               | Incoming Webhook URL. Also required by `slack_notifications` service adapter steps in your workflow.                 |
-| `SLACK_BOT_TOKEN`                    | Mode 2, 3            | Bot User OAuth Token (starts with `xoxb-`).                                                                          |
-| `SLACK_CHANNEL_ID`                   | Mode 2, 3            | Channel ID where the bot posts (e.g. `C123ABC456`).                                                                  |
-| `SLACK_SIGNING_SECRET`               | Mode 3               | Signing secret from Slack app Basic Information. Enables the Events API server — without it, thread polling is used. |
-| `SLACK_EVENTS_PORT`                  | Mode 3 (optional)    | Port for the Events API HTTP server. Default: `3100`.                                                                |
-| `SLACK_POLL_INTERVAL_MS`             | Mode 2 (optional)    | Thread polling interval in milliseconds. Default: `10000` (10 s).                                                    |
-| `SLACK_GATE_REMINDER_INTERVAL_MS`    | Mode 2, 3 (optional) | Delay in ms before a reminder is posted to the gate thread. Default: `600000` (10 min).                              |
-| `SLACK_GATE_ESCALATION_THRESHOLD_MS` | Mode 2, 3 (optional) | Delay in ms before an escalation message is posted. Default: `1800000` (30 min).                                     |
+| Variable                             | Required by          | Description                                                                                          |
+| ------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------- |
+| `SLACK_WEBHOOK_URL`                  | Mode 1               | Incoming Webhook URL. Also required by `slack_notifications` service adapter steps in your workflow. |
+| `SLACK_BOT_TOKEN`                    | Mode 2, 3            | Bot User OAuth Token (starts with `xoxb-`).                                                          |
+| `SLACK_CHANNEL_ID`                   | Mode 2, 3            | Channel ID where the bot posts (e.g. `C123ABC456`).                                                  |
+| `SLACK_APP_TOKEN`                    | Mode 2               | App-level token (starts with `xapp-`). Enables Socket Mode. Requires the `connections:write` scope.  |
+| `SLACK_SIGNING_SECRET`               | Mode 3               | Signing secret for HMAC-SHA256 verification. Enables the Events API server.                          |
+| `SLACK_EVENTS_PORT`                  | Mode 3 (optional)    | Port for the Events API HTTP server. Default: `3100`.                                                |
+| `SLACK_GATE_REMINDER_INTERVAL_MS`    | Mode 2, 3 (optional) | Delay in ms before a reminder is posted to the gate thread. Default: `600000` (10 min).              |
+| `SLACK_GATE_ESCALATION_THRESHOLD_MS` | Mode 2, 3 (optional) | Delay in ms before an escalation message is posted. Default: `1800000` (30 min).                     |
 
 ---
 
@@ -207,9 +225,16 @@ gate and verifies every incoming payload using HMAC-SHA256 with the signing secr
 Verify `SLACK_WEBHOOK_URL` is set. Webhook URLs are not shown again after creation — if you
 lost it, go to your Slack app's Incoming Webhooks page and create a new one.
 
-**Mode 2 — Bot posts the message but doesn't pick up my reply**
+**Mode 2 — Socket Mode connection fails to establish**
 
+- Confirm `SLACK_APP_TOKEN` starts with `xapp-` and is not a bot token (`xoxb-`).
+- Confirm the Slack app has Socket Mode enabled (**Settings → Socket Mode → Enable Socket Mode**).
+- Confirm the App Token has the `connections:write` scope (**Settings → Basic Information →
+  App-Level Tokens**).
 - Confirm the bot is a member of the channel (`/invite @YourAppName` in the channel).
+
+**Mode 2 — Bot posts the message but the gate doesn't resolve from Slack replies**
+
 - Reply _in the thread_ anchored to the bot's gate message, not in the main channel feed.
 - Confirm the `channels:history` scope is present under OAuth & Permissions. For private
   channels, `groups:history` is required instead of (or in addition to) `channels:history`.

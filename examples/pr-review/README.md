@@ -145,11 +145,11 @@ Three modes are available. The active mode is selected automatically from which 
 set. For full setup instructions including step-by-step Slack app creation, see
 [Slack Gate Modes reference](../docs/reference/realm-agent-slack.md).
 
-| Mode                    | Env vars                               | Resolution                               |
-| ----------------------- | -------------------------------------- | ---------------------------------------- |
-| **Mode 1** — Webhook    | `SLACK_WEBHOOK_URL`                    | `realm run respond` in terminal          |
-| **Mode 2** — Bot token  | `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` | Reply in Slack thread (polls every 10 s) |
-| **Mode 3** — Events API | Mode 2 + `SLACK_SIGNING_SECRET`        | Reply in Slack thread (real-time push)   |
+| Mode                     | Env vars                                                        | Resolution                      |
+| ------------------------ | --------------------------------------------------------------- | ------------------------------- |
+| **Mode 1** — Webhook     | `SLACK_WEBHOOK_URL`                                             | `realm run respond` in terminal |
+| **Mode 2** — Socket Mode | `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` + `SLACK_APP_TOKEN`      | Reply in Slack thread (< 1 s)   |
+| **Mode 3** — Events API  | `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` + `SLACK_SIGNING_SECRET` | Reply in Slack thread (< 1 s)   |
 
 ### Mode 1 — quick start (~2 min)
 
@@ -159,22 +159,26 @@ In Slack: **Apps → Incoming Webhooks → Add to Slack** → pick channel → c
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
-### Mode 2 — quick start (~5 min)
+### Mode 2 — quick start (~10 min)
 
 Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps), add `chat:write` and
-`channels:history` scopes, install to your workspace, invite the bot to the channel, then:
+`channels:history` scopes, install to your workspace, invite the bot to the channel. Enable
+Socket Mode (**Settings → Socket Mode**) and generate an App Token with the `connections:write`
+scope, then:
 
 ```
 SLACK_BOT_TOKEN=xoxb-...
 SLACK_CHANNEL_ID=C...
+SLACK_APP_TOKEN=xapp-...
 ```
 
-See the [full Mode 2 setup guide](../docs/reference/realm-agent-slack.md#mode-2----bot-token-bidirectional-no-public-url) for every step.
+See the [full Mode 2 setup guide](../docs/reference/realm-agent-slack.md#mode-2----socket-mode-bidirectional-no-public-url) for every step.
 
 ### Mode 3 — quick start (~15 min)
 
-Complete Mode 2 setup, copy your app’s Signing Secret (Basic Information → App Credentials),
-install ngrok, and add:
+Complete the Mode 2 Slack app setup steps (steps 1–5 only — Socket Mode and `SLACK_APP_TOKEN`
+are not needed for Mode 3). Copy your app's Signing Secret (**Settings → Basic Information →
+App Credentials**), install ngrok, and add:
 
 ```
 SLACK_SIGNING_SECRET=...

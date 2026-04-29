@@ -101,8 +101,8 @@ export const agentCommand = new Command('agent')
             ...(process.env['SLACK_EVENTS_PORT'] !== undefined && {
               slackEventsPort: parseInt(process.env['SLACK_EVENTS_PORT'], 10),
             }),
-            ...(process.env['SLACK_POLL_INTERVAL_MS'] !== undefined && {
-              slackPollIntervalMs: parseInt(process.env['SLACK_POLL_INTERVAL_MS'], 10),
+            ...(process.env['SLACK_APP_TOKEN'] !== undefined && {
+              slackAppToken: process.env['SLACK_APP_TOKEN'],
             }),
             ...(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'] !== undefined && {
               slackGateReminderIntervalMs: parseInt(

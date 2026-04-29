@@ -91,6 +91,9 @@ steps:
       choices:
         - approve
         - reject
+      resolution_messages:
+        approve: '✅ PR approved — summary posted to Slack.'
+        reject: '❌ PR review rejected. Run complete.'
       message: |
         PR #{{ run.params.pr_number }} — {{ context.resources.write_summary.title | truncate: 60 }}
         Risk: {{ context.resources.write_summary.risk | upper }} | AI: {{ context.resources.write_summary.recommendation | truncate: 80 }}
