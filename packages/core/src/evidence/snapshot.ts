@@ -12,6 +12,7 @@ export interface CaptureEvidenceParams {
   diagnostics?: StepDiagnostics;
   agentProfile?: string;
   agentProfileHash?: string;
+  resolvedParams?: Record<string, unknown>;
 }
 
 /** Builds an EvidenceSnapshot from step execution parameters, including a SHA-256 content hash. */
@@ -32,5 +33,6 @@ export function captureEvidence(params: CaptureEvidenceParams): EvidenceSnapshot
     ...(params.agentProfileHash !== undefined
       ? { agent_profile_hash: params.agentProfileHash }
       : {}),
+    ...(params.resolvedParams !== undefined ? { resolved_params: params.resolvedParams } : {}),
   };
 }

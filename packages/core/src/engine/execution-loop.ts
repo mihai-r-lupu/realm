@@ -145,7 +145,10 @@ async function callAdapter(
   options: ExecuteStepOptions,
   pendingRun: RunRecord,
   signal?: AbortSignal,
-): Promise<Record<string, unknown>> {
+): Promise<{
+  output: Record<string, unknown>;
+  resolvedParams: Record<string, unknown> | undefined;
+}> {
   const serviceName = stepDef.uses_service!;
   const serviceDef = definition.services?.[serviceName];
   if (serviceDef === undefined) {
@@ -181,9 +184,9 @@ async function callAdapter(
   const method = stepDef.service_method ?? 'fetch';
   const operation = stepDef.operation ?? options.command;
 
+  const adapterParams = resolveInputMap(stepDef.input_map, options, pendingRun);
   let response: ServiceResponse;
   try {
-    const adapterParams = resolveInputMap(stepDef.input_map, options, pendingRun);
     response = await adapter[method](operation, adapterParams, config, signal);
   } catch (err) {
     if (err instanceof WorkflowError) throw err;
@@ -197,9 +200,14 @@ async function callAdapter(
     });
   }
 
-  return typeof response.data === 'object' && response.data !== null
-    ? (response.data as Record<string, unknown>)
-    : { data: response.data, status: response.status };
+  const output =
+    typeof response.data === 'object' && response.data !== null
+      ? (response.data as Record<string, unknown>)
+      : { data: response.data, status: response.status };
+  return {
+    output,
+    resolvedParams: stepDef.input_map !== undefined ? adapterParams : undefined,
+  };
 }
 
 /**
@@ -456,7 +464,7 @@ export async function executeStep(
   }
 
   const preconditionTrace = evaluateAllPreconditions(stepDef?.preconditions ?? [], evidenceByStep);
-  const inputTokenEstimate = Math.ceil(JSON.stringify(options.input).length / 4);
+  let inputTokenEstimate = Math.ceil(JSON.stringify(options.input).length / 4);
 
   // Step 2b: Validate input schema.
   if (stepDef?.input_schema !== undefined) {
@@ -537,21 +545,36 @@ export async function executeStep(
     const startedAt = new Date();
     let attemptOutput: Record<string, unknown> = {};
     let attemptError: WorkflowError | null = null;
+    let resolvedParams: Record<string, unknown> | undefined;
 
     try {
-      const makeCall = (signal?: AbortSignal): Promise<Record<string, unknown>> => {
+      const makeCall = (
+        signal?: AbortSignal,
+      ): Promise<{
+        output: Record<string, unknown>;
+        resolvedParams: Record<string, unknown> | undefined;
+      }> => {
         if (stepDef?.execution === 'auto' && stepDef.uses_service !== undefined) {
           return callAdapter(stepDef, definition, options, pendingRun, signal);
         } else if (stepDef?.execution === 'auto' && stepDef.handler !== undefined) {
-          return callHandler(stepDef, options, pendingRun, evidenceByStep, signal);
+          return callHandler(stepDef, options, pendingRun, evidenceByStep, signal).then(
+            (result) => ({ output: result, resolvedParams: undefined }),
+          );
         } else {
-          return options.dispatcher(options.command, options.input, pendingRun, signal);
+          return options
+            .dispatcher(options.command, options.input, pendingRun, signal)
+            .then((result) => ({ output: result, resolvedParams: undefined }));
         }
       };
-      attemptOutput =
+      const callResult =
         timeoutMs !== undefined
           ? await withTimeout((signal) => makeCall(signal), timeoutMs, options.command)
           : await makeCall();
+      attemptOutput = callResult.output;
+      resolvedParams = callResult.resolvedParams;
+      if (resolvedParams !== undefined) {
+        inputTokenEstimate = Math.ceil(JSON.stringify(resolvedParams).length / 4);
+      }
     } catch (err) {
       if (err instanceof WorkflowError) {
         attemptError = err;
@@ -584,6 +607,7 @@ export async function executeStep(
       ...(profileData !== undefined
         ? { agentProfile: profile!, agentProfileHash: profileData.content_hash }
         : {}),
+      ...(resolvedParams !== undefined ? { resolvedParams } : {}),
     });
     const snap: EvidenceSnapshot =
       retryConfig !== undefined ? { ...baseSnap, attempt: attemptNum } : baseSnap;
@@ -746,6 +770,9 @@ export async function executeStep(
           opened_at: new Date().toISOString(),
           ...(stepDef!.gate?.owner !== undefined ? { owner: stepDef!.gate.owner } : {}),
           ...(resolvedGateMessage !== undefined ? { resolved_message: resolvedGateMessage } : {}),
+          ...(stepDef!.gate?.resolution_messages !== undefined
+            ? { resolution_messages: stepDef!.gate.resolution_messages }
+            : {}),
         },
       });
     } catch (err) {

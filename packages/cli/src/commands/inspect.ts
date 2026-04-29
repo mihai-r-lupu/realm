@@ -121,6 +121,9 @@ export async function inspectRun(
       // Show Input/Output/Diagnostics for the last attempt.
       const lastSnap = snaps[snaps.length - 1]!;
       lines.push(`     Input:  ${formatSummary(lastSnap.input_summary)}`);
+      if (lastSnap.resolved_params !== undefined) {
+        lines.push(`     Resolved: ${formatSummary(lastSnap.resolved_params)}`);
+      }
       lines.push(`     Output: ${formatSummary(lastSnap.output_summary)}`);
       if (lastSnap.diagnostics !== undefined) {
         lines.push(chalk.dim(`     Diagnostics: ${formatDiagnostics(lastSnap.diagnostics)}`));
@@ -146,6 +149,9 @@ export async function inspectRun(
         lines.push(`     Output:   ${formatSummary(snap.output_summary)}`);
       } else {
         lines.push(`     Input:  ${formatSummary(snap.input_summary)}`);
+        if (snap.resolved_params !== undefined) {
+          lines.push(`     Resolved: ${formatSummary(snap.resolved_params)}`);
+        }
         lines.push(`     Output: ${formatSummary(snap.output_summary)}`);
         if (snap.diagnostics !== undefined) {
           lines.push(chalk.dim(`     Diagnostics: ${formatDiagnostics(snap.diagnostics)}`));

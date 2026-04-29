@@ -67,4 +67,14 @@ describe('captureEvidence', () => {
     expect(ev.agent_profile).toBeUndefined();
     expect(ev.agent_profile_hash).toBeUndefined();
   });
+
+  it('includes resolved_params when provided', () => {
+    const ev = captureEvidence({ ...base, resolvedParams: { path: '/tmp/file.json' } });
+    expect(ev.resolved_params).toEqual({ path: '/tmp/file.json' });
+  });
+
+  it('omits resolved_params entirely when not provided', () => {
+    const ev = captureEvidence(base);
+    expect(Object.prototype.hasOwnProperty.call(ev, 'resolved_params')).toBe(false);
+  });
 });
