@@ -74,6 +74,10 @@ export interface PreflightWarning {
 /**
  * Checks for incomplete Slack bidirectional configuration and returns advisory warnings.
  * These are non-blocking — the run proceeds but with degraded Slack functionality.
+ *
+ * Bidirectional resolution requires SLACK_BOT_TOKEN + SLACK_CHANNEL_ID and at least one of:
+ * - SLACK_APP_TOKEN (Socket Mode — WebSocket push, no public URL required)
+ * - SLACK_SIGNING_SECRET (Events API — HTTP push, requires public URL)
  */
 export function checkSlackBidirectionalConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -87,10 +91,24 @@ export function checkSlackBidirectionalConfig(
     });
   }
 
-  if (env['SLACK_BOT_TOKEN'] !== undefined && env['SLACK_SIGNING_SECRET'] === undefined) {
+  if (
+    env['SLACK_BOT_TOKEN'] !== undefined &&
+    env['SLACK_APP_TOKEN'] === undefined &&
+    env['SLACK_SIGNING_SECRET'] === undefined
+  ) {
     warnings.push({
       message:
-        'SLACK_BOT_TOKEN is set but SLACK_SIGNING_SECRET is not. The Slack Events API endpoint will not start — set SLACK_SIGNING_SECRET to enable event-driven gate resolution.',
+        'SLACK_BOT_TOKEN is set but neither SLACK_APP_TOKEN nor SLACK_SIGNING_SECRET is set. ' +
+        'Gate replies cannot be resolved automatically from Slack — set SLACK_APP_TOKEN (Socket Mode, recommended) ' +
+        'or SLACK_SIGNING_SECRET (Events API) to enable automatic resolution.',
+    });
+  }
+
+  if (env['SLACK_APP_TOKEN'] !== undefined && env['SLACK_SIGNING_SECRET'] !== undefined) {
+    warnings.push({
+      message:
+        'Both SLACK_APP_TOKEN and SLACK_SIGNING_SECRET are set — Socket Mode (Mode 2) takes precedence. ' +
+        'Remove SLACK_APP_TOKEN to use Events API (Mode 3).',
     });
   }
 

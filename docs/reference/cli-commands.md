@@ -138,12 +138,12 @@ and a `realm run respond` command. Optionally configure Slack so the message is 
 there and the gate can be resolved from a Slack thread reply. The active Slack mode is
 selected automatically from the env vars that are present:
 
-| Env vars set                           | Gate mode                                                                                    |
-| -------------------------------------- | -------------------------------------------------------------------------------------------- |
-| (none)                                 | Terminal-only. Gate message printed to stdout. Respond with `realm run respond`.             |
-| `SLACK_WEBHOOK_URL`                    | **Mode 1** — gate notification posted to Slack. Terminal command required to respond.        |
-| `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` | **Mode 2** — bidirectional via thread polling. Reply in Slack thread; resolves within ~10 s. |
-| above + `SLACK_SIGNING_SECRET`         | **Mode 3** — bidirectional via Events API. Real-time push; resolves in < 1 s.                |
+| Env vars set                                                    | Gate mode                                                                             |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| (none)                                                          | Terminal-only. Gate message printed to stdout. Respond with `realm run respond`.      |
+| `SLACK_WEBHOOK_URL`                                             | **Mode 1** — gate notification posted to Slack. Terminal command required to respond. |
+| `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` + `SLACK_APP_TOKEN`      | **Mode 2** — Socket Mode. Reply in Slack thread; resolves in < 1 s.                   |
+| `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` + `SLACK_SIGNING_SECRET` | **Mode 3** — Events API. Reply in Slack thread; resolves in < 1 s.                    |
 
 For step-by-step Slack app setup and the full env var reference, see
 [Slack Gate Modes](./realm-agent-slack.md).
@@ -202,9 +202,10 @@ Updated: 2026-01-15T10:30:42.000Z
 Evidence (3 steps):
 
   1. read_alert                success    12ms   hash: f3a9b2c1
-     Input:  {"path":"/tmp/alert.md"}
-     Output: {"content":"## SEV-2 Alert\nDisk usage on prod-db-1 at 94%","line_count":14}
-     Diagnostics: ~200 tokens | no preconditions
+     Input:    {}
+     Resolved: {"path":"/tmp/alert.md"}
+     Output:   {"content":"## SEV-2 Alert\nDisk usage on prod-db-1 at 94%","line_count":14}
+     Diagnostics: ~22 tokens | no preconditions
 
   2. analyze_cause             [profile: senior-sre] success   8432ms   hash: 2d7e4f81
      Input:  {"content":"## SEV-2 Alert\nDisk usage on prod-db-1 at 94%"}
@@ -230,20 +231,21 @@ shows a `Message:` line under `Choice:` with the exact text the human saw at dec
 
 #### Field reference
 
-| Field                          | What it tells you                                                                                                                                                                             |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Phase**                      | Current run phase (`run_phase`). Terminal runs show `✓` (completed) or no suffix (failed/abandoned).                                                                                          |
-| **Evidence (N steps)**         | Number of distinct steps that produced evidence. Steps with multiple attempts are counted once. Human gate steps are counted once regardless of whether the gate has been responded to.       |
-| **Step number**                | Execution order, 1-based.                                                                                                                                                                     |
-| **Step name**                  | The `id` of the step in your workflow YAML.                                                                                                                                                   |
-| **`[profile: ...]`**           | Which agent profile handled this step. Present on agent steps only; absent on auto steps and human gates.                                                                                     |
-| **Status**                     | `success` (green), `error` (red), or other engine-assigned state (yellow).                                                                                                                    |
-| **Duration**                   | Wall-clock time the step took to complete. High values on agent steps are normal.                                                                                                             |
-| **`hash: XXXXXXXX`**           | First 8 characters of the SHA-256 chain hash. The hash covers all evidence up to and including this step — it changes if any prior step's output changes. Use it to detect replay divergence. |
-| **Input**                      | What the step received. For the first step: the run params. For subsequent steps: the output of the prior step (or merged outputs if `input_map` is configured).                              |
-| **Output**                     | What the step produced. For agent steps: the JSON the AI returned. For auto steps: the handler return value. For adapter steps: the raw adapter response injected by the engine.              |
-| **Diagnostics: `~N tokens`**   | Estimated token count of the context window passed to the agent for this step. Useful for spotting steps that approach model context limits.                                                  |
-| **Diagnostics: preconditions** | Each precondition expression, whether it passed (`→ true`) or failed (`→ false`), and the resolved value in parentheses. If a step ran unexpectedly or was blocked, this is where you look.   |
+| Field                          | What it tells you                                                                                                                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Phase**                      | Current run phase (`run_phase`). Terminal runs show `✓` (completed) or no suffix (failed/abandoned).                                                                                                                                              |
+| **Evidence (N steps)**         | Number of distinct steps that produced evidence. Steps with multiple attempts are counted once. Human gate steps are counted once regardless of whether the gate has been responded to.                                                           |
+| **Step number**                | Execution order, 1-based.                                                                                                                                                                                                                         |
+| **Step name**                  | The `id` of the step in your workflow YAML.                                                                                                                                                                                                       |
+| **`[profile: ...]`**           | Which agent profile handled this step. Present on agent steps only; absent on auto steps and human gates.                                                                                                                                         |
+| **Status**                     | `success` (green), `error` (red), or other engine-assigned state (yellow).                                                                                                                                                                        |
+| **Duration**                   | Wall-clock time the step took to complete. High values on agent steps are normal.                                                                                                                                                                 |
+| **`hash: XXXXXXXX`**           | First 8 characters of the SHA-256 chain hash. The hash covers all evidence up to and including this step — it changes if any prior step's output changes. Use it to detect replay divergence.                                                     |
+| **Input**                      | What the caller passed to the step. For the first step: the run params. For subsequent steps: the output of the prior step. For `input_map` steps this is typically `{}` — see **Resolved** for the actual adapter params.                        |
+| **Resolved**                   | The params the service adapter actually received, assembled by the engine from `input_map` dot-paths. Only present on `execution: auto` steps that declare `input_map`. The token estimate in Diagnostics is computed from this value, not Input. |
+| **Output**                     | What the step produced. For agent steps: the JSON the AI returned. For auto steps: the handler return value. For adapter steps: the raw adapter response injected by the engine.                                                                  |
+| **Diagnostics: `~N tokens`**   | Estimated token count of the context window passed to the agent for this step. Useful for spotting steps that approach model context limits.                                                                                                      |
+| **Diagnostics: preconditions** | Each precondition expression, whether it passed (`→ true`) or failed (`→ false`), and the resolved value in parentheses. If a step ran unexpectedly or was blocked, this is where you look.                                                       |
 
 #### What to look for
 
