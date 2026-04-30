@@ -56,17 +56,15 @@ agent_responses:
   synthesize_review:
     agreed_risk_level: critical
     security_concerns: >
-      Three SQL injection vulnerabilities exist across processPayment and getOrderSummaries —
-      all three queries interpolate caller-supplied strings directly. A hardcoded live Stripe
-      secret key in source is an immediate credential exposure risk.
+      Three SQL injection vulnerabilities found: processPayment SELECT and UPDATE queries
+      interpolate orderId directly, and getOrderSummaries interpolates customerEmail.
+      A hardcoded live Stripe secret key is also present in source.
     performance_concerns: >
-      getOrderSummaries executes one database query per order inside a loop. For a customer
-      with many orders this becomes O(n) sequential round-trips to the database.
+      getOrderSummaries executes one database query per order row inside a loop — O(n)
+      round-trips to the database.
     recommendation: >
-      Block this diff — the hardcoded secret and SQL injection vulnerabilities must be
-      resolved before merge. Replace string interpolation with parameterised queries,
-      move STRIPE_SECRET_KEY to an environment variable, and rewrite getOrderSummaries
-      to use a single JOIN query.
+      BLOCKED — resolve the hardcoded secret key and all SQL injection vulnerabilities
+      before merge.
 expected:
   final_state: completed
   evidence:

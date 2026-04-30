@@ -118,6 +118,14 @@ export interface StepDefinition {
    */
   prompt?: string;
   /**
+   * Optional Jinja-style display template rendered by the CLI against this step's
+   * output_summary for human-readable terminal output. Uses {{ field }} syntax where
+   * field is a dot-path into the step's output object. When absent, the CLI falls
+   * back to the existing headline/message and JSON rendering behaviour.
+   * No engine evaluation — rendered client-side at run completion.
+   */
+  display?: string;
+  /**
    * When present, this entry is a template instantiation rather than a concrete step.
    * Resolved by loadWorkflowFromString before validation — never present in a
    * WorkflowDefinition returned to callers.
