@@ -320,6 +320,78 @@ describe('when condition routing', () => {
     expect(eligible).not.toContain('step_high');
   });
 
+  it('confidence=high → run reaches completed, step_low is skipped', async () => {
+    const definition = makeWhenRoutingWorkflow();
+    const registry = new ExtensionRegistry();
+    registry.register('handler', 'confidence_handler', new ConfidenceHandler('high'));
+
+    const run = await store.create({
+      workflowId: definition.id,
+      workflowVersion: 1,
+      params: {},
+    });
+
+    await executeStep(store, definition, {
+      runId: run.id,
+      command: 'step_a',
+      input: {},
+      dispatcher: passthroughDispatcher,
+      registry,
+    });
+
+    const afterStepA = await store.get(run.id);
+    await executeStep(store, definition, {
+      runId: afterStepA.id,
+      command: 'step_high',
+      input: {},
+      dispatcher: passthroughDispatcher,
+      registry,
+    });
+
+    const finalRun = await store.get(run.id);
+    expect(finalRun.terminal_state).toBe(true);
+    expect(finalRun.run_phase).toBe('completed');
+    expect(finalRun.skipped_steps).toContain('step_low');
+    expect(finalRun.completed_steps).toContain('step_a');
+    expect(finalRun.completed_steps).toContain('step_high');
+  });
+
+  it('confidence=low → run reaches completed, step_high is skipped', async () => {
+    const definition = makeWhenRoutingWorkflow();
+    const registry = new ExtensionRegistry();
+    registry.register('handler', 'confidence_handler', new ConfidenceHandler('low'));
+
+    const run = await store.create({
+      workflowId: definition.id,
+      workflowVersion: 1,
+      params: {},
+    });
+
+    await executeStep(store, definition, {
+      runId: run.id,
+      command: 'step_a',
+      input: {},
+      dispatcher: passthroughDispatcher,
+      registry,
+    });
+
+    const afterStepA = await store.get(run.id);
+    await executeStep(store, definition, {
+      runId: afterStepA.id,
+      command: 'step_low',
+      input: {},
+      dispatcher: passthroughDispatcher,
+      registry,
+    });
+
+    const finalRun = await store.get(run.id);
+    expect(finalRun.terminal_state).toBe(true);
+    expect(finalRun.run_phase).toBe('completed');
+    expect(finalRun.skipped_steps).toContain('step_high');
+    expect(finalRun.completed_steps).toContain('step_a');
+    expect(finalRun.completed_steps).toContain('step_low');
+  });
+
   it('cleanup', async () => {
     await rm(dir, { recursive: true, force: true });
   });

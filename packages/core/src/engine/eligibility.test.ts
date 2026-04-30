@@ -530,6 +530,103 @@ describe('propagateSkips', () => {
     const run = makeRun({ completed_steps: ['a'], failed_steps: ['b'] });
     expect(propagateSkips(run, definition)).not.toContain('c');
   });
+
+  it('skips a routing step when its dep completes and the when-condition is false', () => {
+    const definition = makeWorkflow({
+      classify: { depends_on: [] },
+      route_billing: {
+        depends_on: ['classify'],
+        when: 'classify.category == billing',
+      },
+    });
+    const run = makeRun({
+      completed_steps: ['classify'],
+      evidence: [
+        {
+          step_id: 'classify',
+          started_at: '',
+          completed_at: '',
+          duration_ms: 0,
+          input_summary: {},
+          output_summary: { category: 'bug' },
+          status: 'success',
+          evidence_hash: 'abc',
+        },
+      ],
+    });
+    expect(propagateSkips(run, definition)).toContain('route_billing');
+  });
+
+  it('does not skip a routing step when the when-condition is true', () => {
+    const definition = makeWorkflow({
+      classify: { depends_on: [] },
+      route_billing: {
+        depends_on: ['classify'],
+        when: 'classify.category == billing',
+      },
+    });
+    const run = makeRun({
+      completed_steps: ['classify'],
+      evidence: [
+        {
+          step_id: 'classify',
+          started_at: '',
+          completed_at: '',
+          duration_ms: 0,
+          input_summary: {},
+          output_summary: { category: 'billing' },
+          status: 'success',
+          evidence_hash: 'abc',
+        },
+      ],
+    });
+    expect(propagateSkips(run, definition)).not.toContain('route_billing');
+  });
+
+  it('does not skip a routing step when its dep is still in-progress', () => {
+    const definition = makeWorkflow({
+      classify: { depends_on: [] },
+      route_billing: {
+        depends_on: ['classify'],
+        when: 'classify.category == billing',
+      },
+    });
+    // classify is in-progress — deps are not settled, condition cannot be evaluated yet
+    const run = makeRun({ in_progress_steps: ['classify'] });
+    expect(propagateSkips(run, definition)).not.toContain('route_billing');
+  });
+
+  it('cascade: skipping a when-condition step causes its downstream all_success step to also skip', () => {
+    const definition = makeWorkflow({
+      classify: { depends_on: [] },
+      route_billing: {
+        depends_on: ['classify'],
+        when: 'classify.category == billing',
+      },
+      notify_billing: {
+        depends_on: ['route_billing'],
+        trigger_rule: 'all_success',
+      },
+    });
+    const run = makeRun({
+      completed_steps: ['classify'],
+      evidence: [
+        {
+          step_id: 'classify',
+          started_at: '',
+          completed_at: '',
+          duration_ms: 0,
+          input_summary: {},
+          output_summary: { category: 'bug' },
+          status: 'success',
+          evidence_hash: 'abc',
+        },
+      ],
+    });
+    const result = propagateSkips(run, definition);
+    expect(result).toContain('route_billing');
+    expect(result).toContain('notify_billing');
+  });
 });
 
 // ---------------------------------------------------------------------------
