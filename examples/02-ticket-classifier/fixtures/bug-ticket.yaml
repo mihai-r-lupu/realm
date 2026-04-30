@@ -29,7 +29,10 @@ agent_responses:
   classify_ticket:
     category: bug
     priority: critical
-    one_line_summary: Payment gateway 504 errors since 08:15 UTC, affecting 30% of checkout attempts.
+    summary: >
+      Customer CUST-3847 reports intermittent 504 errors on the payment gateway since
+      08:15 UTC, correlated with the v2.14.1 deployment. Route to on-call engineering
+      immediately.
 expected:
   final_state: completed
   evidence:
