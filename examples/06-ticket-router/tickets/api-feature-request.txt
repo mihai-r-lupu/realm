@@ -1,0 +1,19 @@
+CUST-5501 — Feature Request: Webhook Support for Invoice Events
+
+Customer: CUST-5501
+Reported: 2026-04-11
+
+Hi,
+
+We're currently polling your API every 5 minutes to detect when invoices are
+paid or overdue. This is causing unnecessary load on both sides and introduces
+up to 5 minutes of latency in our accounting system.
+
+We'd like webhook support for invoice lifecycle events — specifically
+invoice.paid, invoice.overdue, and invoice.voided. We need a configurable
+endpoint URL and a shared secret for HMAC signature verification.
+
+This would let us drop the polling loop entirely.
+
+Thanks,
+Platform team, GammaTech

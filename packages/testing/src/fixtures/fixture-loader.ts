@@ -47,6 +47,12 @@ export interface TestFixture {
     /** Expected state of the run after driving it to completion. */
     final_state: string;
     /**
+     * Optional exact set of step IDs expected in skipped_steps at run completion.
+     * Sorted before comparison — order does not matter. Set equality is enforced:
+     * any additional or missing step ID causes the fixture to fail.
+     */
+    skipped_steps?: string[];
+    /**
      * Optional list of expected evidence entries. Each entry must match a snapshot
      * in the run's evidence chain (by step_id and optionally status).
      */
@@ -79,17 +85,20 @@ export function loadFixtureFromString(content: string): TestFixture {
     throw new Error('Fixture must have an "expected.final_state" string field');
   }
 
-  let expectedObj: TestFixture['expected'];
+  let expectedObj: TestFixture['expected'] = { final_state: expected['final_state'] };
+
+  if (expected['skipped_steps'] !== undefined) {
+    expectedObj = { ...expectedObj, skipped_steps: expected['skipped_steps'] as string[] };
+  }
+
   if (expected['evidence'] !== undefined) {
     expectedObj = {
-      final_state: expected['final_state'],
+      ...expectedObj,
       evidence: expected['evidence'] as Array<{
         step_id: string;
         status?: 'success' | 'error' | 'skipped';
       }>,
     };
-  } else {
-    expectedObj = { final_state: expected['final_state'] };
   }
 
   const base: TestFixture = {

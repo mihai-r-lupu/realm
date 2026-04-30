@@ -1,0 +1,47 @@
+name: account issue — SSO lockout after migration
+params:
+  path: /fake/tickets/account-locked.txt
+mocks:
+  tickets:
+    read:
+      status: 200
+      data:
+        path: /fake/tickets/account-locked.txt
+        content: |
+          CUST-7892 — Account Locked After SSO Configuration Change
+
+          Customer: CUST-7892
+          Reported: 2026-04-12
+
+          We migrated our SSO from Okta to Microsoft Entra ID yesterday. After the
+          switch, all team members see "Account locked or not found" on login. Our
+          admin account is also affected. We have 12 users blocked. The old Okta
+          integration is already deprovisioned — rollback is not possible.
+
+          — IT Manager, DeltaCorp
+        line_count: 11
+        size_bytes: 360
+agent_responses:
+  identify_ticket:
+    customer_id: CUST-7892
+    product_area: account management
+    product_version: unknown
+    reported_issue: All users locked out after SSO migration from Okta to Microsoft Entra ID.
+  classify_ticket:
+    category: account
+    priority: critical
+    summary: >
+      Customer CUST-7892 has 12 users locked out following an SSO migration to Microsoft
+      Entra ID. Admin is also affected. Route to the account team for urgent remediation.
+  handle_account:
+    response_draft: >
+      Thank you for reaching out. We have flagged this as urgent and escalated it to our
+      account management team. An engineer will contact you within 1 hour to begin
+      remediation. In the meantime, please confirm the Entra ID tenant ID and the email
+      domain used for SSO so we can locate your configuration immediately.
+expected:
+  final_state: completed
+  skipped_steps: [handle_billing, handle_bug, handle_feature, handle_other]
+  evidence:
+    - step_id: handle_account
+      status: success

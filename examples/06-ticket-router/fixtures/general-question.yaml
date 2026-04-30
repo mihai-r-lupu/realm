@@ -1,0 +1,47 @@
+name: general question — GDPR data retention inquiry
+params:
+  path: /fake/tickets/general-question.txt
+mocks:
+  tickets:
+    read:
+      status: 200
+      data:
+        path: /fake/tickets/general-question.txt
+        content: |
+          CUST-2234 — Data Retention Policy and GDPR Compliance
+
+          Customer: CUST-2234
+          Reported: 2026-04-13
+
+          I'm preparing a data processing audit and have questions about your data
+          retention practices: How long is customer data retained after account
+          cancellation? Do you support the right to erasure (GDPR Article 17)?
+          Is a Data Processing Agreement available?
+
+          — Compliance lead, EpsilonLtd
+        line_count: 10
+        size_bytes: 300
+agent_responses:
+  identify_ticket:
+    customer_id: CUST-2234
+    product_area: compliance and legal
+    product_version: unknown
+    reported_issue: Customer requesting data retention policy details and GDPR compliance information for an audit.
+  classify_ticket:
+    category: other
+    priority: low
+    summary: >
+      Customer CUST-2234 has compliance audit questions about data retention, right to
+      erasure, and DPA availability. Route to the compliance team.
+  handle_other:
+    response_draft: >
+      Thank you for your inquiry. We have received your questions about data retention and
+      GDPR compliance and have assigned them to our compliance team. Someone will follow up
+      with you within 24 hours with the relevant documentation, including our Data Processing
+      Agreement and details on our data retention and erasure processes.
+expected:
+  final_state: completed
+  skipped_steps: [handle_billing, handle_bug, handle_feature, handle_account]
+  evidence:
+    - step_id: handle_other
+      status: success

@@ -1,0 +1,18 @@
+CUST-7892 — Account Locked After SSO Configuration Change
+
+Customer: CUST-7892
+Reported: 2026-04-12
+
+Hi support,
+
+We updated our SSO configuration yesterday to migrate from Okta to Microsoft
+Entra ID. After the switch, our team members are unable to log in — they're
+presented with an "Account locked or not found" error on the login screen.
+
+Our admin account is also affected. We have 12 users who cannot access the
+platform and are blocked on critical work. The old Okta integration has been
+deprovisioned so a rollback is not possible.
+
+Please advise urgently.
+
+— IT Manager, DeltaCorp

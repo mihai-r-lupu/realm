@@ -1,0 +1,49 @@
+name: billing inquiry — double charge
+params:
+  path: /fake/tickets/billing-overcharge.txt
+mocks:
+  tickets:
+    read:
+      status: 200
+      data:
+        path: /fake/tickets/billing-overcharge.txt
+        content: |
+          CUST-1122 — Incorrect Invoice — Double Charge
+
+          Customer: CUST-1122
+          Reported: 2026-04-09
+
+          Hello,
+
+          We were charged twice for our March invoice — once on March 1 and again
+          on March 31. The duplicate charge was for $499.00. Please issue a refund
+          for the duplicate charge and confirm when it will appear on our statement.
+
+          Thanks,
+          Finance team, BetaCo
+        line_count: 11
+        size_bytes: 280
+agent_responses:
+  identify_ticket:
+    customer_id: CUST-1122
+    product_area: billing
+    product_version: unknown
+    reported_issue: Customer was charged twice for the March invoice and is requesting a $499.00 refund.
+  classify_ticket:
+    category: billing
+    priority: high
+    summary: >
+      Customer CUST-1122 reports a duplicate charge of $499.00 on their March invoice.
+      Route to the billing team for refund processing.
+  handle_billing:
+    response_draft: >
+      Thank you for reaching out. We have received your report of a duplicate charge of $499.00
+      on your March invoice. This has been escalated to our billing team and will be reviewed
+      within 2 business days. We will confirm the refund timeline and send you a written
+      confirmation once the credit has been processed.
+expected:
+  final_state: completed
+  skipped_steps: [handle_bug, handle_feature, handle_account, handle_other]
+  evidence:
+    - step_id: handle_billing
+      status: success

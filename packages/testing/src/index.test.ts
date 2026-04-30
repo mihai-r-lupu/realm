@@ -239,6 +239,33 @@ expected:
     const fixture = loadFixtureFromString(yaml);
     expect(fixture.gate_responses).toBeUndefined();
   });
+
+  it('parses skipped_steps when present', () => {
+    const yaml = `
+name: routing fixture
+params: {}
+mocks: {}
+agent_responses: {}
+expected:
+  final_state: completed
+  skipped_steps: [handle_b, handle_c]
+`;
+    const fixture = loadFixtureFromString(yaml);
+    expect(fixture.expected.skipped_steps).toEqual(['handle_b', 'handle_c']);
+  });
+
+  it('leaves skipped_steps undefined when absent', () => {
+    const yaml = `
+name: no routing
+params: {}
+mocks: {}
+agent_responses: {}
+expected:
+  final_state: done
+`;
+    const fixture = loadFixtureFromString(yaml);
+    expect(fixture.expected.skipped_steps).toBeUndefined();
+  });
 });
 
 describe('loadFixturesFromDir', () => {
@@ -749,5 +776,143 @@ expected:
     expect(results).toHaveLength(1);
     expect(results[0]!.passed).toBe(true);
     expect(results[0]!.error).toBeUndefined();
+  });
+
+  it('skipped_steps: correct assertion passes', async () => {
+    const routingWorkflow = `
+id: routing-wf
+name: Routing Workflow
+version: 1
+steps:
+  classifier:
+    description: Classify the input
+    execution: agent
+    depends_on: []
+    input_schema:
+      type: object
+      required: [category]
+      properties:
+        category:
+          type: string
+          enum: [a, b]
+  handle_a:
+    description: Handle category a
+    execution: agent
+    depends_on: [classifier]
+    when: "classifier.category == 'a'"
+    input_schema:
+      type: object
+      required: [result]
+      properties:
+        result:
+          type: string
+  handle_b:
+    description: Handle category b
+    execution: agent
+    depends_on: [classifier]
+    when: "classifier.category == 'b'"
+    input_schema:
+      type: object
+      required: [result]
+      properties:
+        result:
+          type: string
+`;
+    writeFileSync(join(tmpDir, 'workflow.yaml'), routingWorkflow);
+    writeFileSync(
+      join(tmpDir, 'fixtures', 'route-a.yaml'),
+      `
+name: route to a
+params: {}
+mocks: {}
+agent_responses:
+  classifier:
+    category: a
+  handle_a:
+    result: handled
+expected:
+  final_state: completed
+  skipped_steps: [handle_b]
+  evidence:
+    - step_id: handle_a
+      status: success
+`,
+    );
+
+    const results = await runFixtureTests({
+      workflowPath: join(tmpDir, 'workflow.yaml'),
+      fixturesPath: join(tmpDir, 'fixtures'),
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.passed).toBe(true);
+  });
+
+  it('skipped_steps: wrong assertion fails with descriptive error', async () => {
+    const routingWorkflow = `
+id: routing-wf-2
+name: Routing Workflow 2
+version: 1
+steps:
+  classifier:
+    description: Classify
+    execution: agent
+    depends_on: []
+    input_schema:
+      type: object
+      required: [category]
+      properties:
+        category:
+          type: string
+          enum: [a, b]
+  handle_a:
+    description: Handle a
+    execution: agent
+    depends_on: [classifier]
+    when: "classifier.category == 'a'"
+    input_schema:
+      type: object
+      required: [result]
+      properties:
+        result:
+          type: string
+  handle_b:
+    description: Handle b
+    execution: agent
+    depends_on: [classifier]
+    when: "classifier.category == 'b'"
+    input_schema:
+      type: object
+      required: [result]
+      properties:
+        result:
+          type: string
+`;
+    writeFileSync(join(tmpDir, 'workflow.yaml'), routingWorkflow);
+    writeFileSync(
+      join(tmpDir, 'fixtures', 'route-wrong.yaml'),
+      `
+name: wrong skipped assertion
+params: {}
+mocks: {}
+agent_responses:
+  classifier:
+    category: a
+  handle_a:
+    result: handled
+expected:
+  final_state: completed
+  skipped_steps: [handle_a]
+`,
+    );
+
+    const results = await runFixtureTests({
+      workflowPath: join(tmpDir, 'workflow.yaml'),
+      fixturesPath: join(tmpDir, 'fixtures'),
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.passed).toBe(false);
+    expect(results[0]!.error).toMatch(/skipped_steps/);
   });
 });
