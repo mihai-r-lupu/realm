@@ -192,6 +192,41 @@ Two fixtures:
 | ------ | ------ | ------------------------------- |
 | `path` | string | Path to the diff file to review |
 
+## The `display` field
+
+The `display` field on a step definition is a Jinja-style template rendered by the CLI
+against the step's `output_summary` when a run completes. It is evaluated client-side at
+run completion — the engine never sees it.
+
+**Supported syntax:** `{{ field }}` and `{{ nested.field }}` — plain dot-path references into
+the step output object. Filters (e.g. `| upper`) are not supported. Missing paths render as
+an empty string.
+
+**When to use it:** on convergence or classification steps that produce structured output
+and also need readable terminal display. Steps that already use `headline`/`message` do not
+need it — `formatOutputForTerminal` already renders those directly.
+
+**Example** — `synthesize_review` uses:
+
+```yaml
+display: |
+  {{ agreed_risk_level }}: {{ recommendation }}
+
+  Security: {{ security_concerns }}
+  Performance: {{ performance_concerns }}
+```
+
+When a run completes, the CLI prints the rendered template instead of a JSON dump:
+
+```
+critical: BLOCKED — resolve the hardcoded secret key and all SQL injection vulnerabilities before merge.
+
+Security: Three SQL injection vulnerabilities found...
+Performance: getOrderSummaries executes one database query per order row...
+```
+
+Without `display`, the CLI would fall back to printing the raw JSON object.
+
 ## Shared reviewer guidelines
 
 Both specialist steps load the same reviewer guidelines file at run start via

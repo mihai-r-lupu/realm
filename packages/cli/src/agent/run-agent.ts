@@ -66,6 +66,26 @@ export interface AgentRunOptions {
 }
 
 /**
+ * Renders a display template against a flat vars object.
+ * Syntax: {{ field }} or {{ nested.field }} — plain dot-path interpolation, no filters.
+ * Missing paths render as empty string.
+ */
+function renderDisplay(template: string, vars: Record<string, unknown>): string {
+  return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, expr: string) => {
+    const parts = expr.trim().split('.');
+    let val: unknown = vars;
+    for (const part of parts) {
+      if (typeof val !== 'object' || val === null) {
+        val = undefined;
+        break;
+      }
+      val = (val as Record<string, unknown>)[part];
+    }
+    return val === undefined ? '' : typeof val === 'string' ? val : JSON.stringify(val);
+  });
+}
+
+/**
  * Formats a step output object as human-readable plain text for the terminal.
  * Renders `headline` and `message` string fields directly; falls back to JSON.
  */
@@ -642,7 +662,12 @@ export async function runAgent(deps: AgentDeps, options: AgentRunOptions): Promi
       );
     if (lastAgentEvidence !== undefined) {
       console.log(`\nResult (${lastAgentEvidence.step_id}):`);
-      console.log(formatOutputForTerminal(lastAgentEvidence.output_summary));
+      const stepDef = definition.steps[lastAgentEvidence.step_id];
+      const formatted =
+        stepDef?.display !== undefined
+          ? renderDisplay(stepDef.display, lastAgentEvidence.output_summary)
+          : formatOutputForTerminal(lastAgentEvidence.output_summary);
+      console.log(formatted);
     }
 
     return 'completed';
