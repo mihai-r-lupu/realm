@@ -90,15 +90,16 @@ steps:
       Reported issue: {{ context.resources.identify_ticket.reported_issue }}
 
       Required fields:
-      - category: one of bug | feature_request | billing | account | other
-      - priority: one of low | medium | high | critical
-      - one_line_summary: one sentence for the support queue (min 10 chars)
+      - category: one of: bug | feature_request | billing | account | other
+      - priority: one of: low | medium | high | critical
+      - summary: one or two sentences for the support queue, explaining the issue
+        and suggested routing (10–300 characters)
 
-      Return exactly these three fields. Any value outside the allowed enums
-      will be rejected before your response is accepted.
+      Return exactly these three fields. Any category or priority value outside the
+      allowed values will be rejected before your response is accepted.
     input_schema:
       type: object
-      required: [category, priority, one_line_summary]
+      required: [category, priority, summary]
       properties:
         category:
           type: string
@@ -106,9 +107,11 @@ steps:
         priority:
           type: string
           enum: [low, medium, high, critical]
-        one_line_summary:
+        summary:
           type: string
           minLength: 10
+          maxLength: 300
+    display: '{{ priority }}: {{ category }} — {{ summary }}'
 
   record_ticket:
     description: Record the classified ticket

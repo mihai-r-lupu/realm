@@ -27,7 +27,9 @@ agent_responses:
   classify_ticket:
     category: billing
     priority: high
-    one_line_summary: Customer billed twice for March; requesting $499.00 refund for the duplicate charge.
+    summary: >
+      Customer CUST-1122 reports a duplicate charge of $499.00 on their March invoice.
+      Route to the billing team for refund processing and statement confirmation.
 expected:
   final_state: completed
   evidence:

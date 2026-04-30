@@ -71,7 +71,7 @@ read_ticket      (auto — filesystem adapter, loads the raw ticket text)
      │ → ticket_loaded
 identify_ticket  (agent — extracts: customer_id, product_area, product_version, reported_issue)
      │ → ticket_identified    ← schema enforced before classify_ticket starts
-classify_ticket  (agent — classifies: category, priority, one_line_summary)
+classify_ticket  (agent — classifies: category, priority, summary)
                  (prompt reads context.resources.identify_ticket.product_area)
      │ → classified
 record_ticket    (auto — records the full structured result)
@@ -149,7 +149,7 @@ Either way, the agent will:
    resubmit. The state stays at `ticket_loaded` until the schema passes.
 3. Receive a second `next_action.prompt` asking it to classify the ticket. The prompt
    already contains the verified product area and reported issue from step 2. It
-   submits `category`, `priority`, and `one_line_summary`. Same schema enforcement
+   submits `category`, `priority`, and `summary`. Same schema enforcement
    applies.
 4. Once the classification schema passes, `record_ticket` runs and the workflow
    completes.
