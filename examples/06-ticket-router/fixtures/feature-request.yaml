@@ -1,0 +1,48 @@
+name: feature request — webhook support for invoice events
+params:
+  path: /fake/tickets/api-feature-request.txt
+mocks:
+  tickets:
+    read:
+      status: 200
+      data:
+        path: /fake/tickets/api-feature-request.txt
+        content: |
+          CUST-5501 — Feature Request: Webhook Support for Invoice Events
+
+          Customer: CUST-5501
+          Reported: 2026-04-11
+
+          We're currently polling the API every 5 minutes to detect invoice status
+          changes. We'd like webhook support for invoice lifecycle events —
+          specifically invoice.paid, invoice.overdue, and invoice.voided — with a
+          configurable endpoint URL and HMAC signature verification.
+
+          — Platform team, GammaTech
+        line_count: 11
+        size_bytes: 380
+agent_responses:
+  identify_ticket:
+    customer_id: CUST-5501
+    product_area: billing API
+    product_version: unknown
+    reported_issue: Customer requests webhook support for invoice lifecycle events to replace polling.
+  classify_ticket:
+    category: feature_request
+    priority: medium
+    summary: >
+      Customer CUST-5501 requests webhook notifications for invoice events (paid, overdue,
+      voided) with configurable endpoint and HMAC verification. Log and route to product team.
+  handle_feature:
+    response_draft: >
+      Thank you for this feedback. We have logged your request for webhook support for invoice
+      lifecycle events (invoice.paid, invoice.overdue, invoice.voided). This has been added to
+      our product backlog and will be reviewed in our next planning cycle. We cannot commit to
+      a delivery timeline at this stage, but your use case has been noted. We will reach out
+      if we have further questions.
+expected:
+  final_state: completed
+  skipped_steps: [handle_billing, handle_bug, handle_account, handle_other]
+  evidence:
+    - step_id: handle_feature
+      status: success

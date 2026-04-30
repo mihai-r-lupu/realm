@@ -1,0 +1,17 @@
+CUST-3847 — Payment Gateway Timeout
+
+Customer: CUST-3847
+Reported: 2026-04-10
+
+Hi support,
+
+Our payment gateway has been timing out intermittently for the past 6 hours.
+About 30% of checkout attempts fail with a 504 error. This is happening in
+production and is actively costing us revenue.
+
+We last deployed v2.14.1 of the payments service at 07:30 UTC today. The
+timeouts started around 08:15 UTC.
+
+Please treat this as urgent.
+
+— Dev team, Acme Corp

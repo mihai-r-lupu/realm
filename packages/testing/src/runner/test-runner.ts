@@ -173,6 +173,17 @@ async function runSingleFixture(
     // Assert final phase.
     assertFinalState(currentRun, fixture.expected.final_state);
 
+    // Assert skipped_steps when declared — exact set equality.
+    if (fixture.expected.skipped_steps !== undefined) {
+      const actualSkipped = [...currentRun.skipped_steps].sort();
+      const expectedSkipped = [...fixture.expected.skipped_steps].sort();
+      if (JSON.stringify(actualSkipped) !== JSON.stringify(expectedSkipped)) {
+        throw new Error(
+          `Expected skipped_steps ${JSON.stringify(expectedSkipped)} but got ${JSON.stringify(actualSkipped)}`,
+        );
+      }
+    }
+
     // Assert expected evidence entries if provided.
     if (fixture.expected.evidence !== undefined) {
       for (const expected of fixture.expected.evidence) {

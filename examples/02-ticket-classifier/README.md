@@ -199,3 +199,6 @@ Each fixture has two `agent_responses` entries — one for `identify_ticket`, on
   drafted response.
 - [YAML Schema Reference](../../docs/reference/yaml-schema.md) — all step fields,
   execution modes, gate configuration, and `depends_on` / `trigger_rule`
+- [Example 6 — Ticket Router](../06-ticket-router/) — builds on this example's
+  `classify_ticket.category` field: uses `when` conditions to route to one of five
+  handlers automatically, with the routing decision recorded in the evidence chain.

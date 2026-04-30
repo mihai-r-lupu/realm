@@ -1,0 +1,19 @@
+CUST-2234 — Data Retention Policy and GDPR Compliance
+
+Customer: CUST-2234
+Reported: 2026-04-13
+
+Hello,
+
+I'm preparing a data processing audit for our GDPR compliance review and have
+a few questions about your data retention practices:
+
+1. How long is customer data retained after account cancellation?
+2. Do you support the right to erasure (Article 17 GDPR) — and if so, what
+   is the process to request deletion of all data associated with our account?
+3. Is a Data Processing Agreement (DPA) available, and where can we find it?
+
+Please direct me to the appropriate documentation or team.
+
+Thanks,
+Compliance lead, EpsilonLtd
