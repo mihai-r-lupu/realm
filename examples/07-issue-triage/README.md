@@ -72,6 +72,16 @@ Two fixtures:
 - `reject-issue.yaml` — gate choice: reject; asserts `skipped_steps` contains both
   `post_comment` and `apply_labels`
 
+Expected output:
+
+```
+Realm Test — examples/07-issue-triage/workflow.yaml
+  PASS critical memory leak — approved
+  PASS memory leak issue — rejected
+
+2/2 passed
+```
+
 ---
 
 ## Requirements
@@ -126,12 +136,13 @@ to discard.
 
 **Option B — `realm agent` CLI (no VS Code required)**
 
-```bash
-export GITHUB_TOKEN=ghp_...
+Replace `your-org/your-repo` and `123` with a real repository and issue number that your
+`GITHUB_TOKEN` can access (the token needs `issues:read` and `issues:write` on that repo).
 
+```bash
 realm agent \
   --workflow examples/07-issue-triage/workflow.yaml \
-  --params "{\"repo\":\"acme/api-service\",\"issue_number\":42}"
+  --params "{\"repo\":\"your-org/your-repo\",\"issue_number\":123}"
 ```
 
 Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to
