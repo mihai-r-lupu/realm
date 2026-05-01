@@ -302,6 +302,23 @@ export function propagateSkips(run: RunRecord, definition: WorkflowDefinition): 
       if (!canTriggerRuleEverBeSatisfied(step, tempRun)) {
         skipped.push(stepName);
         changed = true;
+        continue;
+      }
+
+      // A step whose when-condition evaluates to false once all its deps are settled
+      // can never become eligible — mark it skipped so isWorkflowComplete can fire.
+      if (step.when !== undefined) {
+        const deps = step.depends_on ?? [];
+        const allDepsSettled = deps.every(
+          (d) =>
+            tempRun.completed_steps.includes(d) ||
+            tempRun.failed_steps.includes(d) ||
+            skipped.includes(d),
+        );
+        if (allDepsSettled && !evaluateWhenCondition(step.when, buildEvidenceByStep(run))) {
+          skipped.push(stepName);
+          changed = true;
+        }
       }
     }
   }
