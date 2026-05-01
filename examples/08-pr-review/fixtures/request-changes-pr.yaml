@@ -1,0 +1,45 @@
+name: pr review — changes requested
+params:
+  repo: acme/api-service
+  pr_number: 7
+mocks:
+  github:
+    get_pr_diff:
+      status: 200
+      data:
+        files:
+          - filename: src/db/queries.ts
+            patch: |
+              -  const result = await db.query(userInput)
+              +  const result = await db.query(userInput)  // TODO: sanitize
+    post_comment:
+      status: 201
+      data:
+        id: 7654321
+        html_url: 'https://github.com/acme/api-service/pull/7#issuecomment-7654321'
+agent_responses:
+  write_review:
+    risk: high
+    key_changes:
+      - 'queries.ts: raw user input passed directly to db.query — SQL injection risk'
+      - 'TODO comment added but input is not sanitized'
+    recommendation: request_changes
+    review_comment: >
+      Changes requested. High risk — user input reaches db.query without sanitization.
+      The TODO comment must be resolved before merge: use parameterized queries or an ORM
+      layer that handles escaping. Do not ship this in current form.
+gate_responses:
+  confirm_review: request_changes
+expected:
+  final_state: completed
+  evidence:
+    - step_id: fetch_pr
+      status: success
+    - step_id: write_review
+      status: success
+    - step_id: confirm_review
+      status: success
+    - step_id: post_changes_request
+      status: success
+  skipped_steps:
+    - post_approval

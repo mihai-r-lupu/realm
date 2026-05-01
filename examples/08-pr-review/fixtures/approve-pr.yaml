@@ -1,0 +1,44 @@
+name: pr review — approved
+params:
+  repo: acme/api-service
+  pr_number: 42
+mocks:
+  github:
+    get_pr_diff:
+      status: 200
+      data:
+        files:
+          - filename: src/auth/session.ts
+            patch: |
+              -  const timeout = 3600
+              +  const timeout = config.sessionTimeoutSeconds ?? 3600
+    post_comment:
+      status: 201
+      data:
+        id: 1234567
+        html_url: 'https://github.com/acme/api-service/pull/42#issuecomment-1234567'
+agent_responses:
+  write_review:
+    risk: low
+    key_changes:
+      - 'session.ts: session timeout is now configurable via config.sessionTimeoutSeconds'
+      - 'Falls back to hardcoded 3600 if config field is absent'
+    recommendation: approve
+    review_comment: >
+      Approve. Low risk — changes timeout to be config-driven with a safe fallback.
+      No auth logic altered. Config field should be documented.
+gate_responses:
+  confirm_review: approve
+expected:
+  final_state: completed
+  evidence:
+    - step_id: fetch_pr
+      status: success
+    - step_id: write_review
+      status: success
+    - step_id: confirm_review
+      status: success
+    - step_id: post_approval
+      status: success
+  skipped_steps:
+    - post_changes_request

@@ -59,6 +59,19 @@ All 5 fixtures should pass. Each fixture provides one ticket, mocks `identify_ti
 `classify_ticket`, and asserts both the evidence chain and `skipped_steps` — confirming
 that the four non-matching handlers were correctly skipped.
 
+Expected output:
+
+```
+Realm Test — examples/06-ticket-router/workflow.yaml
+  PASS account issue — SSO lockout after migration
+  PASS billing inquiry — double charge
+  PASS bug report — payment gateway timeout
+  PASS feature request — webhook support for invoice events
+  PASS general question — GDPR data retention inquiry
+
+5/5 passed
+```
+
 ---
 
 ## Run with an AI agent
@@ -90,7 +103,24 @@ Open Copilot chat and say:
 Realm reads the file, runs the three agent steps, routes to `handle_bug`, and records
 the full chain in the evidence log.
 
-**Option B — `realm agent` CLI (no VS Code required)**
+**Option B — Skill file (default agent)**
+
+Copy `realm-ticket-router.md` from this directory to your workspace's `.github/skills/`
+folder. With the default agent, trigger it with:
+
+> "Route this ticket with Realm: examples/06-ticket-router/tickets/payment-gateway-bug.txt"
+
+> "Route this ticket with Realm: examples/06-ticket-router/tickets/billing-overcharge.txt"
+
+> **Why "with Realm"?** The skill file's `description` intentionally includes that phrase
+> as a trigger signal so the default agent routes to Realm only when explicitly asked to.
+> Without it, a general prompt like "route this ticket" could match the skill and start a
+> Realm run silently. If you want fully natural-language invocation without the trigger
+> phrase, open `realm-ticket-router.md` and remove the phrase from the `description`
+> field — the skill will then fire on any support ticket routing request. Use the Realm
+> agent (Option A) if you want that behaviour without modifying the skill file.
+
+**Option C — `realm agent` CLI (no VS Code required)**
 
 ```bash
 realm agent \
