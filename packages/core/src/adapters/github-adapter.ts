@@ -64,6 +64,7 @@ function enrichGitHub404(
  *   fetch('get_linked_issues', { repo, pr_number })        — GET  /repos/{repo}/issues?pr={pr_number}
  *   fetch('get_issue', { repo, issue_number })             — GET  /repos/{repo}/issues/{issue_number}
  *   create('post_comment', { repo, issue_number, body })   — POST /repos/{repo}/issues/{issue_number}/comments
+ *   create('post_comment', { repo, pr_number, body })     — POST /repos/{repo}/issues/{pr_number}/comments
  *   create('apply_labels', { repo, issue_number, labels }) — POST /repos/{repo}/issues/{issue_number}/labels
  *   update('set_pr_description', { repo, pr_number, body }) — PATCH /repos/{repo}/pulls/{pr_number}
  */
@@ -210,7 +211,7 @@ export class GitHubAdapter implements ServiceAdapter {
     this.checkAborted(signal);
 
     const repo = params['repo'] as string;
-    const issueNumber = params['issue_number'];
+    const issueNumber = params['issue_number'] ?? params['pr_number'];
 
     if (operation === 'post_comment') {
       const body = params['body'];
