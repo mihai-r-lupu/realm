@@ -35,9 +35,9 @@ triage_issue   (agent + gate — severity, labels, comment_draft)
   enforces the gate outcome, not the agent.
 - `resolution_messages` on the gate provides a confirmation message for both `approve` and
   `reject` paths — no extra step or CLI change required.
-- `GITHUB_TOKEN` must be present in the environment. The `github` service uses
-  `trust: user_provided`, which means the adapter reads the token from your environment
-  rather than from the workflow definition.
+- `GITHUB_TOKEN` must be present for write operations to authenticate with GitHub. Add it
+  to a `.env` file in the repo root — the workflow is configured with
+  `auth.token_from: secrets.GITHUB_TOKEN` and the engine injects the value at run time.
 
 ---
 
@@ -76,16 +76,17 @@ Two fixtures:
 
 ## Requirements
 
-Set `GITHUB_TOKEN` before running against a real GitHub issue:
+Create a `.env` file in the repo root with your GitHub token:
 
 ```bash
-export GITHUB_TOKEN=ghp_...
+GITHUB_TOKEN=ghp_...
 ```
 
-The `github` service is configured with `trust: user_provided`. The GitHubAdapter reads
-`GITHUB_TOKEN` from the environment automatically when `auth.token` is not hardcoded in
-the workflow — ensure the token has `issues:write` and `issues:read` scope on the target
-repository.
+The workflow is configured with `auth.token_from: secrets.GITHUB_TOKEN` — the engine reads
+the value from `.env` and injects it into the GitHubAdapter at run time. The `realm agent`
+preflight enforces that `GITHUB_TOKEN` is set before starting a run.
+
+Ensure the token has `issues:write` and `issues:read` scope on the target repository.
 
 ---
 
@@ -93,11 +94,23 @@ repository.
 
 **Option A — VS Code + Copilot (MCP)**
 
-Register the workflow:
+Register the workflow and start the MCP server:
 
 ```bash
 realm workflow register examples/07-issue-triage/workflow.yaml
+
+# Start the MCP server:
+realm mcp
 ```
+
+With VS Code: open the workspace — `realm mcp` starts automatically via `.vscode/mcp.json`.
+
+> **Custom agents (Copilot, Claude):** if you are using a custom agent defined in
+> `.github/agents/*.agent.md`, add `realm/*` to its `tools:` list — this grants access
+> to every tool the Realm MCP server exposes without having to list them individually.
+> The MCP server can be running and the workflow registered, but the tools will not
+> appear in the agent's session unless the agent explicitly includes them. Default
+> (non-custom) agents in VS Code pick up all MCP tools automatically.
 
 Open Copilot chat and say:
 
@@ -123,6 +136,32 @@ realm agent \
 
 Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to
 switch providers.
+
+When the run reaches `triage_issue`, `realm agent` pauses and displays the triage output:
+
+```
+⏸  Gate: triage_issue | ID: gate-abc123
+
+   Severity: critical
+   Labels: ["bug", "P1", "memory"]
+   Comment: Triaged as critical. This appears to be a memory leak...
+
+   Approve: realm run respond <run-id> --gate <gate-id> --choice approve
+   Reject:  realm run respond <run-id> --gate <gate-id> --choice reject
+   Waiting for approval...
+```
+
+In a separate terminal, run the printed command to approve or reject:
+
+```bash
+# To approve (posts comment and applies labels):
+realm run respond <run-id> --gate <gate-id> --choice approve
+
+# To reject (no writes reach GitHub):
+realm run respond <run-id> --gate <gate-id> --choice reject
+```
+
+`realm agent` detects the resolved gate and continues automatically.
 
 ---
 

@@ -65,11 +65,23 @@ that the four non-matching handlers were correctly skipped.
 
 **Option A — VS Code + Copilot (MCP)**
 
-Register the workflow:
+Register the workflow and start the MCP server:
 
 ```bash
 realm workflow register examples/06-ticket-router/workflow.yaml
+
+# Start the MCP server:
+realm mcp
 ```
+
+With VS Code: open the workspace — `realm mcp` starts automatically via `.vscode/mcp.json`.
+
+> **Custom agents (Copilot, Claude):** if you are using a custom agent defined in
+> `.github/agents/*.agent.md`, add `realm/*` to its `tools:` list — this grants access
+> to every tool the Realm MCP server exposes without having to list them individually.
+> The MCP server can be running and the workflow registered, but the tools will not
+> appear in the agent's session unless the agent explicitly includes them. Default
+> (non-custom) agents in VS Code pick up all MCP tools automatically.
 
 Open Copilot chat and say:
 
@@ -78,19 +90,42 @@ Open Copilot chat and say:
 Realm reads the file, runs the three agent steps, routes to `handle_bug`, and records
 the full chain in the evidence log.
 
-**Option B — `realm agent` (headless)**
+**Option B — `realm agent` CLI (no VS Code required)**
 
 ```bash
-realm agent examples/06-ticket-router/workflow.yaml \
-  --params path=$(pwd)/examples/06-ticket-router/tickets/billing-overcharge.txt
+realm agent \
+  --workflow examples/06-ticket-router/workflow.yaml \
+  --params "{\"path\":\"$(pwd)/examples/06-ticket-router/tickets/billing-overcharge.txt\"}"
 ```
 
-**Option C — `realm agent` with a different ticket**
+Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers.
+
+Point `--params path` at any ticket file in `tickets/` to test a different route:
 
 ```bash
-realm agent examples/06-ticket-router/workflow.yaml \
-  --params path=$(pwd)/examples/06-ticket-router/tickets/general-question.txt
+realm agent \
+  --workflow examples/06-ticket-router/workflow.yaml \
+  --params "{\"path\":\"$(pwd)/examples/06-ticket-router/tickets/general-question.txt\"}"
 ```
+
+## Inspect the evidence chain
+
+```bash
+realm run inspect <run-id>
+```
+
+The evidence chain shows entries for `read_ticket`, `identify_ticket`, `classify_ticket`, and
+the matching handler. `skipped_steps` lists the four handlers that were evaluated but not
+taken. The routing decision is permanently recorded — `realm run inspect` shows which `when`
+condition matched and which four were skipped.
+
+## Configuration reference
+
+`params_schema` requires:
+
+| Field | Type   | Description                                    |
+| ----- | ------ | ---------------------------------------------- |
+| path  | string | Absolute path to the support ticket text file. |
 
 ---
 

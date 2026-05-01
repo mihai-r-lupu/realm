@@ -113,7 +113,44 @@ Both `review_security` and `review_performance` read from `context.resources.rea
 Neither reads from the other. `synthesize_review` reads from both via
 `context.resources.review_security.*` and `context.resources.review_performance.*`.
 
-## Install and run
+## Install
+
+```bash
+# From the repo root
+npm install
+```
+
+---
+
+## Run fixture tests
+
+```bash
+realm workflow test examples/05-parallel-code-review/workflow.yaml \
+  -f examples/05-parallel-code-review/fixtures/
+```
+
+Two fixtures:
+
+- `fan-out-pass.yaml` — both specialists succeed on the first call. All five steps reach
+  `success`. Final state: `completed`.
+- `convergence-after-branch-retry.yaml` — `review_security` receives one provider timeout,
+  then succeeds on retry. `review_performance` succeeds immediately. The test runner resets
+  the run state and retries `review_security` — the synthesizer waits for both branches
+  regardless of retry. All five steps reach `success`. Final state: `completed`.
+
+Expected output:
+
+```
+Realm Test — examples/05-parallel-code-review/workflow.yaml
+  PASS convergence after branch retry — provider timeout and recovery
+  PASS fan-out pass — payment integration diff
+
+2/2 passed
+```
+
+---
+
+## Run with an AI agent
 
 ```bash
 # Register the workflow (once, from the repo root):
@@ -169,22 +206,6 @@ their declaration order in the YAML. `synthesize_review` always appears after bo
 
 `realm run inspect` shows the `Resolved:` line for auto steps that use `input_map`
 (i.e. `read_diff`), so you can confirm exactly which diff file path was read.
-
-## Test headlessly
-
-```bash
-realm workflow test examples/05-parallel-code-review/workflow.yaml \
-  -f examples/05-parallel-code-review/fixtures/
-```
-
-Two fixtures:
-
-- **`fan-out-pass.yaml`** — both specialists succeed on the first call. All five steps reach
-  `success`. Final state: `completed`.
-- **`convergence-after-branch-retry.yaml`** — `review_security` receives one provider timeout,
-  then succeeds on retry. `review_performance` succeeds immediately. The test runner resets the
-  run state and retries `review_security` — the synthesizer waits for both branches regardless
-  of retry. All five steps reach `success`. Final state: `completed`.
 
 ## Configuration reference
 

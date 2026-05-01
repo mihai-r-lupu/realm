@@ -26,7 +26,9 @@ mocks:
 agent_responses:
   review_changes:
     severity: low
-    summary: Adds an early return guard to prevent a null pointer dereference when the config object is not yet initialised.
+    summary: >-
+      Adds an early return in `getTimeout()` that returns `DEFAULT_TIMEOUT` when config
+      is null, preventing a null pointer dereference.
     breaking_changes: false
     action_required: false
 expected:

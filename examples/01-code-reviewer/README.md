@@ -73,7 +73,7 @@ npm install
 
 No per-example build step is required.
 
-## Run it (headless)
+## Run fixture tests
 
 ```bash
 # From the repo root:
@@ -90,7 +90,7 @@ Realm Test — examples/01-code-reviewer/workflow.yaml
 2/2 passed
 ```
 
-## Run it with an AI agent
+## Run with an AI agent
 
 ```bash
 # Register the workflow (once, from the repo root):
@@ -145,7 +145,7 @@ realm agent \
   --params "{\"path\":\"$(pwd)/examples/01-code-reviewer/diffs/add-oauth-provider.diff\"}"
 ```
 
-Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers. The agent drives the full workflow, resubmits automatically if any field fails schema validation, and prints the `review_changes` result as formatted JSON when the run completes.
+Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers. The agent drives the full workflow, resubmits automatically if any field fails schema validation, and prints the `review_changes` result when the run completes.
 
 Either way, the agent starts the run, loads the diff automatically, then receives a prompt
 asking for the structured review. If any field violates the schema — wrong enum
@@ -153,9 +153,33 @@ value, summary too short, missing boolean — it receives `agent_action: provide
 with the exact validation error and must correct and resubmit. The workflow state
 does not advance until the schema passes.
 
+## Inspect the evidence chain
+
+```bash
+realm run inspect <run-id>
+```
+
+The evidence chain shows entries for `read_diff` and `review_changes`. The `review_changes`
+entry shows the exact fields the agent submitted — severity, summary, breaking_changes, and
+action_required. If the agent submitted an invalid value and corrected it on retry, both
+attempts appear in the chain.
+
+---
+
+## Configuration reference
+
+`params_schema` requires:
+
+| Field | Type   | Description                               |
+| ----- | ------ | ----------------------------------------- |
+| path  | string | Absolute path to the diff file to review. |
+
+---
+
 ## What to look at next
 
-- [Example 2 — Reliable Output, Every Time](../02-ticket-classifier/) — schema
-  enforcement with enum validation and pattern matching across five fields
+- [Example 2 — Verified Data Flows Between Steps](../02-ticket-classifier/) — two
+  chained agent steps where each step's output is validated before the next step starts;
+  `context.resources` threads verified data between steps
 - [YAML Schema Reference](../../docs/reference/yaml-schema.md) — all step fields,
   execution modes, `input_schema` constraints, and `depends_on` / `trigger_rule`

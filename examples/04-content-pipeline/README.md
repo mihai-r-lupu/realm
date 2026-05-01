@@ -57,7 +57,7 @@ fetch_content  (auto — filesystem adapter)          [depends_on: none]
 summarise      (agent — produces: title, summary, word_count)
                [depends_on: fetch_content]           schema enforced before tag_content starts
      ↓
-tag_content    (agent — reads context.resources.summarise; produces: tags[])
+tag_content    (agent — reads context.resources.summarise; produces: headline, message)
                [depends_on: summarise]               provider timeout target in resume fixture
      ↓
 record_result  (auto — terminal step; marks pipeline complete)
@@ -69,7 +69,41 @@ run advances. The run stays in its current state on rejection — the agent rece
 `agent_action: provide_input` with the validation error and resubmits. Nothing downstream
 runs on bad data.
 
-## Install and run
+## Install
+
+```bash
+# From the repo root
+npm install
+```
+
+---
+
+## Run fixture tests
+
+```bash
+realm workflow test examples/04-content-pipeline/workflow.yaml \
+  -f examples/04-content-pipeline/fixtures/
+```
+
+Two fixtures:
+
+- `happy-path.yaml` — all steps succeed, no retry; final state: `completed`
+- `resume-after-timeout.yaml` — `tag_content` fails once with a provider timeout, succeeds
+  on retry; the evidence chain shows all four steps as `success`
+
+Expected output:
+
+```
+Realm Test — examples/04-content-pipeline/workflow.yaml
+  PASS happy path — ML infrastructure article
+  PASS resume after timeout — distributed tracing article
+
+2/2 passed
+```
+
+---
+
+## Run with an AI agent
 
 ```bash
 # Register the workflow (once, from the repo root):
@@ -123,7 +157,7 @@ realm agent \
   --params "{\"path\":\"$(pwd)/examples/04-content-pipeline/articles/ml-infrastructure.txt\"}"
 ```
 
-Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers. The agent drives all steps sequentially and prints the `tag_content` result as formatted JSON when the run completes. If `tag_content` times out mid-run, use `realm run list` to find the run ID and `realm run resume` as described in the timeout section below.
+Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers. The agent drives all steps sequentially and prints the `tag_content` result when the run completes. If `tag_content` times out mid-run, use `realm run list` to find the run ID and `realm run resume` as described in the timeout section below.
 
 Either way, the agent will:
 
@@ -132,10 +166,11 @@ Either way, the agent will:
    `summary`, and `word_count`. If any field fails schema validation, it receives
    `provide_input` and must correct and resubmit. The run stays at `summarise` until
    the schema passes.
-3. Receive a second prompt asking it to generate tags. The prompt already
-   contains the verified title and summary from step 2. It submits `tags`. Same schema
-   enforcement applies — each tag is checked for length, lowercase, and no spaces.
-4. Once the tags schema passes, `record_result` runs and the workflow completes.
+3. Receive a second prompt asking it to produce a formatted article result. The prompt
+   already contains the verified title, summary, and word count from step 2. It submits
+   `headline` and `message`. Same schema enforcement applies — both fields have minimum
+   length requirements.
+4. Once `tag_content`'s schema passes, `record_result` runs and the workflow completes.
 
 **When `tag_content` fails with a provider timeout:**
 
@@ -160,20 +195,6 @@ The evidence chain shows four entries in order: `fetch_content`, `summarise`, `t
 for the failed attempt (with the provider timeout error) and once for the successful retry.
 You can see the timestamp of the failed attempt and the successful retry side by side. Steps
 1 and 2 appear only once each — they were not re-run.
-
-## Test headlessly
-
-```bash
-# From the repo root:
-realm workflow test examples/04-content-pipeline/workflow.yaml \
-  -f examples/04-content-pipeline/fixtures/
-```
-
-Two fixtures are included:
-
-- `happy-path.yaml` — all steps succeed, no retry; final state: `completed`
-- `resume-after-timeout.yaml` — `tag_content` fails once with a provider timeout, succeeds
-  on retry; the evidence chain shows all four steps as `success`
 
 ## Configuration reference
 
