@@ -4,14 +4,15 @@ Examples are ordered by the developer pain they address, starting with the most 
 felt problems. Each example has a **before** (the naive approach) and an **after** (the Realm
 workflow), so you can see exactly what changes and why.
 
-| Example                                              | Pain points demonstrated                                                           | Realm primitive                                                                                  | Gate? |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----- |
-| [01-code-reviewer/](01-code-reviewer/)               | Verification gap, non-determinism, instruction file spiral, no audit trail         | Workflow states as verification gates, `input_schema` enforcement                                |       |
-| [02-ticket-classifier/](02-ticket-classifier/)       | Structured output failures, tool calling brittleness, hidden framework retry logic | Agent step `input_schema` enforcement, schema-driven `provide_input`                             |       |
-| [03-incident-response/](03-incident-response/)       | No human gate before irreversible action, no audit trail, duplicate posts on retry | Human gate, idempotency via evidence chain, sequential agent steps                               | ⏸     |
-| [04-content-pipeline/](04-content-pipeline/)         | State loss on failure, expensive full restart, no checkpoint recovery              | Checkpoint/resume, DAG execution model, `realm run resume` from any failed step                  |       |
-| [05-parallel-code-review/](05-parallel-code-review/) | Sequential bottleneck, non-determinism, verification gap across parallel branches  | DAG fan-out (`depends_on` on multiple predecessors), independent per-branch `input_schema`       |       |
-| [06-ticket-router/](06-ticket-router/)               | Routing rules embedded in agent instructions, untestable and invisible             | `when` condition — step only becomes eligible when prior step output matches declared expression |       |
+| Example                                              | Pain points demonstrated                                                                                     | Realm primitive                                                                                               | Gate? |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ----- |
+| [01-code-reviewer/](01-code-reviewer/)               | Verification gap, non-determinism, instruction file spiral, no audit trail                                   | Workflow states as verification gates, `input_schema` enforcement                                             |       |
+| [02-ticket-classifier/](02-ticket-classifier/)       | No audit trail between extraction and classification, tool calling brittleness, hidden framework retry logic | Chained agent steps with per-step `input_schema`, `context.resources` data flow, `provide_input` on rejection |       |
+| [03-incident-response/](03-incident-response/)       | No human gate before irreversible action, no audit trail, duplicate posts on retry                           | Human gate, idempotency via evidence chain, sequential agent steps                                            | ⏸     |
+| [04-content-pipeline/](04-content-pipeline/)         | State loss on failure, expensive full restart, no checkpoint recovery                                        | Checkpoint/resume, DAG execution model, `realm run resume` from any failed step                               |       |
+| [05-parallel-code-review/](05-parallel-code-review/) | Sequential bottleneck, non-determinism, verification gap across parallel branches                            | DAG fan-out (`depends_on` on multiple predecessors), independent per-branch `input_schema`                    |       |
+| [06-ticket-router/](06-ticket-router/)               | Routing rules embedded in agent instructions, untestable and invisible                                       | `when` condition — step only becomes eligible when prior step output matches declared expression              |       |
+| [07-issue-triage/](07-issue-triage/)                 | LLM writes to GitHub before human reviews; no structural guarantee writes are blocked on rejection           | Agent step + `trust: human_confirmed` gate + `when: "choice == 'approve'"` on write steps                     | ⏸     |
 
 ⏸ = example has a human gate. Slack gate modes (webhook notification, bidirectional thread reply, or Events API real-time push) apply to these examples. See [Slack Gate Modes](../docs/reference/realm-agent-slack.md) for setup.
 
@@ -79,7 +80,10 @@ Each example ships with test fixtures under `fixtures/`. Run them with:
 realm workflow test examples/01-code-reviewer/workflow.yaml -f examples/01-code-reviewer/fixtures/
 realm workflow test examples/02-ticket-classifier/workflow.yaml -f examples/02-ticket-classifier/fixtures/
 realm workflow test examples/03-incident-response/workflow.yaml -f examples/03-incident-response/fixtures/
+realm workflow test examples/04-content-pipeline/workflow.yaml -f examples/04-content-pipeline/fixtures/
+realm workflow test examples/05-parallel-code-review/workflow.yaml -f examples/05-parallel-code-review/fixtures/
 realm workflow test examples/06-ticket-router/workflow.yaml -f examples/06-ticket-router/fixtures/
+realm workflow test examples/07-issue-triage/workflow.yaml -f examples/07-issue-triage/fixtures/
 ```
 
 ---

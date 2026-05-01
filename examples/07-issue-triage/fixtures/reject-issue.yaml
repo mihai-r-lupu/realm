@@ -1,0 +1,31 @@
+name: memory leak issue — rejected
+params:
+  repo: acme/api-service
+  issue_number: 123
+mocks:
+  github:
+    get_issue:
+      status: 200
+      data:
+        number: 123
+        title: 'Memory leak under high load'
+        body: 'Under sustained load the request handler leaks ~50MB per hour. Observed on v3.2.1. Needs investigation.'
+        state: open
+        labels: []
+agent_responses:
+  triage_issue:
+    severity: critical
+    labels: [bug, P1, memory]
+    comment_draft: 'Triaged as critical. This appears to be a memory leak introduced in the request handler — assigning to the platform team for immediate investigation.'
+gate_responses:
+  triage_issue: reject
+expected:
+  final_state: completed
+  skipped_steps:
+    - post_comment
+    - apply_labels
+  evidence:
+    - step_id: fetch_issue
+      status: success
+    - step_id: triage_issue
+      status: success
