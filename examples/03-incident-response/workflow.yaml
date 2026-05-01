@@ -123,8 +123,8 @@ steps:
         - send
         - reject
       resolution_messages:
-        send: '✅ Approved. Gate choice recorded in the evidence chain.'
-        reject: '❌ Rejected. Gate choice recorded in the evidence chain.'
+        send: 'Draft approved — choice recorded in the evidence chain.'
+        reject: 'Draft rejected — choice recorded in the evidence chain.'
       message: |
         {{ context.resources.analyze_cause.severity | upper }} — {{ context.resources.analyze_cause.root_cause | truncate: 80 }}
         Impacted: {{ context.resources.analyze_cause.impacted_services | join }}
