@@ -47,9 +47,11 @@ mocks:
 agent_responses:
   review_changes:
     severity: high
-    summary: Adds a required `provider` parameter to the public authenticate() function, breaking all existing call sites that do not pass the argument.
+    summary: >-
+      Adds a required `provider` parameter to the public `authenticate()` function —
+      all existing call sites will fail to compile until updated.
     breaking_changes: true
-    action_required: false
+    action_required: true
 expected:
   final_state: completed
   evidence:

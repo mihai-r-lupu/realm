@@ -31,7 +31,14 @@ agent_responses:
       as a checkpoint that enables partial replay rather than full restart.
     word_count: 210
   tag_content:
-    tags: [machine-learning, infrastructure, reliability, mlops, data-validation]
+    headline: 'Building Reliable ML Infrastructure — 210 words'
+    message: |
+      Summary: The article examines how ML system failures differ from traditional software
+      failures and argues that layered validation — at ingestion, feature extraction,
+      and prediction — is the key reliability primitive. Each validation layer acts
+      as a checkpoint that enables partial replay rather than full restart.
+
+      Tags: machine-learning, infrastructure, reliability, mlops, data-validation
 expected:
   final_state: completed
   evidence:

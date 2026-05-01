@@ -87,13 +87,13 @@ see the Slack section below.
 ## Run fixture tests
 
 ```bash
-realm workflow test examples/03-incident-response --fixtures examples/03-incident-response/fixtures
+realm workflow test examples/03-incident-response/workflow.yaml -f examples/03-incident-response/fixtures/
 ```
 
 Expected output:
 
 ```
-Realm Test — examples/03-incident-response
+Realm Test — examples/03-incident-response/workflow.yaml
   PASS approved
   PASS rejected
 
@@ -107,12 +107,12 @@ produce 4 evidence entries and land in `completed`.
 Fixture tests use an in-memory store — no run-id is produced and `realm run list` will not show
 these runs. To get an inspectable run record, use the AI agent mode below.
 
-## Run it with an AI agent (any VS Code agent with MCP support)
+## Run with an AI agent
 
 **Step 1** — Register the workflow so the global Realm MCP server can find it:
 
 ```bash
-realm workflow register examples/03-incident-response
+realm workflow register examples/03-incident-response/workflow.yaml
 ```
 
 **Step 2** — VS Code picks up `.vscode/mcp.json` from the repo root automatically. The single
@@ -189,7 +189,7 @@ realm run respond <run-id> --gate <gate-id> --choice send
 realm run respond <run-id> --gate <gate-id> --choice reject
 ```
 
-`realm agent` detects the resolved gate and continues automatically. When the run completes it prints the `draft_response` result as formatted JSON.
+`realm agent` detects the resolved gate and continues automatically. When the run completes it prints the `draft_response` result.
 
 ### Slack gate modes
 
@@ -244,12 +244,6 @@ The workspace instruction file (`.github/instructions/realm.instructions.md`) gi
 the generic Realm protocol. The `realm-incident-response.md` skill layers the workflow-specific
 behaviour on top.
 
-The MCP session produces a run-id. Once the run completes, inspect the full evidence chain:
-
-```bash
-realm run inspect <run-id>
-```
-
 If the tools don't appear in Copilot, see [examples/README.md](../README.md#troubleshooting-mcp--vs-code).
 
 ## Agent profiles
@@ -275,6 +269,28 @@ alerts/
 
 Point the workflow at any JSON file containing alert data. The agent reads whatever structure
 is present via `context.resources.read_alert.content`.
+
+---
+
+## Inspect the evidence chain
+
+```bash
+realm run inspect <run-id>
+```
+
+The evidence chain includes entries for `read_alert`, `analyze_cause`, `draft_response`, and
+`confirm_and_send`. The gate choice (`send` or `reject`) is recorded permanently — `realm run inspect`
+shows exactly what was approved, what the analysis contained, and the full draft text.
+
+---
+
+## Configuration reference
+
+`params_schema` requires:
+
+| Field | Type   | Description                                     |
+| ----- | ------ | ----------------------------------------------- |
+| path  | string | Absolute path to the alert JSON file to triage. |
 
 ---
 

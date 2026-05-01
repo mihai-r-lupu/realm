@@ -44,10 +44,15 @@ steps:
       Review the following code diff and produce a structured assessment.
 
       Required fields:
-      - severity: one of critical | high | medium | low
-      - summary: a description of what this change does (min 20 characters)
-      - breaking_changes: true if a public API, function signature, or contract changes
-      - action_required: true if the author needs to make changes before this can merge
+      - severity: overall severity of the change — exactly one of: critical, high, medium, low
+      - summary: one or two sentences describing what the diff does and why it matters
+        (minimum 20 characters)
+      - breaking_changes: true if any existing caller, interface, or contract is broken; false otherwise
+      - action_required: true if the author or a downstream consumer must take action before merging
+        or deploying; false otherwise
+
+      Return exactly these four fields. Any severity value outside the allowed enum
+      will be rejected before your response is accepted.
 
       Diff:
       {{ context.resources.read_diff.content }}
@@ -65,6 +70,11 @@ steps:
           type: boolean
         action_required:
           type: boolean
+    display: |
+      {{ severity }}: {{ summary }}
+
+      Breaking changes: {{ breaking_changes }}
+      Action required: {{ action_required }}
 
   record_review:
     description: Record the structured code review

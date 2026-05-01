@@ -30,7 +30,14 @@ agent_responses:
       with head-based at low rates, adding tail-based for error traces.
     word_count: 185
   tag_content:
-    tags: [distributed-systems, tracing, observability, sampling, opentelemetry]
+    headline: 'Distributed Tracing at Scale — 185 words'
+    message: |
+      Summary: The article explains distributed tracing as a tool for identifying slow services
+      in distributed systems and focuses on the core operational challenge: sampling strategy.
+      It contrasts head-based and tail-based sampling and recommends starting with head-based
+      at low rates, adding tail-based for error traces.
+
+      Tags: distributed-systems, tracing, observability, sampling, opentelemetry
 agent_errors:
   tag_content:
     - provider timed out after 30s

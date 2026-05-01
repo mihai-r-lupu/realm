@@ -83,7 +83,42 @@ pass before the run advances. The run stays in its current state on rejection �
 agent receives `agent_action: provide_input` with the validation error and resubmits.
 Nothing downstream runs on bad data.
 
-## Install and run
+## Install
+
+```bash
+# From the repo root
+npm install
+```
+
+---
+
+## Run fixture tests
+
+```bash
+realm workflow test examples/02-ticket-classifier/workflow.yaml -f examples/02-ticket-classifier/fixtures/
+```
+
+Two fixtures:
+
+- `bug-ticket.yaml` — a P1 payment gateway bug from `CUST-3847`, expected: `completed`
+- `billing-ticket.yaml` — a billing overcharge from `CUST-1122`, expected: `completed`
+
+Expected output:
+
+```
+Realm Test — examples/02-ticket-classifier/workflow.yaml
+  PASS billing inquiry — double charge on March invoice
+  PASS bug report — payment gateway timeout
+
+2/2 passed
+```
+
+Each fixture has two `agent_responses` entries — one for `identify_ticket`, one for
+`classify_ticket` — and an `expected.evidence` with all four steps.
+
+---
+
+## Run with an AI agent
 
 ```bash
 # Register the workflow (once, from the repo root):
@@ -138,7 +173,7 @@ realm agent \
   --params "{\"path\":\"$(pwd)/examples/02-ticket-classifier/tickets/billing-overcharge.txt\"}"
 ```
 
-Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers. The agent drives both steps sequentially, validating each output against its schema before advancing, and prints the `classify_ticket` result as formatted JSON when the run completes.
+Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` before running. Use `--provider anthropic` to switch providers. The agent drives both steps sequentially, validating each output against its schema before advancing, and prints the `classify_ticket` result when the run completes.
 
 Either way, the agent will:
 
@@ -167,21 +202,6 @@ The evidence chain shows four entries in order: `read_ticket`, `identify_ticket`
 fields. The `classify_ticket` entry shows the inputs it received (from
 `context.resources.identify_ticket`) and its output. If classification is wrong, the
 evidence chain tells you whether the extractor or the classifier was at fault.
-
-## Test headlessly
-
-```bash
-# From the repo root:
-realm workflow test examples/02-ticket-classifier/workflow.yaml -f examples/02-ticket-classifier/fixtures/
-```
-
-Two fixtures are included:
-
-- `bug-ticket.yaml` — a P1 payment gateway bug from `CUST-3847`, expected: `completed`
-- `billing-ticket.yaml` — a billing overcharge from `CUST-1122`, expected: `completed`
-
-Each fixture has two `agent_responses` entries — one for `identify_ticket`, one for
-`classify_ticket` — and an `expected.evidence` with all four steps.
 
 ## Configuration reference
 

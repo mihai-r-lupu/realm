@@ -78,25 +78,32 @@ steps:
       Generate tags for this article.
 
       Title: {{ context.resources.summarise.title }}
+      Word count: {{ context.resources.summarise.word_count }}
       Summary: {{ context.resources.summarise.summary }}
 
       Required fields:
-      - tags: a list of 1–10 keyword tags (each 2–50 characters, lowercase, no spaces —
-        use hyphens for multi-word tags, e.g. "machine-learning", "distributed-systems")
+      - headline: article title followed by word count.
+        Example: "Building Reliable ML Infrastructure — 210 words"
+      - message: full tagging result. Use this exact layout — a blank line between each section:
 
-      Return exactly the tags field. Any tag outside the constraints will be rejected.
+          Summary: <the article summary, one paragraph>
+
+          Tags: tag1, tag2, tag3
+          (1–10 tags, lowercase, hyphens for multi-word, e.g. machine-learning)
+
+      Return exactly these two fields. Any tag outside the format constraints will be rejected.
     input_schema:
       type: object
-      required: [tags]
+      required: [headline, message]
       properties:
-        tags:
-          type: array
-          minItems: 1
-          maxItems: 10
-          items:
-            type: string
-            minLength: 2
-            maxLength: 50
+        headline:
+          type: string
+          description: 'Article title and word count'
+          minLength: 5
+        message:
+          type: string
+          description: 'Full result with Summary and Tags sections'
+          minLength: 20
 
   record_result:
     description: Mark the pipeline complete. Data is already in the evidence chain from
