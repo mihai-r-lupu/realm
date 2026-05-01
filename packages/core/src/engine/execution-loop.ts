@@ -864,7 +864,12 @@ export async function executeStep(
     ...afterComplete,
     skipped_steps: propagateSkips(afterComplete, definition),
   };
-  const isComplete = isWorkflowComplete(withSkippedComplete, definition);
+  // A run is terminal when all steps are settled OR when no step will ever become
+  // eligible again (safety net for when-condition routing not fully covered by propagateSkips).
+  const isComplete =
+    isWorkflowComplete(withSkippedComplete, definition) ||
+    (withSkippedComplete.in_progress_steps.length === 0 &&
+      findEligibleSteps(definition, withSkippedComplete).length === 0);
   const finalRun: RunRecord = {
     ...withSkippedComplete,
     terminal_state: isComplete,
@@ -1015,7 +1020,12 @@ export async function submitHumanResponse(
     ...afterGate,
     skipped_steps: propagateSkips(afterGate, definition),
   };
-  const isComplete = isWorkflowComplete(withSkippedGate, definition);
+  // A run is terminal when all steps are settled OR when no step will ever become
+  // eligible again (safety net for when-condition routing not fully covered by propagateSkips).
+  const isComplete =
+    isWorkflowComplete(withSkippedGate, definition) ||
+    (withSkippedGate.in_progress_steps.length === 0 &&
+      findEligibleSteps(definition, withSkippedGate).length === 0);
   const finalRun: RunRecord = {
     ...withSkippedGate,
     terminal_state: isComplete,
