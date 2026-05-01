@@ -507,7 +507,12 @@ export async function runAgent(deps: AgentDeps, options: AgentRunOptions): Promi
       const gate = currentRun.pending_gate;
 
       console.log(`\n⏸  Gate: ${gate.step_name} | ID: ${gate.gate_id}`);
-      const gateText = gate.resolved_message ?? formatOutputForTerminal(gate.preview);
+      const gateStepDef = definition.steps[gate.step_name];
+      const gateText =
+        gate.resolved_message ??
+        (gateStepDef?.display !== undefined
+          ? renderDisplay(gateStepDef.display, gate.preview)
+          : formatOutputForTerminal(gate.preview));
       const indented = gateText
         .trimEnd()
         .split('\n')
