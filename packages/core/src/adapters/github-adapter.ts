@@ -18,20 +18,32 @@ export interface GitHubAdapterConfig {
  * Rewraps a `SERVICE_HTTP_4XX` 404 WorkflowError with an actionable diagnostic message.
  * Returns the original error unchanged for any other error type or status code.
  * Does not log or expose token values.
+ *
+ * @param mode - `'pr'` renders `gh pr view`; `'issue'` renders `gh issue view`. Defaults to `'pr'`.
  */
-function enrichGitHub404(err: unknown, repo: string | undefined, prNumber: unknown): unknown {
+function enrichGitHub404(
+  err: unknown,
+  repo: string | undefined,
+  number: unknown,
+  mode: 'pr' | 'issue' = 'pr',
+): unknown {
   if (
     err instanceof WorkflowError &&
     err.code === 'SERVICE_HTTP_4XX' &&
     err.details['status'] === 404
   ) {
+    const noun = mode === 'issue' ? 'Issue' : 'PR';
+    const ghCmd =
+      mode === 'issue'
+        ? `gh issue view ${number} --repo ${repo ?? '<repo>'}`
+        : `gh pr view ${number} --repo ${repo ?? '<repo>'}`;
     return new WorkflowError(
       `HTTP 404: Resource not found.\n\n` +
         `Likely causes:\n` +
-        `  - Repository '${repo ?? '<repo>'}' or PR #${prNumber} does not exist\n` +
+        `  - Repository '${repo ?? '<repo>'}' or ${noun} #${number} does not exist\n` +
         `  - GITHUB_TOKEN does not have access to this repository (private repos return 404)\n\n` +
         `Verify with:\n` +
-        `  gh pr view ${prNumber} --repo ${repo ?? '<repo>'}`,
+        `  ${ghCmd}`,
       {
         code: 'SERVICE_HTTP_4XX',
         category: 'SERVICE',
@@ -48,8 +60,11 @@ function enrichGitHub404(err: unknown, repo: string | undefined, prNumber: unkno
  * GitHubAdapter communicates with the GitHub REST API.
  *
  * Supported operations:
- *   fetch('get_pr_diff', { repo, pr_number })       — GET /repos/{repo}/pulls/{pr_number}/files
- *   fetch('get_linked_issues', { repo, pr_number }) — GET /repos/{repo}/issues?pr={pr_number}
+ *   fetch('get_pr_diff', { repo, pr_number })              — GET  /repos/{repo}/pulls/{pr_number}/files
+ *   fetch('get_linked_issues', { repo, pr_number })        — GET  /repos/{repo}/issues?pr={pr_number}
+ *   fetch('get_issue', { repo, issue_number })             — GET  /repos/{repo}/issues/{issue_number}
+ *   create('post_comment', { repo, issue_number, body })   — POST /repos/{repo}/issues/{issue_number}/comments
+ *   create('apply_labels', { repo, issue_number, labels }) — POST /repos/{repo}/issues/{issue_number}/labels
  *   update('set_pr_description', { repo, pr_number, body }) — PATCH /repos/{repo}/pulls/{pr_number}
  */
 export class GitHubAdapter implements ServiceAdapter {
@@ -87,7 +102,7 @@ export class GitHubAdapter implements ServiceAdapter {
   }
 
   private async executeRequest(
-    method: 'GET' | 'PATCH',
+    method: 'GET' | 'PATCH' | 'POST',
     url: string,
     body?: unknown,
     signal?: AbortSignal,
@@ -168,6 +183,16 @@ export class GitHubAdapter implements ServiceAdapter {
       }
     }
 
+    if (operation === 'get_issue') {
+      const issueNumber = params['issue_number'];
+      const url = `${this.baseUrl}/repos/${repo}/issues/${issueNumber}`;
+      try {
+        return await this.executeRequest('GET', url, undefined, signal);
+      } catch (err) {
+        throw enrichGitHub404(err, repo, issueNumber, 'issue');
+      }
+    }
+
     throw new WorkflowError(`GitHubAdapter: unknown operation: ${operation}`, {
       code: 'ENGINE_ADAPTER_FAILED',
       category: 'ENGINE',
@@ -177,12 +202,29 @@ export class GitHubAdapter implements ServiceAdapter {
   }
 
   async create(
-    _operation: string,
-    _params: Record<string, unknown>,
+    operation: string,
+    params: Record<string, unknown>,
     _config: Record<string, unknown>,
-    _signal?: AbortSignal,
+    signal?: AbortSignal,
   ): Promise<ServiceResponse> {
-    throw new WorkflowError('GitHubAdapter: unsupported operation: create', {
+    this.checkAborted(signal);
+
+    const repo = params['repo'] as string;
+    const issueNumber = params['issue_number'];
+
+    if (operation === 'post_comment') {
+      const body = params['body'];
+      const url = `${this.baseUrl}/repos/${repo}/issues/${issueNumber}/comments`;
+      return this.executeRequest('POST', url, { body }, signal);
+    }
+
+    if (operation === 'apply_labels') {
+      const labels = params['labels'];
+      const url = `${this.baseUrl}/repos/${repo}/issues/${issueNumber}/labels`;
+      return this.executeRequest('POST', url, { labels }, signal);
+    }
+
+    throw new WorkflowError(`GitHubAdapter: unknown operation: ${operation}`, {
       code: 'ENGINE_ADAPTER_FAILED',
       category: 'ENGINE',
       agentAction: 'stop',

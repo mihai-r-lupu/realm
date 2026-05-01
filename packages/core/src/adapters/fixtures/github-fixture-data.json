@@ -25,5 +25,23 @@
   "PATCH /repos/:owner/:repo/pulls/:pr": {
     "status": 200,
     "echo": ["body"]
+  },
+  "GET /repos/:owner/:repo/issues/:issue": {
+    "status": 200,
+    "body": {
+      "number": 123,
+      "title": "Memory leak under high load",
+      "body": "Under sustained load the request handler leaks ~50MB per hour. Observed on v3.2.1. Needs investigation.",
+      "state": "open",
+      "labels": []
+    }
+  },
+  "POST /repos/:owner/:repo/issues/:issue/comments": {
+    "status": 201,
+    "echo": ["body"]
+  },
+  "POST /repos/:owner/:repo/issues/:issue/labels": {
+    "status": 200,
+    "echo": ["labels"]
   }
 }

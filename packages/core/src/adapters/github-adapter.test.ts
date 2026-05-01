@@ -83,8 +83,46 @@ describe('GitHubAdapter', () => {
     await expect(adapter.fetch('nonexistent_op', {}, {})).rejects.toBeInstanceOf(WorkflowError);
   });
 
-  it('create throws WorkflowError', async () => {
-    await expect(adapter.create('anything', {}, {})).rejects.toBeInstanceOf(WorkflowError);
+  it('get_issue returns correct shape', async () => {
+    const result = await adapter.fetch(
+      'get_issue',
+      { repo: 'owner/repo', issue_number: '123' },
+      {},
+    );
+    expect(result.status).toBe(200);
+    const data = result.data as Record<string, unknown>;
+    expect(data['number']).toBe(123);
+    expect(data['title']).toBe('Memory leak under high load');
+    expect(data['state']).toBe('open');
+  });
+
+  it('post_comment returns 201 and echoes body', async () => {
+    const result = await adapter.create(
+      'post_comment',
+      { repo: 'owner/repo', issue_number: '123', body: 'Triaged as P1.' },
+      {},
+    );
+    expect(result.status).toBe(201);
+    const data = result.data as Record<string, unknown>;
+    expect(data['body']).toBe('Triaged as P1.');
+  });
+
+  it('apply_labels returns 200 and echoes labels', async () => {
+    const result = await adapter.create(
+      'apply_labels',
+      { repo: 'owner/repo', issue_number: '123', labels: ['critical', 'needs-investigation'] },
+      {},
+    );
+    expect(result.status).toBe(200);
+    const data = result.data as Record<string, unknown>;
+    expect(Array.isArray(data['labels'])).toBe(true);
+    expect(data['labels']).toEqual(['critical', 'needs-investigation']);
+  });
+
+  it('unknown create operation throws WorkflowError with ENGINE_ADAPTER_FAILED', async () => {
+    await expect(adapter.create('nonexistent_op', {}, {})).rejects.toMatchObject({
+      code: 'ENGINE_ADAPTER_FAILED',
+    });
   });
 
   it('AbortSignal: aborted before call throws STEP_ABORTED', async () => {
