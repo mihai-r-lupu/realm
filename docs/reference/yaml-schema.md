@@ -302,6 +302,72 @@ message: |
 - [ ] If content is truncated or capped (`| limit:`, `| truncate:`), the reviewer can either consult a primary source (URL, PR number, ticket) or — once bidirectional gate messaging is available — ask the agent for more detail in the same thread. Do not hide information that exists nowhere else and has no reachable primary source.
 - [ ] Tested in terminal rendering, not only previewed as Slack Markdown
 
+### resolution_messages
+
+`gate.resolution_messages` is an optional per-choice confirmation map displayed after the gate
+resolves. Each key is a valid gate choice; the value is shown in the terminal and posted as a
+Slack thread reply to the gate notification.
+
+```yaml
+gate:
+  choices: [send, reject]
+  message: |
+    {{ context.resources.analyze_cause.severity | upper }} — {{ context.resources.analyze_cause.root_cause }}
+    Draft: {{ context.resources.draft_response.headline | truncate: 80 }}
+  resolution_messages:
+    send: 'Draft approved — posted to the incident channel.'
+    reject: 'Draft rejected — run cancelled.'
+```
+
+Values are **plain text** — no template substitution. Keep entries to one line. Every choice in
+`gate.choices` should have a corresponding entry; missing choices resolve silently (no message).
+
+---
+
+## Step display
+
+The `display:` field produces a formatted terminal summary printed after the step completes.
+Without `display:`, the CLI prints the raw JSON output. With `display:`, it renders the
+developer-authored template.
+
+```yaml
+write_review:
+  execution: agent
+  depends_on: [fetch_pr]
+  display: |
+    Risk: {{ risk }}
+
+    {{ review_comment }}
+```
+
+### Short-path syntax
+
+`display:` uses a **short-path renderer** — `{{ field }}` resolves against the step's own
+output object. It does **not** support:
+
+- `{{ context.resources.STEP.field }}` — cross-step references
+- `{{ run.params.field }}` — run params
+- Liquid filters (`| upper`, `| bullets`, `| truncate`)
+
+Unrecognised paths pass through as literal text. This is the most common authoring mistake
+— if you see `{{ context.resources.write_review.risk }}` in the terminal instead of a value,
+you are using context paths in `display:` where you should be using `gate.message`.
+
+### Gate fallback
+
+On `execution: auto` steps with `trust: human_confirmed`, `display:` is used as the
+`gate.display` fallback when `gate.message` is absent:
+
+```
+1. gate.message resolved  → used as gate.display (Liquid filters supported)
+2. display: resolved      → used as gate.display (short paths only, no filters)
+3. step.prompt resolved   → used as gate.display (existing fallback)
+4. none present           → gate.display is absent
+```
+
+For gate steps that need filters or cross-step references in the decision card, use
+`gate.message` — not `display:`.
+
 ---
 
 ## Template filters

@@ -67,7 +67,7 @@ steps:
       - recommendation: your suggested outcome — "approve" or "request_changes"
       - review_comment: the full comment to post on the PR — concise, engineering-focused,
         no greetings, no "thank you for this PR", no customer-facing language; under 200 words;
-        state your recommendation on the first line
+        begin with "Approve." or "Changes requested." (capitalized, with a period), then explain
     input_schema:
       type: object
       required: [risk, key_changes, recommendation, review_comment]
