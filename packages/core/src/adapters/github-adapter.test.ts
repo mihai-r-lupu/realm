@@ -31,8 +31,12 @@ describe('GitHubAdapter', () => {
     expect(typeof data['diff_text']).toBe('string');
     expect(data['pr_title']).toBe('Add new feature');
     expect(data['base_branch']).toBe('main');
+    expect(data['head_sha']).toBe('abc123def456');
+    expect(data['repo']).toBe('owner/repo');
     expect(Array.isArray(data['files_changed'])).toBe(true);
-    expect((data['files_changed'] as unknown[]).length).toBe(2);
+    expect(data['files_changed']).toEqual(['src/main.ts', 'src/utils.ts']);
+    expect(data['diff_text']).toContain('--- src/main.ts');
+    expect(data['diff_text']).toContain('--- src/utils.ts');
   });
 
   it('get_linked_issues returns correct shape', async () => {
@@ -67,7 +71,7 @@ describe('GitHubAdapter', () => {
     const spy = vi.spyOn(globalThis, 'fetch');
     try {
       await adapter.fetch('get_pr_diff', { repo: 'owner/repo', pr_number: '1' }, {});
-      expect(spy).toHaveBeenCalledOnce();
+      expect(spy).toHaveBeenCalledTimes(2);
       const [, opts] = spy.mock.calls[0] as [string, RequestInit];
       const headers = opts.headers as Record<string, string>;
       expect(headers['Authorization']).toBe('Bearer test-token');
@@ -123,6 +127,49 @@ describe('GitHubAdapter', () => {
     await expect(adapter.create('nonexistent_op', {}, {})).rejects.toMatchObject({
       code: 'ENGINE_ADAPTER_FAILED',
     });
+  });
+
+  it('get_issue_comments returns correct shape', async () => {
+    const result = await adapter.fetch(
+      'get_issue_comments',
+      { repo: 'owner/repo', issue_number: '123' },
+      {},
+    );
+    expect(result.status).toBe(200);
+    const data = result.data as Array<Record<string, unknown>>;
+    expect(Array.isArray(data)).toBe(true);
+    expect(data.length).toBe(2);
+    expect(data[0]?.['author']).toBe('alice');
+    expect(data[0]?.['body']).toBe('Confirmed on v3.2.1.');
+    expect(data[0]?.['created_at']).toBe('2024-01-15T10:30:00Z');
+  });
+
+  it('get_file_contents decodes base64 content', async () => {
+    const result = await adapter.fetch(
+      'get_file_contents',
+      { repo: 'owner/repo', path: 'main.ts' },
+      {},
+    );
+    expect(result.status).toBe(200);
+    const data = result.data as Record<string, unknown>;
+    expect(data['path']).toBe('main.ts');
+    expect(data['content']).toBe('// hello');
+  });
+
+  it('get_pr_review_comments returns correct shape', async () => {
+    const result = await adapter.fetch(
+      'get_pr_review_comments',
+      { repo: 'owner/repo', pr_number: '1' },
+      {},
+    );
+    expect(result.status).toBe(200);
+    const data = result.data as Array<Record<string, unknown>>;
+    expect(Array.isArray(data)).toBe(true);
+    expect(data.length).toBe(2);
+    expect(data[0]?.['file']).toBe('src/main.ts');
+    expect(data[0]?.['line']).toBe(5);
+    expect(data[0]?.['author']).toBe('carol');
+    expect(data[1]?.['line']).toBe(3);
   });
 
   it('AbortSignal: aborted before call throws STEP_ABORTED', async () => {
