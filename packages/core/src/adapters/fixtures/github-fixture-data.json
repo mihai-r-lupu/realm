@@ -1,12 +1,23 @@
 {
   "GET /repos/:owner/:repo/pulls/:pr/files": {
     "status": 200,
+    "body": [
+      {
+        "filename": "src/main.ts",
+        "patch": "@@ -1,4 +1,5 @@\n+// added feature\n export function main() {}"
+      },
+      {
+        "filename": "src/utils.ts",
+        "patch": "@@ -0,0 +1,3 @@\n+export function helper() {}\n+export function other() {}"
+      }
+    ]
+  },
+  "GET /repos/:owner/:repo/pulls/:pr": {
+    "status": 200,
     "body": {
-      "diff_text": "diff --git a/src/main.ts b/src/main.ts\n--- a/src/main.ts\n+++ b/src/main.ts\n@@ -1,4 +1,5 @@\n+// added feature\n export function main() {}",
-      "pr_title": "Add new feature",
-      "base_branch": "main",
-      "files_changed": ["src/main.ts", "src/utils.ts"],
-      "repo": "owner/repo"
+      "title": "Add new feature",
+      "base": { "ref": "main", "sha": "base000sha" },
+      "head": { "sha": "abc123def456" }
     }
   },
   "GET /repos/:owner/:repo/issues": {
@@ -43,5 +54,45 @@
   "POST /repos/:owner/:repo/issues/:issue/labels": {
     "status": 200,
     "echo": ["labels"]
+  },
+  "GET /repos/:owner/:repo/issues/:issue/comments": {
+    "status": 200,
+    "body": [
+      {
+        "user": { "login": "alice" },
+        "body": "Confirmed on v3.2.1.",
+        "created_at": "2024-01-15T10:30:00Z"
+      },
+      {
+        "user": { "login": "bob" },
+        "body": "Assigned to milestone 4.",
+        "created_at": "2024-01-16T08:00:00Z"
+      }
+    ]
+  },
+  "GET /repos/:owner/:repo/contents/:filename": {
+    "status": 200,
+    "body": {
+      "content": "Ly8gaGVsbG8=",
+      "encoding": "base64"
+    }
+  },
+  "GET /repos/:owner/:repo/pulls/:pr/comments": {
+    "status": 200,
+    "body": [
+      {
+        "path": "src/main.ts",
+        "line": 5,
+        "user": { "login": "carol" },
+        "body": "This logic should be extracted."
+      },
+      {
+        "path": "src/utils.ts",
+        "line": null,
+        "original_line": 3,
+        "user": { "login": "dave" },
+        "body": "Needs a test."
+      }
+    ]
   }
 }

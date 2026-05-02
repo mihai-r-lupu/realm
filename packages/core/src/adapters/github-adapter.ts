@@ -60,13 +60,16 @@ function enrichGitHub404(
  * GitHubAdapter communicates with the GitHub REST API.
  *
  * Supported operations:
- *   fetch('get_pr_diff', { repo, pr_number })              — GET  /repos/{repo}/pulls/{pr_number}/files
- *   fetch('get_linked_issues', { repo, pr_number })        — GET  /repos/{repo}/issues?pr={pr_number}
- *   fetch('get_issue', { repo, issue_number })             — GET  /repos/{repo}/issues/{issue_number}
- *   create('post_comment', { repo, issue_number, body })   — POST /repos/{repo}/issues/{issue_number}/comments
- *   create('post_comment', { repo, pr_number, body })     — POST /repos/{repo}/issues/{pr_number}/comments
- *   create('apply_labels', { repo, issue_number, labels }) — POST /repos/{repo}/issues/{issue_number}/labels
- *   update('set_pr_description', { repo, pr_number, body }) — PATCH /repos/{repo}/pulls/{pr_number}
+ *   fetch('get_pr_diff', { repo, pr_number })                          — GET  /repos/{repo}/pulls/{pr_number}/files + /pulls/{pr_number}
+ *   fetch('get_linked_issues', { repo, pr_number })                   — GET  /repos/{repo}/issues?pr={pr_number}
+ *   fetch('get_issue', { repo, issue_number })                        — GET  /repos/{repo}/issues/{issue_number}
+ *   fetch('get_issue_comments', { repo, issue_number })               — GET  /repos/{repo}/issues/{issue_number}/comments
+ *   fetch('get_file_contents', { repo, path, ref? })                  — GET  /repos/{repo}/contents/{path}[?ref={ref}]
+ *   fetch('get_pr_review_comments', { repo, pr_number })              — GET  /repos/{repo}/pulls/{pr_number}/comments
+ *   create('post_comment', { repo, issue_number, body })              — POST /repos/{repo}/issues/{issue_number}/comments
+ *   create('post_comment', { repo, pr_number, body })                 — POST /repos/{repo}/issues/{pr_number}/comments
+ *   create('apply_labels', { repo, issue_number, labels })            — POST /repos/{repo}/issues/{issue_number}/labels
+ *   update('set_pr_description', { repo, pr_number, body })           — PATCH /repos/{repo}/pulls/{pr_number}
  */
 export class GitHubAdapter implements ServiceAdapter {
   readonly id: string;
@@ -166,10 +169,32 @@ export class GitHubAdapter implements ServiceAdapter {
     const prNumber = params['pr_number'];
 
     if (operation === 'get_pr_diff') {
-      const url = `${this.baseUrl}/repos/${repo}/pulls/${prNumber}/files`;
+      const filesUrl = `${this.baseUrl}/repos/${repo}/pulls/${prNumber}/files`;
+      const metaUrl = `${this.baseUrl}/repos/${repo}/pulls/${prNumber}`;
       try {
-        const result = await this.executeRequest('GET', url, undefined, signal);
-        return { ...result, data: { ...(result.data as Record<string, unknown>), repo } };
+        const filesResult = await this.executeRequest('GET', filesUrl, undefined, signal);
+        const metaResult = await this.executeRequest('GET', metaUrl, undefined, signal);
+        const filesData = filesResult.data as Array<{ filename: string; patch?: string }>;
+        const prMeta = metaResult.data as {
+          title: string;
+          base: { ref: string };
+          head: { sha: string };
+        };
+        const diff_text = filesData
+          .map((f) => `--- ${f.filename}\n${f.patch ?? '(binary file, not shown)'}`)
+          .join('\n\n');
+        const files_changed = filesData.map((f) => f.filename);
+        return {
+          status: filesResult.status,
+          data: {
+            diff_text,
+            pr_title: prMeta.title,
+            base_branch: prMeta.base.ref,
+            head_sha: prMeta.head.sha,
+            files_changed,
+            repo,
+          },
+        };
       } catch (err) {
         throw enrichGitHub404(err, repo, prNumber);
       }
@@ -191,6 +216,89 @@ export class GitHubAdapter implements ServiceAdapter {
         return await this.executeRequest('GET', url, undefined, signal);
       } catch (err) {
         throw enrichGitHub404(err, repo, issueNumber, 'issue');
+      }
+    }
+
+    if (operation === 'get_issue_comments') {
+      const issueNumber = params['issue_number'];
+      const url = `${this.baseUrl}/repos/${repo}/issues/${issueNumber}/comments`;
+      try {
+        const result = await this.executeRequest('GET', url, undefined, signal);
+        const raw = result.data as Array<{
+          user: { login: string };
+          body: string;
+          created_at: string;
+        }>;
+        const data = raw.map((c) => ({
+          author: c.user.login,
+          body: c.body,
+          created_at: c.created_at,
+        }));
+        return { status: result.status, data };
+      } catch (err) {
+        throw enrichGitHub404(err, repo, issueNumber, 'issue');
+      }
+    }
+
+    if (operation === 'get_file_contents') {
+      const ref = params['ref'] as string | undefined;
+      const refQuery = ref !== undefined ? `?ref=${encodeURIComponent(ref)}` : '';
+      const url = `${this.baseUrl}/repos/${repo}/contents/${params['path'] as string}${refQuery}`;
+      try {
+        const result = await this.executeRequest('GET', url, undefined, signal);
+        const data = result.data as { content: string; encoding: string };
+        if (data.encoding !== 'base64') {
+          throw new WorkflowError(`GitHubAdapter: unsupported encoding: ${data.encoding}`, {
+            code: 'ENGINE_ADAPTER_FAILED',
+            category: 'ENGINE',
+            agentAction: 'stop',
+            retryable: false,
+          });
+        }
+        const content = Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf-8');
+        return { status: result.status, data: { path: params['path'] as string, content } };
+      } catch (err) {
+        if (
+          err instanceof WorkflowError &&
+          err.code === 'SERVICE_HTTP_4XX' &&
+          err.details['status'] === 404
+        ) {
+          throw new WorkflowError(
+            `HTTP 404: File not found. Verify the path and ref exist in the repository.\n\n` +
+              `  path: ${params['path'] as string}${ref !== undefined ? `\n  ref: ${ref}` : ''}`,
+            {
+              code: 'SERVICE_HTTP_4XX',
+              category: 'SERVICE',
+              agentAction: 'stop',
+              retryable: false,
+              details: { status: 404, operation: url },
+            },
+          );
+        }
+        throw err;
+      }
+    }
+
+    if (operation === 'get_pr_review_comments') {
+      const url = `${this.baseUrl}/repos/${repo}/pulls/${prNumber}/comments`;
+      try {
+        const result = await this.executeRequest('GET', url, undefined, signal);
+        const raw = result.data as Array<{
+          path: string;
+          line?: number;
+          original_line?: number;
+          user: { login: string };
+          body: string;
+        }>;
+        const data = raw.map((c) => ({
+          file: c.path,
+          line: c.line ?? c.original_line ?? 0,
+          author: c.user.login,
+          body: c.body,
+        }));
+        return { status: result.status, data };
+      } catch (err) {
+        throw enrichGitHub404(err, repo, prNumber);
       }
     }
 
