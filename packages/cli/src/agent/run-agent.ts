@@ -519,15 +519,22 @@ export async function runAgent(deps: AgentDeps, options: AgentRunOptions): Promi
         .map((l) => `   ${l}`)
         .join('\n');
       console.log('\n' + indented + '\n');
-      for (const choice of gate.choices) {
-        const label = choice.charAt(0).toUpperCase() + choice.slice(1);
-        console.log(
-          `   ${label}: realm run respond ${runId} --gate ${gate.gate_id} --choice ${choice}`,
-        );
-      }
 
       // Use the first choice as the approve command for the Slack notification.
       const approveCmd = `realm run respond ${runId} --gate ${gate.gate_id} --choice ${gate.choices[0] ?? 'approve'}`;
+
+      const hasTransport =
+        deps.onGate !== undefined ||
+        (options.slackBotToken !== undefined && options.slackChannelId !== undefined);
+
+      if (!hasTransport) {
+        for (const choice of gate.choices) {
+          const label = choice.charAt(0).toUpperCase() + choice.slice(1);
+          console.log(
+            `   ${label}: realm run respond ${runId} --gate ${gate.gate_id} --choice ${choice}`,
+          );
+        }
+      }
 
       if (deps.onGate !== undefined) {
         await deps.onGate(runId, gate, approveCmd);
