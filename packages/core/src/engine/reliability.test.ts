@@ -222,11 +222,19 @@ describe('reliability', () => {
     });
 
     // Slow dispatcher that yields — first call claims the step and holds it in_progress.
+    // claimedPromise resolves the moment the dispatcher is entered, which only happens
+    // after claimStep has written in_progress to disk — no timing sleep needed.
     let resolveFirst!: (v: Record<string, unknown>) => void;
-    const firstDispatcher: StepDispatcher = () =>
-      new Promise<Record<string, unknown>>((r) => {
+    let signalClaimed!: () => void;
+    const claimedPromise = new Promise<void>((r) => {
+      signalClaimed = r;
+    });
+    const firstDispatcher: StepDispatcher = () => {
+      signalClaimed();
+      return new Promise<Record<string, unknown>>((r) => {
         resolveFirst = r;
       });
+    };
 
     // Start first call (does not await yet).
     const firstPromise = executeStep(store, noTimeoutDef, {
@@ -236,8 +244,9 @@ describe('reliability', () => {
       dispatcher: firstDispatcher,
     });
 
-    // Give first call time to claim the step.
-    await new Promise((r) => setTimeout(r, 20));
+    // Wait until the dispatcher has been entered — by that point claimStep has already
+    // written in_progress to disk.
+    await claimedPromise;
 
     // Second concurrent call on the same step — should be blocked.
     const secondEnvelope = await executeStep(store, noTimeoutDef, {
