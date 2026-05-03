@@ -59,9 +59,9 @@
     "@sensigo/realm-testing": "*",
     "@modelcontextprotocol/sdk": "1.29.0",
     "chalk": "^5.0.0",
-    "commander": "*",
-    "dotenv": "^16.0.0",
-    "js-yaml": "*"
+    "commander": "^14.0.3",
+    "dotenv": "^17.4.0",
+    "js-yaml": "^4.1.1"
   },
   "bin": {
     "realm": "./dist/index.js"
