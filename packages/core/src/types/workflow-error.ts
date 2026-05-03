@@ -64,7 +64,9 @@ export type ErrorCode =
   | 'RESOURCE_FETCH_FAILED'
   | 'RESOURCE_TOO_LARGE'
   | 'RESOURCE_FORMAT_INVALID'
-  | 'RESOURCE_NOT_ACCESSIBLE';
+  | 'RESOURCE_NOT_ACCESSIBLE'
+  // MCP
+  | 'MCP_CONNECTION_FAILED';
 
 export interface WorkflowErrorOptions {
   code: ErrorCode;
