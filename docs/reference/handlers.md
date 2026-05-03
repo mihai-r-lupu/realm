@@ -503,3 +503,7 @@ expect(result.data.accepted_count).toBe(2);
 
 The `testStepHandler` helper constructs a complete `StepContext` from the partial context you
 provide, so you only need to specify the fields relevant to your test.
+
+For the full testing API — fixture runner, mocks, adapter and processor test helpers, gate
+responder, assertion helpers, and `startGitHubMockServer` — see the
+[Testing Reference](testing.md).

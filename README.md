@@ -171,6 +171,7 @@ Run `realm <command> --help` for full options on any command.
 - [MCP Protocol Reference](docs/reference/mcp-protocol.md) — tools, response envelope, next_action, agent_action
 - [CLI Reference](docs/reference/cli-commands.md) — all commands with options
 - [Built-in Service Adapters](docs/reference/adapters.md) — `FileSystemAdapter`, `GitHubAdapter`, `GenericHttpAdapter` — config, operations, response shapes
+- [Testing Reference](docs/reference/testing.md) — `@sensigo/realm-testing` full API: fixture runner, mocks, assertions, GitHub mock server
 - [Examples](examples/) — working workflow examples
 
 ## Development
