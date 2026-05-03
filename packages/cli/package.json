@@ -1,7 +1,7 @@
 {
   "name": "@sensigo/realm-cli",
   "version": "0.1.0",
-  "description": "CLI for Realm — 16 commands for building, testing, operating, and serving workflows.",
+  "description": "CLI for Realm — 17 commands for building, testing, operating, and serving workflows.",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",
@@ -51,5 +51,12 @@
   },
   "bin": {
     "realm": "./dist/index.js"
-  }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
 }
