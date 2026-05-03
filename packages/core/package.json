@@ -2,6 +2,7 @@
   "name": "@sensigo/realm",
   "version": "0.1.0",
   "description": "Realm workflow execution engine — state machine, evidence capture, and service adapters for agent-driven workflows.",
+  "license": "Apache-2.0",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",
