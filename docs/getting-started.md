@@ -674,30 +674,34 @@ Run the tests:
 realm workflow test ./ --fixtures ./fixtures/
 ```
 
-In unit tests, use `@sensigo/realm-testing`:
+For programmatic tests, use `@sensigo/realm-testing`. The `runFixtureTests` runner drives a
+workflow to completion for every fixture file in a directory and returns one result per file:
 
 ```typescript
-import {
-  InMemoryStore,
-  createAgentDispatcher,
-  assertFinalState,
-  assertStepOutput,
-} from '@sensigo/realm-testing';
-import { executeChain } from '@sensigo/realm';
+import { describe, it, expect } from 'vitest';
+import { runFixtureTests } from '@sensigo/realm-testing';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const store = new InMemoryStore();
-const dispatch = createAgentDispatcher({ step_one: { result: 'the document text' } });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const run = await store.create({
-  workflowId: 'extraction-demo',
-  workflowVersion: 1,
-  params: {},
+describe('extraction-demo fixtures', async () => {
+  const results = await runFixtureTests({
+    workflowPath: path.join(__dirname, '../extraction-demo'),
+    fixturesPath: path.join(__dirname, '../extraction-demo/fixtures'),
+  });
+
+  for (const result of results) {
+    it(result.name, () => {
+      expect(result.passed, result.error).toBe(true);
+    });
+  }
 });
-await executeChain({ definition, run, store, dispatch });
-
-assertFinalState(run, 'completed');
-assertStepOutput(run.evidence, 'step_one', { result: 'the document text' });
 ```
+
+For the full testing API — `InMemoryStore`, `createAgentDispatcher`, `createGateResponder`,
+`MockServiceRecorder`, all assertion helpers, `startGitHubMockServer`, and the programmatic
+step-by-step walkthrough — see the [Testing Reference](reference/testing.md).
 
 ---
 
@@ -708,5 +712,6 @@ assertStepOutput(run.evidence, 'step_one', { result: 'the document text' });
 - Browse the [`examples/03-incident-response/`](../examples/03-incident-response/workflow.yaml) workflow for a realistic 4-step pattern with a filesystem adapter, two agent steps with personas, and a human gate.
 - Read the [YAML Schema Reference](reference/yaml-schema.md) for all step fields, execution modes, and DAG dependencies.
 - Read the [MCP Protocol Reference](reference/mcp-protocol.md) for full tool and response envelope documentation.
+- Read the [Testing Reference](reference/testing.md) for the full `@sensigo/realm-testing` API.
 - Read the [`@sensigo/realm` source](../packages/core/src/index.ts) for the full public API.
 ````
