@@ -18,7 +18,6 @@ import type { WorkflowRegistrar } from '@sensigo/realm';
 import type { LlmProvider } from './llm-provider.js';
 import { startSlackGateServer } from './slack-gate-server.js';
 import { connectSocketMode } from './slack-socket-client.js';
-import { interpretGateIntent } from './gate-intent-interpreter.js';
 
 export type AgentRunResult = 'completed' | 'failed';
 
@@ -349,30 +348,22 @@ export async function handleBidirectionalGate(params: BidirectionalGateParams): 
   const processCandidate = async (text: string): Promise<void> => {
     if (abortController.signal.aborted) return;
 
-    const interpretation = await interpretGateIntent({
-      userMessage: text,
-      allowedChoices: gate.choices,
-      gateStepName: gate.step_name,
-      ...(typeof gate.preview['headline'] === 'string'
-        ? { previewSummary: gate.preview['headline'] as string }
-        : {}),
-      llmClient: provider,
-    });
+    // Gate choices must be exact (case-insensitive). No LLM interpretation — gate responses
+    // are irreversible writes and must reflect unambiguous intent.
+    const normalised = text.trim().toLowerCase();
+    const exactMatch = gate.choices.find((c) => c.toLowerCase() === normalised);
 
-    if (
-      (interpretation.confidence === 'high' || interpretation.confidence === 'medium') &&
-      gate.choices.includes(interpretation.choice)
-    ) {
+    if (exactMatch !== undefined) {
       try {
         await submitHumanResponse(store, definition, {
           runId,
           gateId: gate.gate_id,
-          choice: interpretation.choice,
+          choice: exactMatch,
         });
         if (gateThreadTs !== undefined) {
           const confirmationText =
-            gate.resolution_messages?.[interpretation.choice] ??
-            `✅ Gate resolved: \`${interpretation.choice}\` — run continuing.`;
+            gate.resolution_messages?.[exactMatch] ??
+            `✅ Gate resolved: \`${exactMatch}\` — run continuing.`;
           await postSlackReply(slackBotToken, slackChannelId, gateThreadTs, confirmationText);
         }
         abortController.abort();
