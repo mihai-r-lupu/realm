@@ -72,7 +72,10 @@ function closeServer(server: Server): Promise<void> {
 
 /** Sends a minimal MCP JSON-RPC POST and returns the response. */
 async function postMcp(url: string, authHeader?: string): Promise<Response> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/event-stream',
+  };
   if (authHeader !== undefined) headers['Authorization'] = authHeader;
   return fetch(url, {
     method: 'POST',
@@ -149,5 +152,36 @@ describe('realm serve — HTTP protocol', () => {
       body: 'this is not json{',
     });
     expect(res.status).toBe(400);
+  });
+
+  it('tools/list returns a valid MCP response', async () => {
+    ({ server } = await startTestServer({ devMode: true }));
+    const addr = server.address() as { port: number };
+    const res = await postMcp(`http://127.0.0.1:${addr.port}`);
+    // StreamableHTTP responds with an SSE stream; extract the JSON from the data line.
+    const text = await res.text();
+    const dataLine = text.split('\n').find((line) => line.startsWith('data: '));
+    expect(dataLine).toBeDefined();
+    const parsed = JSON.parse((dataLine ?? '').slice(6)) as Record<string, unknown>;
+    const result = parsed['result'] as Record<string, unknown> | undefined;
+    expect(Array.isArray(result?.['tools'])).toBe(true);
+  });
+
+  it('rejects if the port is already in use (EADDRINUSE)', async () => {
+    const first = await startTestServer({ devMode: true });
+    const addr = first.server.address() as { port: number };
+    try {
+      await expect(
+        startHttpMcpServer({
+          port: addr.port,
+          host: '127.0.0.1',
+          devMode: true,
+          token: undefined,
+          workflowStore: makeTempStore(),
+        }),
+      ).rejects.toThrow();
+    } finally {
+      await closeServer(first.server);
+    }
   });
 });
