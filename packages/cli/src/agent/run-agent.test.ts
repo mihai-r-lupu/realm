@@ -15,18 +15,14 @@ import type { LlmProvider } from './llm-provider.js';
 import { startSlackGateServer } from './slack-gate-server.js';
 import type { SlackGateEvent } from './slack-gate-server.js';
 import { connectSocketMode } from './slack-socket-client.js';
-import { interpretGateIntent } from './gate-intent-interpreter.js';
 
 // Module-level mocks are hoisted by vitest — run-agent.ts will receive these stubs for its
-// internal imports of slack-gate-server, slack-socket-client, and gate-intent-interpreter.
+// internal imports of slack-gate-server and slack-socket-client.
 vi.mock('./slack-gate-server.js', () => ({
   startSlackGateServer: vi.fn().mockReturnValue({ close: vi.fn() }),
 }));
 vi.mock('./slack-socket-client.js', () => ({
   connectSocketMode: vi.fn().mockReturnValue({ close: vi.fn() }),
-}));
-vi.mock('./gate-intent-interpreter.js', () => ({
-  interpretGateIntent: vi.fn(),
 }));
 
 describe('formatGatePreviewForSlack', () => {
@@ -393,6 +389,38 @@ function makeMinimalStore(): RunStore {
   } as unknown as RunStore;
 }
 
+/**
+ * Store that mimics a gate-waiting run for the first get() call, then returns
+ * completed. Includes a patch() stub so submitHumanResponse can write evidence.
+ */
+function makeGateStore(gate: PendingGate): RunStore {
+  const completedRun = {
+    id: 'run1',
+    terminal_state: 'completed',
+    pending_gate: undefined,
+    run_phase: 'completed',
+    version: 2,
+    in_progress_steps: [],
+    completed_steps: [gate.step_name],
+    skipped_steps: [],
+    evidence: [],
+  };
+  const openRun = {
+    id: 'run1',
+    terminal_state: undefined,
+    pending_gate: gate,
+    run_phase: 'waiting_for_human',
+    version: 1,
+    in_progress_steps: [gate.step_name],
+    completed_steps: [],
+    skipped_steps: [],
+    evidence: [],
+  };
+  const get = vi.fn().mockResolvedValueOnce(openRun).mockResolvedValue(completedRun);
+  const update = vi.fn().mockResolvedValue(completedRun);
+  return { get, update } as unknown as RunStore;
+}
+
 function makeMinimalDefinition(): WorkflowDefinition {
   return { id: 'wf1', name: 'Test WF', version: '1', steps: {} } as unknown as WorkflowDefinition;
 }
@@ -446,11 +474,6 @@ describe('handleBidirectionalGate', () => {
   });
 
   it('duplicate event_id triggers only one candidate processing attempt', async () => {
-    vi.mocked(interpretGateIntent).mockResolvedValue({
-      choice: 'unclear',
-      confidence: 'low',
-      reason: 'ambiguous',
-    });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
 
     let capturedOnEvent: ((event: SlackGateEvent) => void) | undefined;
@@ -458,6 +481,10 @@ describe('handleBidirectionalGate', () => {
       capturedOnEvent = opts.onEvent;
       return { close: vi.fn() };
     });
+
+    // Use a fetch spy to count how many clarification replies are sent.
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchSpy);
 
     const promise = handleBidirectionalGate(makeGateParams());
 
@@ -468,7 +495,7 @@ describe('handleBidirectionalGate', () => {
       event_id: 'Ev001',
       thread_ts: '1234567890.000',
       user: 'U1',
-      text: 'maybe approve',
+      text: 'maybe approve', // not an exact choice — triggers one clarification reply
       ts: '1234567890.001',
     };
 
@@ -478,7 +505,11 @@ describe('handleBidirectionalGate', () => {
     await new Promise<void>((r) => setTimeout(r, 50));
     await promise;
 
-    expect(interpretGateIntent).toHaveBeenCalledOnce();
+    // Only one clarification reply should have been sent (dedupe is working).
+    const replyCalls = fetchSpy.mock.calls.filter(([url]: [string]) =>
+      (url as string).includes('postMessage'),
+    );
+    expect(replyCalls).toHaveLength(1);
   });
 
   it('selects Socket Mode (connectSocketMode) when slackAppToken is set and slackSigningSecret is absent', async () => {
@@ -501,5 +532,91 @@ describe('handleBidirectionalGate', () => {
 
     expect(connectSocketMode).toHaveBeenCalledOnce();
     expect(startSlackGateServer).not.toHaveBeenCalled();
+  });
+
+  it('exact match resolves gate and posts confirmation reply', async () => {
+    const gate: PendingGate = {
+      gate_id: 'g1',
+      step_name: 'confirm_review',
+      preview: { headline: 'PR #42' },
+      choices: ['approve', 'request_changes'],
+      opened_at: new Date().toISOString(),
+    };
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', mockFetch);
+
+    let capturedOnEvent: ((event: SlackGateEvent) => void) | undefined;
+    vi.mocked(startSlackGateServer).mockImplementationOnce((opts) => {
+      capturedOnEvent = opts.onEvent;
+      return { close: vi.fn() };
+    });
+
+    const promise = handleBidirectionalGate(makeGateParams({ gate, store: makeGateStore(gate) }));
+    expect(capturedOnEvent).toBeDefined();
+
+    capturedOnEvent!({
+      event_id: 'E1',
+      thread_ts: '1234567890.000',
+      user: 'U1',
+      text: 'approve',
+      ts: '1234567890.001',
+    });
+
+    await promise;
+
+    const replyCalls = mockFetch.mock.calls.filter(([url]: [string]) =>
+      (url as string).includes('postMessage'),
+    );
+    expect(replyCalls.length).toBeGreaterThan(0);
+    const replyBody = JSON.parse(replyCalls[replyCalls.length - 1][1].body as string) as {
+      text: string;
+    };
+    expect(replyBody.text).toContain('approve');
+  });
+
+  it('non-exact input sends a clarification reply listing valid choices', async () => {
+    const gate: PendingGate = {
+      gate_id: 'g1',
+      step_name: 'confirm_review',
+      preview: { headline: 'PR #42' },
+      choices: ['approve', 'request_changes'],
+      opened_at: new Date().toISOString(),
+    };
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', mockFetch);
+
+    let capturedOnEvent: ((event: SlackGateEvent) => void) | undefined;
+    vi.mocked(startSlackGateServer).mockImplementationOnce((opts) => {
+      capturedOnEvent = opts.onEvent;
+      return { close: vi.fn() };
+    });
+
+    const promise = handleBidirectionalGate(makeGateParams({ gate }));
+    expect(capturedOnEvent).toBeDefined();
+
+    // 'reject' is not a valid choice — gate must not be resolved
+    capturedOnEvent!({
+      event_id: 'E2',
+      thread_ts: '1234567890.000',
+      user: 'U1',
+      text: 'reject',
+      ts: '1234567890.002',
+    });
+
+    await new Promise<void>((r) => setTimeout(r, 50));
+    await promise;
+
+    const replyCalls = mockFetch.mock.calls.filter(([url]: [string]) =>
+      (url as string).includes('postMessage'),
+    );
+    expect(replyCalls.length).toBeGreaterThan(0);
+    const replyBody = JSON.parse(replyCalls[replyCalls.length - 1][1].body as string) as {
+      text: string;
+    };
+    expect(replyBody.text).toContain('approve');
+    expect(replyBody.text).toContain('request_changes');
+    // Must not silently resolve with a guessed choice
+    expect(replyBody.text).not.toContain('Changes requested');
+    expect(replyBody.text).not.toContain('Gate resolved');
   });
 });
