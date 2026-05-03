@@ -20,5 +20,9 @@
     "@types/node": "^25.5.0",
     "typescript": "*",
     "vitest": "*"
-  }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
 }

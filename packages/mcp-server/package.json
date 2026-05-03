@@ -22,5 +22,9 @@
   "devDependencies": {
     "typescript": "*",
     "vitest": "*"
-  }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
 }
