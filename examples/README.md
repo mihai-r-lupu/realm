@@ -18,7 +18,6 @@ workflow), so you can see exactly what changes and why.
 ⏸ = example has a human gate. Slack gate modes (webhook notification, bidirectional thread reply, or Events API real-time push) apply to these examples. See [Slack Gate Modes](../docs/reference/realm-agent-slack.md) for setup.
 
 More examples covering multi-agent coordination are planned.
-See `.private/realm-ai-automation-pain-points-final.md` for the full priority ladder.
 
 ---
 

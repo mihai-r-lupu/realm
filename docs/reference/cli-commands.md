@@ -107,6 +107,22 @@ expected_final_state: completed
 
 ---
 
+### `realm workflow migrate`
+
+Back-fills the `origin` field on workflow definition files created before provenance tracking
+was introduced. Run this once after upgrading from an older version of Realm if
+`realm run inspect` shows missing `origin` values in workflow metadata.
+
+```bash
+realm workflow migrate
+```
+
+Scans `~/.realm/workflows/`, adds `origin: human` to any file that does not already have an
+`origin` field, and reports how many files were migrated vs. already up to date. Safe to run
+more than once — files that already have `origin` are skipped.
+
+---
+
 ## Standalone agent
 
 ---
@@ -439,182 +455,3 @@ The server refuses to start if neither `REALM_SERVE_TOKEN` nor `--dev` / `REALM_
 ```
 
 ---
-
-## Cloud Sync Commands
-
-The following commands require Realm Cloud credentials. Run `realm login` to authenticate first.
-
----
-
-### `realm login`
-
-Authenticates with Realm Cloud by opening the browser to the OAuth flow. Credentials are stored
-locally and used by all subsequent cloud commands.
-
-```bash
-realm login
-realm login --url https://your-realm-instance.example.com
-```
-
-| Option        | Default                 | Description    |
-| ------------- | ----------------------- | -------------- |
-| `--url <url>` | `https://app.realm.dev` | Cloud base URL |
-
----
-
-### `realm logout`
-
-Removes stored Realm Cloud credentials from the local machine.
-
-```bash
-realm logout
-```
-
----
-
-### `realm push [path]`
-
-Pushes one or all local workflows to Realm Cloud.
-
-- Without `--all`, `<path>` must point to a workflow directory or YAML file.
-- Diverged workflows (present in both stores with different content) are blocked unless
-  `--strategy keep-local` is set.
-
-```bash
-realm push ./my-workflow            # push a single workflow by path
-realm push --all                    # push all local workflows
-realm push --all --strategy keep-local   # overwrite cloud with local on divergence
-```
-
-| Option                  | Default  | Description                                               |
-| ----------------------- | -------- | --------------------------------------------------------- |
-| `--all`                 | off      | Push all locally registered workflows                     |
-| `--strategy <strategy>` | `manual` | Conflict resolution: `manual`, `keep-local`, `keep-cloud` |
-
-Exit code 1 if any workflow is blocked or fails.
-
----
-
-### `realm pull [id]`
-
-Pulls one or all cloud workflows to the local store.
-
-- Without `--all`, `<id>` must be a workflow ID that exists in the cloud store.
-- Diverged workflows are blocked unless `--strategy keep-cloud` is set.
-
-```bash
-realm pull my-workflow-id                    # pull a single workflow by ID
-realm pull --all                             # pull all cloud workflows
-realm pull --all --strategy keep-cloud       # overwrite local with cloud on divergence
-```
-
-| Option                  | Default  | Description                                               |
-| ----------------------- | -------- | --------------------------------------------------------- |
-| `--all`                 | off      | Pull all cloud workflows                                  |
-| `--strategy <strategy>` | `manual` | Conflict resolution: `manual`, `keep-local`, `keep-cloud` |
-
-Exit code 1 if any workflow is blocked or fails.
-
----
-
-### `realm sync`
-
-Computes and optionally applies a two-way sync plan between the local store and Realm Cloud.
-By default this is a **dry-run** — it prints the plan without making any changes.
-
-Workflows are classified into four buckets:
-
-| Classification | Meaning                                                                                 |
-| -------------- | --------------------------------------------------------------------------------------- |
-| `only_local`   | Exists locally, not in cloud → planned action: push                                     |
-| `only_cloud`   | Exists in cloud, not locally → planned action: pull                                     |
-| `identical`    | Both stores have the same definition → skip                                             |
-| `diverged`     | Both stores have the workflow but they differ → blocked unless `--strategy` resolves it |
-
-```bash
-realm sync                                      # dry-run: show plan
-realm sync --apply                              # execute the plan
-realm sync --apply --strategy keep-local        # apply, overwriting cloud on divergence
-realm sync --json                               # output plan as JSON (dry-run)
-realm sync --apply --json                       # output plan + result as JSON
-```
-
-| Option                  | Default  | Description                                                                      |
-| ----------------------- | -------- | -------------------------------------------------------------------------------- |
-| `--apply`               | off      | Execute the sync plan (mutations enabled)                                        |
-| `--strategy <strategy>` | `manual` | Conflict resolution for diverged workflows: `manual`, `keep-local`, `keep-cloud` |
-| `--json`                | off      | Output plan (and result if `--apply`) as JSON for machine consumption            |
-
-Exit code 1 if any workflow is blocked or has errors.
-
----
-
-### `realm run push [id]`
-
-Pushes local run records to Realm Cloud.
-
-- Without `--all`, `<id>` must be the ID of a run in the local store.
-- If the same run ID exists in cloud with different content, the push is blocked (exit 1).
-
-```bash
-realm run push abc123               # push a single run by ID
-realm run push --all                # push all local-only runs to cloud
-```
-
-| Option  | Default | Description                       |
-| ------- | ------- | --------------------------------- |
-| `--all` | off     | Push all local-only runs to cloud |
-
-Exit code 1 if any run is diverged or the push fails.
-
----
-
-### `realm run pull [id]`
-
-Pulls cloud run records to the local store.
-
-- Without `--all`, `<id>` must be the ID of a run in the cloud store.
-- Diverged runs (same ID, different content in both stores) are blocked (exit 1).
-
-```bash
-realm run pull abc123               # pull a single run by ID
-realm run pull --all                # pull all cloud-only runs to local
-```
-
-| Option  | Default | Description                             |
-| ------- | ------- | --------------------------------------- |
-| `--all` | off     | Pull all cloud-only runs to local store |
-
-Exit code 1 if any run is diverged or the pull fails.
-
----
-
-### `realm run sync`
-
-Computes and optionally applies a two-way sync plan for run records between the local store and Realm Cloud.
-By default this is a **dry-run** — it prints the plan without making any changes.
-
-Run sync uses **union semantics** — no strategy parameter is needed. Runs are append-only
-records. Diverged runs (same ID, different content in both stores) are always flagged and
-never auto-resolved.
-
-| Classification | Meaning                                                          |
-| -------------- | ---------------------------------------------------------------- |
-| `only_local`   | Exists locally, not in cloud → planned action: push              |
-| `only_cloud`   | Exists in cloud, not locally → planned action: pull              |
-| `identical`    | Both stores have the same record → skip                          |
-| `diverged`     | Both stores have the run but they differ → flagged (no strategy) |
-
-```bash
-realm run sync                  # dry-run: show plan
-realm run sync --apply          # execute the plan
-realm run sync --json           # output plan as JSON (dry-run)
-realm run sync --apply --json   # output plan + result as JSON
-```
-
-| Option    | Default | Description                                   |
-| --------- | ------- | --------------------------------------------- |
-| `--apply` | off     | Execute the sync plan (mutations enabled)     |
-| `--json`  | off     | Output plan (and result if `--apply`) as JSON |
-
-Exit code 1 if any run is diverged or has errors.
