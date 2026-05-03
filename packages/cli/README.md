@@ -1,6 +1,6 @@
 # @sensigo/realm-cli
 
-`@sensigo/realm-cli` — the Realm command-line interface. Manages workflow registration, triggers runs, and inspects run history.
+Run autonomous agent workflows, host an MCP server over HTTP, and manage workflow definitions and run history from the terminal.
 
 ## Installation
 
