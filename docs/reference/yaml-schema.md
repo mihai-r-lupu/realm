@@ -521,6 +521,10 @@ services:
 | `engine_managed`   | The engine manages the service call; the agent provides input parameters.              |
 | `agent_provided`   | The agent is responsible for the service interaction.                                  |
 
+For full configuration reference, supported operations, and response shapes for the
+built-in adapters (`FileSystemAdapter`, `GitHubAdapter`, `GenericHttpAdapter`), see the
+[Built-in Service Adapters Reference](adapters.md).
+
 ---
 
 ## Step Templates

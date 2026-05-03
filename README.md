@@ -170,6 +170,7 @@ Run `realm <command> --help` for full options on any command.
 - [Handler Authoring Reference](docs/reference/handlers.md) — `StepHandler` interface, `StepContext` fields, primitives catalogue, built-in handlers, registration
 - [MCP Protocol Reference](docs/reference/mcp-protocol.md) — tools, response envelope, next_action, agent_action
 - [CLI Reference](docs/reference/cli-commands.md) — all commands with options
+- [Built-in Service Adapters](docs/reference/adapters.md) — `FileSystemAdapter`, `GitHubAdapter`, `GenericHttpAdapter` — config, operations, response shapes
 - [Examples](examples/) — working workflow examples
 
 ## Development
