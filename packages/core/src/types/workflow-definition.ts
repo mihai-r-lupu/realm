@@ -1,4 +1,5 @@
 // Typed representation of a parsed workflow YAML definition.
+import type { McpServerConfig } from './mcp-types.js';
 
 export type ExecutionMode = 'auto' | 'agent';
 
@@ -163,6 +164,21 @@ export interface StepDefinition {
   };
   /** Name of the agent profile for this step. Only valid on execution: 'agent' steps. */
   agent_profile?: string;
+  /**
+   * Allow-list of tools this step may invoke, in 'server_id:tool_name' format.
+   * Only valid on execution: 'agent' steps without a handler. Requires input_schema.
+   */
+  tools?: string[];
+  /**
+   * Maximum number of tool-call iterations before the agentic loop terminates.
+   * Default: 20 (applied at runtime).
+   */
+  max_tool_calls?: number;
+  /**
+   * Timeout in seconds for each individual tool call.
+   * Default: 30 (applied at runtime).
+   */
+  tool_timeout?: number;
 }
 
 export interface WorkflowDefinition {
@@ -174,6 +190,8 @@ export interface WorkflowDefinition {
   /** Optional protocol customizations — overrides generated sections. */
   protocol?: ProtocolConfig;
   services?: Record<string, ServiceDefinition>;
+  /** MCP server configurations available to tool-enabled steps in this workflow. */
+  mcp_servers?: McpServerConfig[];
   /** Optional named step groups with {{ param }} placeholders; resolved at load time. */
   templates?: Record<string, TemplateDefinition>;
   steps: Record<string, StepDefinition>;

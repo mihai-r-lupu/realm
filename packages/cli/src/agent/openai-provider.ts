@@ -1,6 +1,21 @@
 // openai-provider.ts — OpenAI LLM provider implementation for realm agent.
 // Requires openai >= 4.0.0 as an optional peer dependency (npm install openai).
+import { WorkflowError } from '@sensigo/realm';
 import type { LlmProvider } from './llm-provider.js';
+import type {
+  ToolCallRecord,
+  ToolDefinition,
+  ToolExecutor,
+  StepWithToolsResult,
+} from './mcp-types.js';
+import {
+  sanitizeError,
+  serializeToolResult,
+  parseNamespacedId,
+  tryParseJson,
+  validateSchema,
+  rejectAfter,
+} from './agent-utils.js';
 
 const SYSTEM_PROMPT_BASE =
   'You are an AI agent executing a step in a structured workflow.\n' +
@@ -76,6 +91,192 @@ export class OpenAIProvider implements LlmProvider {
         return JSON.parse(retry) as Record<string, unknown>;
       } catch {
         throw new Error(`OpenAI returned non-JSON content after retry: ${retry.slice(0, 200)}`);
+      }
+    }
+  }
+
+  /**
+   * Agentic loop for tool-capable steps. Executes tool calls serially (V1 constraint)
+   * until the model returns a final JSON answer or the tool call budget is exhausted.
+   */
+  async callStepWithTools(
+    prompt: string,
+    tools: ToolDefinition[],
+    executor: ToolExecutor,
+    options: {
+      inputSchema?: Record<string, unknown>;
+      maxToolCalls?: number;
+      toolTimeoutMs?: number;
+    },
+  ): Promise<StepWithToolsResult> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let mod: any;
+    try {
+      const moduleId: string = 'openai';
+      mod = await import(moduleId);
+    } catch {
+      console.error('realm agent requires the openai package. Run: npm install openai');
+      process.exit(1);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new (mod.default as new (opts: Record<string, unknown>) => any)({
+      apiKey: process.env['OPENAI_API_KEY'],
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const createCompletions = client.chat.completions.create as (
+      opts: Record<string, unknown>,
+    ) => Promise<any>;
+
+    const responseFormat =
+      options.inputSchema !== undefined
+        ? {
+            type: 'json_schema' as const,
+            json_schema: { name: 'output', strict: true, schema: options.inputSchema },
+          }
+        : undefined;
+
+    // ToolDefinition → OpenAI function tool wire format (namespaced id is used for round-tripping).
+    const openaiTools = tools.map((tool) => ({
+      type: 'function' as const,
+      function: {
+        name: tool.id,
+        description: tool.description,
+        parameters: tool.inputSchema,
+      },
+    }));
+
+    const maxCalls = options.maxToolCalls ?? 20;
+    let tool_call_count = 0;
+    const tool_call_records: ToolCallRecord[] = [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const history: any[] = [
+      { role: 'system', content: buildSystemPrompt(options.inputSchema) },
+      { role: 'user', content: prompt },
+    ];
+
+    const buildMainCallOpts = (): Record<string, unknown> => {
+      const opts: Record<string, unknown> = { model: this.model, messages: history };
+      if (openaiTools.length > 0) opts['tools'] = openaiTools;
+      if (responseFormat !== undefined) opts['response_format'] = responseFormat;
+      return opts;
+    };
+
+    const buildFinalCallOpts = (): Record<string, unknown> => {
+      const opts: Record<string, unknown> = { model: this.model, messages: history };
+      if (responseFormat !== undefined) opts['response_format'] = responseFormat;
+      return opts;
+    };
+
+    // Injects the over-budget message and calls the API without tools to produce a final answer.
+    const performFinalExtraction = async (): Promise<StepWithToolsResult> => {
+      history.push({
+        role: 'user',
+        content:
+          'You have reached the maximum number of tool calls. Produce your final JSON answer now using only what you have already gathered. No further tool calls will be executed.',
+      });
+      const final = await createCompletions(buildFinalCallOpts());
+      const text: string = (final.choices[0].message.content as string | null) ?? '';
+      const parsed = tryParseJson(text);
+      if (parsed && validateSchema(parsed, options.inputSchema)) {
+        return { output: parsed, toolCalls: tool_call_records };
+      }
+      throw new WorkflowError('max_tool_calls reached; final extraction failed', {
+        code: 'ENGINE_STEP_FAILED',
+        category: 'ENGINE',
+        agentAction: 'stop',
+        retryable: false,
+      });
+    };
+
+    while (true) {
+      const response = await createCompletions(buildMainCallOpts());
+      const message = response.choices[0].message as {
+        content: string | null;
+        tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>;
+      };
+
+      if (message.tool_calls?.length) {
+        const batch = message.tool_calls;
+        history.push(message);
+        let budget_exhausted_mid_batch = false;
+
+        for (const tool of batch) {
+          const llmToolCallId = tool.id; // captured verbatim — API returns 400 if echoed incorrectly
+
+          if (tool_call_count >= maxCalls) {
+            // Budget exhausted — must still answer every id in the assistant message.
+            history.push({
+              role: 'tool',
+              tool_call_id: llmToolCallId,
+              content: 'Error: tool call budget exhausted',
+            });
+            budget_exhausted_mid_batch = true;
+            continue;
+          }
+
+          const { serverId, toolName } = parseNamespacedId(tool.function.name);
+          const args = JSON.parse(tool.function.arguments || '{}') as Record<string, unknown>;
+          const start = Date.now();
+
+          let resultContent: string;
+          let record: ToolCallRecord;
+
+          try {
+            const rawResult = await Promise.race([
+              executor(tool.function.name, args),
+              rejectAfter(options.toolTimeoutMs ?? 30000),
+            ]);
+            const serialized = serializeToolResult(rawResult);
+            record = {
+              server_id: serverId,
+              tool: toolName,
+              args,
+              result: serialized,
+              duration_ms: Date.now() - start,
+            };
+            resultContent = serialized;
+          } catch (err) {
+            const sanitized = sanitizeError(err);
+            const content = sanitized.length > 0 ? `Error: ${sanitized}` : 'Error: (redacted)';
+            record = {
+              server_id: serverId,
+              tool: toolName,
+              args,
+              result: null,
+              duration_ms: Date.now() - start,
+              error: sanitized,
+            };
+            resultContent = content;
+          }
+
+          tool_call_records.push(record);
+          tool_call_count++;
+          history.push({ role: 'tool', tool_call_id: llmToolCallId, content: resultContent });
+        }
+
+        if (budget_exhausted_mid_batch || tool_call_count >= maxCalls) {
+          return performFinalExtraction();
+        }
+      } else {
+        // No tool calls — attempt to parse the final answer.
+        const text: string = (message.content as string | null) ?? '';
+        const parsed = tryParseJson(text);
+        if (parsed && validateSchema(parsed, options.inputSchema)) {
+          return { output: parsed, toolCalls: tool_call_records };
+        }
+        // Schema mismatch — append correction message and continue the loop.
+        history.push({ role: 'assistant', content: text });
+        history.push({
+          role: 'user',
+          content: 'Your response did not match the required JSON schema. Try again.',
+        });
+        tool_call_count++; // schema correction consumes a slot
+        if (tool_call_count >= maxCalls) {
+          return performFinalExtraction();
+        }
       }
     }
   }

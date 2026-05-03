@@ -139,12 +139,13 @@ realm agent \
   --params '{"key":"value"}'
 ```
 
-| Option              | Default    | Description                                                                            |
-| ------------------- | ---------- | -------------------------------------------------------------------------------------- |
-| `--workflow <path>` | (required) | Path to `workflow.yaml` or its containing directory                                    |
-| `--params <json>`   | `{}`       | Run params as a JSON string                                                            |
-| `--provider <name>` | `openai`   | LLM provider. Values: `openai`, `anthropic`                                            |
-| `--register`        | off        | Persist the workflow to `~/.realm/workflows/` so `realm run inspect` resolves it by ID |
+| Option              | Default    | Description                                                                                                                                            |
+| ------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--workflow <path>` | (required) | Path to `workflow.yaml` or its containing directory                                                                                                    |
+| `--params <json>`   | `{}`       | Run params as a JSON string                                                                                                                            |
+| `--provider <name>` | `openai`   | LLM provider. Values: `openai`, `anthropic`                                                                                                            |
+| `--register`        | off        | Persist the workflow to `~/.realm/workflows/` so `realm run inspect` resolves it by ID                                                                 |
+| `--run-id <id>`     | —          | Attach to an existing run instead of creating a new one. Mutually exclusive with `--workflow`. The run must exist and must not be in a terminal state. |
 
 **LLM key:** set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in your shell or `.env` file. The
 CLI loads `.env` automatically on startup.
@@ -455,3 +456,30 @@ The server refuses to start if neither `REALM_SERVE_TOKEN` nor `--dev` / `REALM_
 ```
 
 ---
+
+## realm webhook
+
+Starts an HTTP server that receives GitHub webhook events, verifies HMAC-SHA256 signatures,
+and spawns `realm agent --run-id` for each matching, non-duplicate delivery.
+
+```
+realm webhook --workflow <path> --port <port> [--secret <secret>]
+              [--event event:action,...] [--provider openai|anthropic] [--model <model>]
+```
+
+**Required flags:**
+
+- `--workflow <path>` — workflow YAML file to register and run for each delivery
+- `--port <port>` — port number to listen on
+
+**Optional flags:**
+
+- `--secret <secret>` — HMAC-SHA256 secret; may also be set via `GITHUB_WEBHOOK_SECRET` env var.
+  The command refuses to start if neither is set.
+- `--event <filter>` — comma-separated `event:action` pairs (default: `pull_request:opened`).
+  Non-matching deliveries are silently acknowledged with `200 OK`.
+- `--provider <name>` — forwarded to `realm agent` as `--provider`
+- `--model <name>` — forwarded to `realm agent` as `--model`
+
+**Security:** Signature verification always runs before event-type filtering.
+Requests with missing or invalid signatures receive `403 Forbidden`.

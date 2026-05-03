@@ -3,6 +3,7 @@
 // Includes: step claiming, step-level retry, step timeouts, human gate mechanics,
 // auto-chaining with fan-out, and registry-based dispatch for adapter and handler steps.
 import type { RunRecord, EvidenceSnapshot, WorkflowContextSnapshot } from '../types/run-record.js';
+import type { ToolCallRecord } from '../types/mcp-types.js';
 import type { ResponseEnvelope, NextAction } from '../types/response-envelope.js';
 import { WorkflowError } from '../types/workflow-error.js';
 import type {
@@ -49,6 +50,12 @@ export interface ExecuteStepOptions {
   registry?: ExtensionRegistry;
   /** Resolved secrets passed to adapter configs (e.g. API tokens). */
   secrets?: Record<string, string>;
+  /**
+   * Tool calls produced by callStepWithTools for this step.
+   * Absent on the callStep path (no tools configured).
+   * Present (possibly []) when tools were declared — threads through to captureEvidence.
+   */
+  stepMeta?: { toolCalls?: ToolCallRecord[] };
 }
 
 export interface SubmitGateOptions {
@@ -66,6 +73,12 @@ export interface ExecuteChainOptions {
   registry?: ExtensionRegistry;
   /** @see ExecuteStepOptions.secrets */
   secrets?: Record<string, string>;
+  /**
+   * Tool calls produced by callStepWithTools for this step.
+   * Absent on the callStep path (no tools configured).
+   * Present (possibly []) when tools were declared — threads through to captureEvidence.
+   */
+  stepMeta?: { toolCalls?: ToolCallRecord[] };
 }
 
 function delayMs(ms: number): Promise<void> {
@@ -608,6 +621,9 @@ export async function executeStep(
         ? { agentProfile: profile!, agentProfileHash: profileData.content_hash }
         : {}),
       ...(resolvedParams !== undefined ? { resolvedParams } : {}),
+      ...(options.stepMeta?.toolCalls !== undefined
+        ? { toolCalls: options.stepMeta.toolCalls }
+        : {}),
     });
     const snap: EvidenceSnapshot =
       retryConfig !== undefined ? { ...baseSnap, attempt: attemptNum } : baseSnap;

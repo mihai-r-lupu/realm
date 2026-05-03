@@ -313,6 +313,78 @@ export function loadWorkflowFromString(content: string): WorkflowDefinition {
         errors.push(`Step '${stepName}': 'when' must be a non-empty string`);
       }
     }
+
+    // Validate tools: only valid on execution: agent steps without handler.
+    if (
+      step['tools'] !== undefined &&
+      (step['execution'] !== 'agent' || step['handler'] !== undefined)
+    ) {
+      errors.push(
+        `Step '${stepName}': 'tools' is only valid on execution: agent steps without 'handler' defined`,
+      );
+    }
+
+    // Validate tools: requires input_schema.
+    if (step['tools'] !== undefined && step['input_schema'] === undefined) {
+      errors.push(
+        `Step '${stepName}': 'tools' requires 'input_schema' to be defined — the agentic loop needs a schema for final output extraction`,
+      );
+    }
+
+    // Validate tools: entries must be in server_id:tool_name format.
+    if (step['tools'] !== undefined && Array.isArray(step['tools'])) {
+      for (const entry of step['tools'] as string[]) {
+        if (!/^[^:]+:[^:]+$/.test(entry)) {
+          errors.push(
+            `Step '${stepName}': tools entry '${entry}' must be in 'server_id:tool_name' format`,
+          );
+        }
+      }
+    }
+
+    // Validate tools: server_id must reference a defined mcp_server.
+    if (
+      step['tools'] !== undefined &&
+      Array.isArray(step['tools']) &&
+      Array.isArray(doc['mcp_servers'])
+    ) {
+      const serverIds = new Set((doc['mcp_servers'] as Array<{ id: string }>).map((s) => s.id));
+      for (const entry of step['tools'] as string[]) {
+        const serverId = entry.split(':')[0] ?? '';
+        if (!serverIds.has(serverId)) {
+          errors.push(
+            `Step '${stepName}': tools entry '${entry}' references unknown MCP server '${serverId}'`,
+          );
+        }
+      }
+    }
+
+    // Validate max_tool_calls: must be a positive integer.
+    if (
+      step['max_tool_calls'] !== undefined &&
+      (!Number.isInteger(step['max_tool_calls']) || (step['max_tool_calls'] as number) <= 0)
+    ) {
+      errors.push(`Step '${stepName}': 'max_tool_calls' must be a positive integer`);
+    }
+
+    // Validate tool_timeout: must be a positive integer.
+    if (
+      step['tool_timeout'] !== undefined &&
+      (!Number.isInteger(step['tool_timeout']) || (step['tool_timeout'] as number) <= 0)
+    ) {
+      errors.push(`Step '${stepName}': 'tool_timeout' must be a positive integer`);
+    }
+  }
+
+  // Validate mcp_servers: ids must be unique (workflow-level check).
+  if (Array.isArray(doc['mcp_servers'])) {
+    const seen = new Set<string>();
+    for (const server of doc['mcp_servers'] as Array<{ id: string }>) {
+      if (seen.has(server.id)) {
+        errors.push(`mcp_servers: duplicate server id '${server.id}'`);
+      }
+      seen.add(server.id);
+    }
   }
 
   if (errors.length > 0) {

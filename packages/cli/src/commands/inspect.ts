@@ -42,11 +42,13 @@ function colorStatus(status: string): string {
  * @param runId         The ID of the run to inspect.
  * @param store         Store holding run records.
  * @param workflowStore Registrar for workflow definitions.
+ * @param options       Optional rendering options (e.g. verbose tool call output).
  */
 export async function inspectRun(
   runId: string,
   store: RunStore,
   workflowStore: WorkflowRegistrar,
+  options?: { verbose?: boolean },
 ): Promise<string> {
   const run: RunRecord = await store.get(runId);
 
@@ -153,6 +155,22 @@ export async function inspectRun(
           lines.push(`     Resolved: ${formatSummary(snap.resolved_params)}`);
         }
         lines.push(`     Output: ${formatSummary(snap.output_summary)}`);
+        if (snap.tool_calls === undefined) {
+          // callStep path — print nothing
+        } else if (snap.tool_calls.length === 0) {
+          lines.push('     Tools declared, none called');
+        } else {
+          lines.push(`     Tool calls (${snap.tool_calls.length}):`);
+          for (const tc of snap.tool_calls) {
+            const errSuffix = tc.error ? `  error: ${tc.error}` : '';
+            lines.push(`       [${tc.server_id}:${tc.tool}]  ${tc.duration_ms}ms${errSuffix}`);
+            if (options?.verbose) {
+              lines.push(`         args:   ${formatSummary(tc.args)}`);
+              const resultStr = typeof tc.result === 'string' ? tc.result : '(null)';
+              lines.push(`         result: ${resultStr}`);
+            }
+          }
+        }
         if (snap.diagnostics !== undefined) {
           lines.push(chalk.dim(`     Diagnostics: ${formatDiagnostics(snap.diagnostics)}`));
         }
@@ -166,12 +184,18 @@ export async function inspectRun(
 export const inspectCommand = new Command('inspect')
   .argument('<run-id>', 'ID of the run to inspect')
   .description('Display the full evidence chain and diagnostics for a run')
-  .action(async (runId: string) => {
+  .option('--verbose', 'Show full tool call args and results')
+  .action(async (runId: string, cmdOpts: { verbose?: boolean }) => {
     const { JsonFileStore, JsonWorkflowStore } = await import('@sensigo/realm');
     const store = new JsonFileStore();
     const workflowStore = new JsonWorkflowStore();
     try {
-      const output = await inspectRun(runId, store, workflowStore);
+      const output = await inspectRun(
+        runId,
+        store,
+        workflowStore,
+        cmdOpts.verbose === true ? { verbose: true } : undefined,
+      );
       console.log(output);
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));

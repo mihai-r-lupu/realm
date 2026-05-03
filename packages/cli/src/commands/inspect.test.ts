@@ -150,4 +150,80 @@ describe('inspectRun', () => {
     expect(result).toContain('Choice:   reject');
     expect(result).toContain('gate_response');
   });
+
+  it('renders tool_calls summary line for each call when tool_calls is present', async () => {
+    const snap = makeSnapshot('research', {
+      tool_calls: [
+        {
+          tool: 'get_pull_request',
+          server_id: 'github',
+          args: { pr: 42 },
+          result: 'PR body',
+          duration_ms: 87,
+          started_at: new Date().toISOString(),
+        },
+      ],
+    });
+    const run = makeRun([snap]);
+    const result = await inspectRun('run_test1', makeRunStore(run), makeWorkflowStore(basicDef));
+    expect(result).toContain('[github:get_pull_request]  87ms');
+    expect(result).toContain('Tool calls (1)');
+  });
+
+  it('renders verbose tool args and result when verbose is true', async () => {
+    const snap = makeSnapshot('research', {
+      tool_calls: [
+        {
+          tool: 'get_pull_request',
+          server_id: 'github',
+          args: { pr: 42 },
+          result: '{"title":"Fix bug"}',
+          duration_ms: 87,
+          started_at: new Date().toISOString(),
+        },
+      ],
+    });
+    const run = makeRun([snap]);
+    const result = await inspectRun('run_test1', makeRunStore(run), makeWorkflowStore(basicDef), {
+      verbose: true,
+    });
+    expect(result).toContain('args:');
+    expect(result).toContain('result:');
+    expect(result).toContain('{"title":"Fix bug"}');
+  });
+
+  it('omits args and result when verbose is false (default)', async () => {
+    const snap = makeSnapshot('research', {
+      tool_calls: [
+        {
+          tool: 'get_pull_request',
+          server_id: 'github',
+          args: { pr: 42 },
+          result: '{"title":"Fix bug"}',
+          duration_ms: 50,
+          started_at: new Date().toISOString(),
+        },
+      ],
+    });
+    const run = makeRun([snap]);
+    const result = await inspectRun('run_test1', makeRunStore(run), makeWorkflowStore(basicDef));
+    expect(result).not.toContain('args:');
+    expect(result).not.toContain('result:');
+  });
+
+  it('renders "Tools declared, none called" when tool_calls is an empty array', async () => {
+    const snap = makeSnapshot('research', { tool_calls: [] });
+    const run = makeRun([snap]);
+    const result = await inspectRun('run_test1', makeRunStore(run), makeWorkflowStore(basicDef));
+    expect(result).toContain('Tools declared, none called');
+  });
+
+  it('renders nothing for tool_calls when tool_calls is absent (old evidence records)', async () => {
+    const snap = makeSnapshot('research'); // no tool_calls field
+    const run = makeRun([snap]);
+    const result = await inspectRun('run_test1', makeRunStore(run), makeWorkflowStore(basicDef));
+    expect(result).not.toContain('Tool calls');
+    expect(result).not.toContain('Tools declared');
+    expect(result).toContain('research');
+  });
 });

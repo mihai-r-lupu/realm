@@ -1,0 +1,101 @@
+# Example 09 — Webhook PR Review
+# Triggered by GitHub pull_request:opened or pull_request:synchronize events.
+# Use `realm webhook` to receive and dispatch these events.
+
+name: webhook-pr-review
+description: >
+  Reviews a GitHub pull request using MCP tools, pauses for human approval,
+  then posts the approved review as a GitHub comment.
+
+params_schema:
+  type: object
+  required:
+    - pr_number
+    - repo_owner
+    - repo_name
+    - pr_title
+    - head_sha
+    - pr_url
+    - author
+    - pr_action
+    - github_delivery_id
+  properties:
+    pr_number: { type: integer }
+    repo_owner: { type: string }
+    repo_name: { type: string }
+    pr_title: { type: string }
+    head_sha: { type: string }
+    base_sha: { type: string }
+    pr_url: { type: string }
+    author: { type: string }
+    pr_action: { type: string }
+    github_delivery_id: { type: string }
+
+mcp_servers:
+  - id: github
+    transport: stdio
+    command: npx
+    args:
+      - -y
+      - '@modelcontextprotocol/server-github'
+    env:
+      GITHUB_TOKEN: '${GITHUB_TOKEN}'
+
+steps:
+  - id: fetch_pr
+    name: Fetch PR diff and file list
+    description: >
+      Retrieve the full diff, list of changed files, and any inline review comments
+      already present on this PR. Capture the content needed to assess the change.
+    execution: agent
+    tools:
+      - 'github:get_pull_request'
+      - 'github:list_pull_requests_files'
+      - 'github:get_pull_request_diff'
+    max_tool_calls: 10
+    tool_timeout: 30
+    input_schema:
+      type: object
+      required: [diff_summary, changed_files]
+      properties:
+        diff_summary: { type: string }
+        changed_files: { type: array, items: { type: string } }
+
+  - id: analyze_changes
+    name: Analyze and draft review
+    description: >
+      Using the diff and file list from fetch_pr, analyze the change for correctness,
+      style, test coverage, and security concerns. Draft a concise review comment
+      (max 500 words) that summarizes findings and any blocking issues.
+    execution: agent
+    depends_on: [fetch_pr]
+    tools:
+      - 'github:get_pull_request'
+    max_tool_calls: 5
+    tool_timeout: 30
+    input_schema:
+      type: object
+      required: [review_body]
+      properties:
+        review_body: { type: string }
+        blocking_count: { type: integer }
+        suggestion_count: { type: integer }
+
+  - id: approve_review
+    name: Human approval gate
+    description: >
+      Present the drafted review to a human reviewer. They may approve it for posting
+      or reject it to discard this run without commenting on the PR.
+    execution: human
+    depends_on: [analyze_changes]
+
+  - id: post_review
+    name: Post review comment
+    description: >
+      Post the approved review body as a PR review comment on GitHub using the
+      GitHub REST API adapter.
+    execution: handler
+    depends_on: [approve_review]
+    handler:
+      uses_service: github
+      action: create_pull_request_review

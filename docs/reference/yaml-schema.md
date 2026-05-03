@@ -18,6 +18,7 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 | `profiles_dir`     | string  | No       | Path to agent profile files, relative to the workflow YAML. Defaults to `profiles/` in the same directory.                   |
 | `workflow_context` | object  | No       | Named file entries loaded once at run start and available in all step prompts. See [Workflow context](#workflow-context).    |
 | `context_wrapper`  | string  | No       | Wrapper format applied to `{{ workflow.context.NAME }}` references. One of `xml` (default), `brackets`, `none`.              |
+| `mcp_servers`      | array   | No       | External MCP server definitions. Steps reference these via `tools`. See [MCP servers](#mcp-servers).                         |
 
 ---
 
@@ -45,6 +46,9 @@ Complete reference for `workflow.yaml` fields. Every field documented here is va
 | `gate`            | object                          | No       | Gate configuration. `gate.choices` lists the valid human response values. `gate.message` is a developer-authored template string shown to the human reviewer. See [Gate message](#gate-message).                                                                                                                                                                                                                                                         |
 | `input_map`       | `Record<string, string>`        | No       | Maps param names the service adapter receives to dot-path values from the run context. Only valid on `execution: auto` steps with `uses_service`. Each value is a dot-path: `run.params.<key>` reads from the run's start params; `context.resources.<step>.<field>` reads a field from a prior step's output. The resolved params are recorded in the evidence chain as `resolved_params` and are visible in `realm run inspect` as a `Resolved:` line. |
 | `agent_profile`   | string                          | No       | Agent profile name. Only valid on `execution: agent` steps. Must match a file in `profiles_dir`.                                                                                                                                                                                                                                                                                                                                                         |
+| `tools`           | `string[]`                      | No       | Tool names this step may call, in `server_id:tool_name` format. Only valid on `execution: agent` steps with an `input_schema`. References entries in `mcp_servers`.                                                                                                                                                                                                                                                                                      |
+| `max_tool_calls`  | integer                         | No       | Maximum number of tool calls the agent may make in a single step execution. Must be a positive integer.                                                                                                                                                                                                                                                                                                                                                  |
+| `tool_timeout`    | integer                         | No       | Timeout in seconds for each individual MCP tool call. Must be a positive integer.                                                                                                                                                                                                                                                                                                                                                                        |
 
 ---
 
@@ -851,3 +855,34 @@ verify_repo:
 
 For handler authoring details, interface signatures, primitives, and registration patterns, see
 [Handler Authoring Reference](handlers.md).
+
+---
+
+## MCP servers
+
+Defines external MCP servers that steps may call tools on. Each server has a unique `id`.
+Step tool declarations reference server entries via `server_id:tool_name` in the `tools` field.
+
+```yaml
+mcp_servers:
+  - id: github # required; unique within this workflow
+    transport: stdio # required; only 'stdio' is supported
+    command: npx # required for stdio transport
+    args:
+      - -y
+      - '@modelcontextprotocol/server-github'
+    env:
+      GITHUB_TOKEN: '${GITHUB_TOKEN}' # ${VAR} is expanded from process.env at connect time
+```
+
+| Field       | Required | Description                                                                      |
+| ----------- | -------- | -------------------------------------------------------------------------------- |
+| `id`        | Yes      | Unique server identifier within this workflow. Used in `tools` field references. |
+| `transport` | Yes      | Transport type. Currently only `stdio` is supported.                             |
+| `command`   | Yes      | Executable to launch (e.g. `npx`, `node`, absolute path).                        |
+| `args`      | No       | Arguments passed to `command`.                                                   |
+| `env`       | No       | Environment variables for the server process. Values support `${VAR}` expansion. |
+
+`env` values support `${VAR}` substitution resolved from `process.env` at connect time.
+An unresolved variable causes the run to fail with `MCP_CONNECTION_FAILED` at the point
+where the first tool call for that server is attempted.

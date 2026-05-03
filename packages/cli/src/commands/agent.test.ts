@@ -13,6 +13,7 @@ import type { AgentDeps, AgentRunOptions } from '../agent/run-agent.js';
 import type { LlmProvider } from '../agent/llm-provider.js';
 import { resolveProvider } from '../agent/llm-provider.js';
 import { checkAdapterPrerequisites, formatPreflightError } from '../agent/preflight.js';
+import { agentCommand } from './agent.js';
 
 // ---------------------------------------------------------------------------
 // MockLlmProvider — queue-based: returns responses in order of callStep() calls.
@@ -378,5 +379,40 @@ describe('checkAdapterPrerequisites', () => {
     expect(msg).toContain("adapter 'github'");
     expect(msg).toContain('GITHUB_TOKEN');
     expect(msg).toContain('export GITHUB_TOKEN=');
+  });
+});
+
+describe('agentCommand CLI guards', () => {
+  beforeEach(() => {
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as () => never);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('exits with 1 and prints error when neither --workflow nor --run-id is provided', async () => {
+    await agentCommand.parseAsync(['node', 'realm']).catch(() => {});
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('--workflow or --run-id'));
+  });
+
+  it('exits with 1 and prints error when both --workflow and --run-id are provided', async () => {
+    await agentCommand
+      .parseAsync(['node', 'realm', '--workflow', 'some/path', '--run-id', 'run_abc'])
+      .catch(() => {});
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('mutually exclusive'));
+  });
+
+  it('exits with 1 and prints error when --params is used with --run-id', async () => {
+    await agentCommand
+      .parseAsync(['node', 'realm', '--run-id', 'run_abc', '--params', '{"key":"val"}'])
+      .catch(() => {});
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('--params cannot be used with --run-id'),
+    );
   });
 });

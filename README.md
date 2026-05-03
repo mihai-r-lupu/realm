@@ -166,6 +166,7 @@ When no registered workflow matches the task, the agent calls `create_workflow` 
 | `realm workflow migrate`         | Back-fill provenance fields on local workflow definitions from earlier versions |
 | `realm mcp`                      | Start the MCP server over stdio (for local AI agents)                           |
 | `realm serve`                    | Start the MCP server over HTTP with Bearer token auth (for hosted platforms)    |
+| `realm webhook`                  | Receive GitHub webhook events and spawn agents for each delivery                |
 
 Run `realm <command> --help` for full options on any command.
 
