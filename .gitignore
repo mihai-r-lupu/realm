@@ -13,8 +13,8 @@ plans/
 .github/instructions/pre-publication.instructions.md
 .github/instructions/project-info-prompt.md
 
-# Local scripts (dashboard is a personal planning tool — not for the public repo)
-scripts/dashboard.mjs
+# Local scripts
+scripts/
 *.bat
 
 # Dependencies
