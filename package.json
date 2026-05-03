@@ -12,6 +12,7 @@
     "lint": "turbo run lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "check:versions": "node .github/scripts/check-versions.mjs",
     "postinstall": "lefthook install"
   },
   "devDependencies": {

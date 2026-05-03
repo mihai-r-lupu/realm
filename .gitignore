@@ -14,7 +14,7 @@ plans/
 .github/instructions/project-info-prompt.md
 
 # Local scripts
-scripts/
+/scripts/
 *.bat
 
 # Dependencies
