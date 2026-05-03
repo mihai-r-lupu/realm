@@ -64,4 +64,4 @@ await server.connect(transport);
 
 ## Full documentation
 
-Full documentation: https://github.com/mihai-r-lupu/realm
+Full documentation: https://github.com/sensigo-hq/realm
