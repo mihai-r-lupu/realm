@@ -1,7 +1,7 @@
 {
   "name": "@sensigo/realm-cli",
   "version": "0.1.0",
-  "description": "CLI for Realm — 17 commands for building, testing, operating, and serving workflows.",
+  "description": "Run autonomous agent workflows, host an MCP server over HTTP, and manage workflow definitions and run history from the terminal.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
