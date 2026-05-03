@@ -1,4 +1,5 @@
 // llm-provider.ts — LLM provider interface and factory function for realm agent.
+import type { ToolDefinition, ToolExecutor, StepWithToolsResult } from './mcp-types.js';
 
 /** A single LLM call: given a prompt and optional JSON schema, return a parsed JSON object. */
 export interface LlmProvider {
@@ -8,6 +9,17 @@ export interface LlmProvider {
    * The returned value is passed directly to executeChain as step params.
    */
   callStep(prompt: string, inputSchema?: Record<string, unknown>): Promise<Record<string, unknown>>;
+  /** Agentic loop path — tool-capable steps. */
+  callStepWithTools?(
+    prompt: string,
+    tools: ToolDefinition[],
+    executor: ToolExecutor,
+    options: {
+      inputSchema?: Record<string, unknown>;
+      maxToolCalls?: number; // default: 20
+      toolTimeoutMs?: number; // default: 30000 — applies per executor() call; NOT to final extraction
+    },
+  ): Promise<StepWithToolsResult>;
 }
 
 export type ProviderName = 'openai' | 'anthropic';

@@ -1,4 +1,5 @@
 // Types for an active or historical workflow run record stored on disk.
+import type { ToolCallRecord } from './mcp-types.js';
 
 /** Diagnostic metadata captured during step execution. Written once; read by inspect. */
 export interface StepDiagnostics {
@@ -37,6 +38,8 @@ export interface EvidenceSnapshot {
   agent_profile?: string;
   /** SHA-256 hash of the profile content at register time. Auditable even if the file changes. */
   agent_profile_hash?: string;
+  /** MCP tool calls made during this step, if any. */
+  tool_calls?: ToolCallRecord[];
   /**
    * Present only when the step used input_map. Records the concrete params the engine
    * derived from run state and passed to the service adapter. Absent for all other step types.

@@ -6,7 +6,13 @@ Most AI workflow platforms orchestrate LLMs as services: the platform decides wh
 
 If your skill file has grown a list of "Do NOT" rules, each one is a scar from a failure the agent invented. Realm replaces those rules with structure: wrong behaviour becomes impossible rather than prohibited.
 
-You define workflows in YAML. The engine enforces step order, validates every agent output against a JSON schema, captures tamper-evident evidence at each step, and pauses at human gates until a person approves. The result is not just a log of what ran — it is a cryptographically verifiable record that every step ran correctly. For developers building AI workflows for clients, that record is the deliverable.
+You define workflows in YAML. The engine enforces step order, validates every agent output against a JSON schema, records tamper-evident evidence at each step before the run can advance, and pauses at human gates until a person approves. The result is not a log of what ran — it is a certified, cryptographically verifiable record that every step was verified. Competitors log execution. Realm certifies it.
+
+## Who it's for
+
+**Developers building production AI workflows** — replace SKILL.md prohibition rules with YAML structure that makes wrong behaviour architecturally impossible.
+
+**AI contractors and agencies** — deliver to clients with a certified audit trail. The evidence chain proves every step was verified before the run advanced. It is the deliverable, not a side effect.
 
 ## Packages
 

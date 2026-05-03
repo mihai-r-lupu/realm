@@ -129,6 +129,7 @@ Use `create_workflow` when no registered workflow matches the task. It registers
     {
       "id": "generate_fixes",
       "description": "For each file identified, generate corrected JSDoc.",
+      "depends_on": ["research_problem"],
       "input_schema": {
         "type": "object",
         "properties": { "audit_summary": { "type": "string" } },
@@ -143,4 +144,23 @@ Use `create_workflow` when no registered workflow matches the task. It registers
 }
 ```
 
-The response has the same shape as a `start_run` response. Check `next_actions[0]` immediately and proceed with `execute_step`. See `.github/instructions/realm-create-workflow.instructions.md` for the full protocol.
+### Step fields
+
+| Field             | Required | Description                                                                                                |
+| ----------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `id`              | Yes      | Unique step identifier. Snake_case verb-noun (e.g. `research_problem`). No spaces.                         |
+| `description`     | Yes      | Acceptance criterion for the step — what correct output looks like, not how to produce it.                 |
+| `depends_on`      | No       | Array with at most one step ID this step depends on. Controls execution order. Omit for the first step.    |
+| `input_schema`    | No       | JSON Schema for the fields this step's `params` must include. Used to validate `execute_step` submissions. |
+| `timeout_seconds` | No       | Positive integer. If the step is not completed within this time, the run enters an error state.            |
+
+### Metadata fields
+
+| Field              | Required | Description                                           |
+| ------------------ | -------- | ----------------------------------------------------- |
+| `name`             | No       | Short kebab-case slug used to derive the workflow ID. |
+| `task_description` | No       | Human-readable description of the overall task.       |
+
+### Response and continuation
+
+The response has the same shape as a `start_run` response. Check `next_actions[0]` immediately and proceed with `execute_step` — the run is already live when `create_workflow` returns.
