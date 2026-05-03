@@ -215,7 +215,8 @@ Services let the engine fetch, create, or update data in external systems.
 `@sensigo/realm` ships `FileSystemAdapter`, which reads a local file and returns
 `{ content, path, line_count, size_bytes }`. When using `createRealmMcpServer()` with no
 custom registry, it is pre-registered automatically under the name `filesystem` — no
-TypeScript required. Declare it only in your workflow YAML:
+TypeScript required. Declare it only in your workflow YAML. For the full operations and
+response reference, see [Built-in Service Adapters](reference/adapters.md).
 
 ```yaml
 services:
@@ -249,10 +250,21 @@ registry.register('handler', 'my_handler', myHandler);
 const server = createRealmMcpServer({ workflowStore, registry });
 ```
 
+### GitHubAdapter
+
+`@sensigo/realm` also ships `GitHubAdapter`, which speaks to the GitHub REST API (and GitHub
+Enterprise Server). It is not pre-registered — when using `realm agent`, set `GITHUB_TOKEN`
+in your environment and the CLI registers it automatically. For the full operation list
+(`get_pr_diff`, `get_issue`, `post_comment`, `apply_labels`, and more), auth token scope
+requirements, GitHub Enterprise setup, and the MCP server registration pattern, see
+[Built-in Service Adapters — GitHubAdapter](reference/adapters.md#githubackapter).
+
 ### Custom adapters
 
 To fetch from any other source — an API, a database, a cloud service — implement `ServiceAdapter`
-and register it the same way. Add the service declaration to `workflow.yaml`:
+and register it the same way. `GenericHttpAdapter` (also in `@sensigo/realm`) covers most REST
+APIs without any custom code — see the [adapter reference](reference/adapters.md#generichttpadapter).
+For fully custom logic, add the service declaration to `workflow.yaml`:
 
 ```yaml
 services:
