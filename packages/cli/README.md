@@ -48,4 +48,4 @@ The `@sensigo/realm-cli` package exports its command groups for embedding in cus
 
 ## Full documentation
 
-Full documentation: https://github.com/mihai-r-lupu/realm
+Full documentation: https://github.com/sensigo-hq/realm

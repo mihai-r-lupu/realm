@@ -147,4 +147,4 @@ registry.register('adapter', 'my-adapter', myAdapter);
 
 ## Full documentation
 
-Full documentation: https://github.com/mihai-r-lupu/realm
+Full documentation: https://github.com/sensigo-hq/realm

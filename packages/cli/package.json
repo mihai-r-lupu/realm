@@ -5,9 +5,9 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mihai-r-lupu/realm.git"
+    "url": "https://github.com/sensigo-hq/realm.git"
   },
-  "homepage": "https://github.com/mihai-r-lupu/realm#readme",
+  "homepage": "https://github.com/sensigo-hq/realm#readme",
   "keywords": [
     "workflow",
     "cli",
