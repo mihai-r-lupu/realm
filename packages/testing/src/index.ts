@@ -28,7 +28,6 @@ export {
 
 // Unit test helpers
 export { testStepHandler } from './helpers/test-step-handler.js';
-export { testProcessor } from './helpers/test-processor.js';
 export { testAdapter } from './helpers/test-adapter.js';
 
 // Runner

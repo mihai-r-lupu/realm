@@ -38,8 +38,6 @@ out/
 Thumbs.db
 
 # Editor
-.vscode/*
-!.vscode/mcp.json
 .idea/
 *.swp
 *.swo
@@ -60,3 +58,6 @@ coverage/
 .turbo/
 tmp/
 temp/
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore
