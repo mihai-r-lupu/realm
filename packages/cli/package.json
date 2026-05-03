@@ -2,6 +2,7 @@
   "name": "@sensigo/realm-cli",
   "version": "0.1.0",
   "description": "CLI for Realm — 17 commands for building, testing, operating, and serving workflows.",
+  "license": "Apache-2.0",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",

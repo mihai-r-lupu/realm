@@ -2,6 +2,7 @@
   "name": "@sensigo/realm-testing",
   "version": "0.1.0",
   "description": "Testing utilities for Realm workflows — fixtures, assertions, mocks, and in-memory store.",
+  "license": "Apache-2.0",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",

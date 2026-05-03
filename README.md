@@ -185,4 +185,4 @@ npm run lint         # lint all packages
 
 ## License
 
-MIT
+Apache 2.0
