@@ -13,10 +13,6 @@ plans/
 .github/instructions/pre-publication.instructions.md
 .github/instructions/project-info-prompt.md
 
-# Local scripts
-/scripts/
-*.bat
-
 # Dependencies
 node_modules/
 .pnp
