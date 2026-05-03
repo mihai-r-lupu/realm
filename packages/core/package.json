@@ -3,6 +3,21 @@
   "version": "0.1.0",
   "description": "Realm workflow execution engine — state machine, evidence capture, and service adapters for agent-driven workflows.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mihai-r-lupu/realm.git"
+  },
+  "homepage": "https://github.com/mihai-r-lupu/realm#readme",
+  "keywords": [
+    "workflow",
+    "ai-agent",
+    "mcp",
+    "state-machine",
+    "orchestration",
+    "evidence",
+    "human-in-the-loop",
+    "typescript"
+  ],
   "private": false,
   "type": "module",
   "main": "./dist/index.js",

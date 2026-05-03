@@ -3,6 +3,19 @@
   "version": "0.1.0",
   "description": "MCP server for Realm — exposes 7 tools for AI agent connections over stdio or HTTP.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mihai-r-lupu/realm.git"
+  },
+  "homepage": "https://github.com/mihai-r-lupu/realm#readme",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai-agent",
+    "agent-workflow",
+    "workflow",
+    "typescript"
+  ],
   "private": false,
   "type": "module",
   "main": "./dist/index.js",

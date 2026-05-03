@@ -3,6 +3,19 @@
   "version": "0.1.0",
   "description": "CLI for Realm — 17 commands for building, testing, operating, and serving workflows.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mihai-r-lupu/realm.git"
+  },
+  "homepage": "https://github.com/mihai-r-lupu/realm#readme",
+  "keywords": [
+    "workflow",
+    "cli",
+    "ai-agent",
+    "agent-workflow",
+    "mcp",
+    "typescript"
+  ],
   "private": false,
   "type": "module",
   "main": "./dist/index.js",
