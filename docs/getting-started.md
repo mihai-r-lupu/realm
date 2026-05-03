@@ -3,7 +3,7 @@
 This guide walks through building, running, and testing a Realm workflow from scratch.
 
 **Time to complete:** ~10 minutes  
-**Prerequisites:** Node.js 20+, npm 10+
+**Prerequisites:** Node.js 22+, npm 10+
 
 ---
 
@@ -310,11 +310,6 @@ steps:
     execution: auto
     trust: human_confirmed
     depends_on: [analyze_findings]
-    prompt: |
-      The following findings have been identified. Reply with 'approve' to accept or 'reject' to flag for re-review.
-    instructions: |
-      Present the display content to the user verbatim. Ask for their choice from gate.response_spec.choices,
-      then call submit_human_response with run_id, gate_id, and choice.
     gate:
       choices:
         - approve
@@ -323,9 +318,23 @@ steps:
         {{ context.resources.analyze_findings.finding_count }} findings identified.
         Severity: {{ context.resources.analyze_findings.highest_severity }}.
         Reply 'approve' to accept or 'reject' to flag for re-review.
+      resolution_messages:
+        approve: 'Approved — run continuing.'
+        reject: 'Rejected — run stopped.'
 ```
 
+**Choosing your gate choices:** keep them short, unambiguous, and domain-relevant. Common patterns:
+
+- `approve` / `reject` — clear for most approval flows
+- `yes` / `no` — minimal and obvious
+- `send` / `discard` — for outbound content flows
+- `approve` / `reject` / `postpone` — three-way with a deferral path
+
+Each choice routes independently: use `when: "gate_step.choice == 'reject'"` on downstream steps to branch based on the outcome. Choices must be typed **exactly** when resolving the gate — the engine does not interpret synonyms or partial matches.
+
 `gate.message` is optional. When set, it is resolved at gate-open using the step's output for template substitution — including self-reference (`{{ context.resources.review_findings.field }}` reads the gate step's own output). If any `{{ }}` placeholder cannot be resolved, the engine returns an error and the gate does not open. The resolved message is stored permanently in the evidence chain as a verbatim record of what the human saw.
+
+`gate.resolution_messages` is optional. When set, the value for the chosen key is displayed as a confirmation after the gate resolves, instead of the default `✅ Gate resolved: \`choice\` — run continuing.`.
 
 When the engine reaches a step with `trust: human_confirmed`, it pauses the run and returns `status: confirm_required`. The run will not advance until a human responds.
 
@@ -343,7 +352,7 @@ When the engine opens a gate, the `confirm_required` response includes a `gate` 
 
 - `gate.display` — the human-facing content. Resolved from `gate.message` if configured; otherwise falls back to `step.prompt` resolved. Present this to the user verbatim before asking for their choice.
 - `gate.agent_hint` — optional agent protocol instruction resolved from `step.instructions`. If present, the agent follows this to determine how to present the gate.
-- `gate.response_spec.choices` — the valid choice values (e.g. `["approve", "reject"]`). Pass one of these as `choice` when calling `submit_human_response`.
+- `gate.response_spec.choices` — the valid choice values (e.g. `["approve", "reject"]`). The human must reply with one of these values exactly. Pass the chosen value as `choice` when calling `submit_human_response`.
 - `gate.preview` — the full step output at point of gate opening, for reference and debugging.
 
 **Authoring constraint:** keep `step.prompt` content bounded and human-readable — a concise summary, a count, or a short excerpt. Do not surface unbounded payloads (full document text, large JSON objects) as the gate display. Workflow authors are responsible for ensuring gate content remains manageable.

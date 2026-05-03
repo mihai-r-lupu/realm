@@ -4,6 +4,7 @@
 # Agent prompts and reports (local workflow artifacts)
 prompts/
 reports/
+plans/
 
 # Local agent customisation files — personal agents stay private, shared Realm agent is committed
 .github/agents/master-architect.agent.md

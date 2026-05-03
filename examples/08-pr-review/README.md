@@ -38,13 +38,17 @@ recommendation, review_comment}` and renders them via `display:` in the terminal
   relative to step output. `confirm_review.gate.message:` uses full
   `context.resources.write_review.*` paths. Both are required; each serves a different
   rendering context.
-- `gate.choices` are `approve` and `request_changes` — real GitHub review outcomes.
+- `gate.choices` are `approve` and `request_changes` — chosen to match real GitHub review
+  outcomes. Gate choices are free-form strings defined by the workflow author; common patterns
+  include `yes/no`, `approve/reject`, or domain-specific commands like `postpone`. Whatever
+  you define here is what the reviewer must type exactly in Slack to resolve the gate.
 - `post_approval` and `post_changes_request` both `depend_on: [confirm_review]` with mutually
   exclusive `when` conditions. The false branch is moved to `skipped_steps` by the engine
   after gate resolution.
 - `resolution_messages` provides a confirmation message for both choices.
-- `GITHUB_TOKEN` needs `contents:read` to fetch the diff and `issues:write` to post the
-  comment (GitHub's PR comment endpoint is the Issues API).
+- `GITHUB_TOKEN` needs `pull_requests:read` to fetch the diff and `issues:write` to post the
+  comment (GitHub's PR comment endpoint is the Issues API). If you later extend the workflow
+  to read file contents via `get_file_contents`, add `contents:read` as well.
 
 ---
 

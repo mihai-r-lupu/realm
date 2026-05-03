@@ -13,7 +13,7 @@ You define workflows in YAML. The engine enforces step order, validates every ag
 | Package                  | npm                                                                                                                 | Description                                                              |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | `@sensigo/realm`         | [![npm](https://img.shields.io/npm/v/@sensigo/realm)](https://www.npmjs.com/package/@sensigo/realm)                 | Core engine — state guard, execution loop, evidence capture              |
-| `@sensigo/realm-cli`     | [![npm](https://img.shields.io/npm/v/@sensigo/realm-cli)](https://www.npmjs.com/package/@sensigo/realm-cli)         | `realm` CLI — 15 commands for building, operating, and serving workflows |
+| `@sensigo/realm-cli`     | [![npm](https://img.shields.io/npm/v/@sensigo/realm-cli)](https://www.npmjs.com/package/@sensigo/realm-cli)         | `realm` CLI — 17 commands for building, operating, and serving workflows |
 | `@sensigo/realm-mcp`     | [![npm](https://img.shields.io/npm/v/@sensigo/realm-mcp)](https://www.npmjs.com/package/@sensigo/realm-mcp)         | `realm-mcp` MCP server — 7 tools for AI agent connections                |
 | `@sensigo/realm-testing` | [![npm](https://img.shields.io/npm/v/@sensigo/realm-testing)](https://www.npmjs.com/package/@sensigo/realm-testing) | Testing utilities — fixtures, assertions, in-memory store                |
 
@@ -59,14 +59,12 @@ This creates `my-workflow/` with `workflow.yaml`, `schema.json`, `.env.example`,
 id: my-workflow
 name: 'My Workflow'
 version: 1
-initial_state: created
 
 steps:
   gather_input:
     description: 'Agent collects the required information'
     execution: agent
-    allowed_from_states: [created]
-    produces_state: input_ready
+    depends_on: []
     input_schema:
       type: object
       required: [summary]
@@ -75,11 +73,10 @@ steps:
           type: string
 
   finalize:
-    description: 'Human reviews and approves'
+    description: 'Human reviews and approves the submitted summary'
     execution: auto
+    depends_on: [gather_input]
     trust: human_confirmed
-    allowed_from_states: [input_ready]
-    produces_state: completed
 ```
 
 ### 3. Validate, register, and run
@@ -144,32 +141,25 @@ When no registered workflow matches the task, the agent calls `create_workflow` 
 
 ## CLI Reference
 
-| Command                          | Description                                                                    |
-| -------------------------------- | ------------------------------------------------------------------------------ |
-| `realm workflow init <name>`     | Scaffold a new workflow project directory                                      |
-| `realm workflow validate <path>` | Validate a workflow YAML without registering it                                |
-| `realm workflow register <path>` | Register a workflow in the local store                                         |
-| `realm workflow watch <path>`    | Watch a workflow YAML and re-register on every change                          |
-| `realm workflow run <path>`      | Run a workflow interactively (development mode)                                |
-| `realm agent`                    | Run a workflow autonomously with an LLM — no MCP client or IDE required        |
-| `realm workflow test <path>`     | Run fixture-based tests against a workflow                                     |
-| `realm run list`                 | List all runs; filter by `--workflow <id>` or `--status <phase>`               |
-| `realm run resume <run-id>`      | Resume a paused run                                                            |
-| `realm run respond <run-id>`     | Submit a response to a human gate                                              |
-| `realm run inspect <run-id>`     | Print the full evidence chain for a run                                        |
-| `realm run replay <run-id>`      | Re-evaluate preconditions with modified step outputs                           |
-| `realm run diff <run-a> <run-b>` | Compare evidence chains of two runs side by side                               |
-| `realm run cleanup`              | Mark idle non-terminal runs as abandoned                                       |
-| `realm mcp`                      | Start the MCP server over stdio (for local AI agents)                          |
-| `realm serve`                    | Start the MCP server over HTTP with Bearer token auth (for hosted platforms)   |
-| `realm login`                    | Authenticate with Realm Cloud (opens browser)                                  |
-| `realm logout`                   | Remove stored Realm Cloud credentials                                          |
-| `realm push [path]`              | Push local workflows to Realm Cloud                                            |
-| `realm pull [id]`                | Pull cloud workflows to local store                                            |
-| `realm sync`                     | Two-way sync plan between local and cloud (dry-run by default)                 |
-| `realm run push [id]`            | Push local run records to Realm Cloud                                          |
-| `realm run pull [id]`            | Pull cloud run records to local store                                          |
-| `realm run sync`                 | Two-way sync plan for run records between local and cloud (dry-run by default) |
+| Command                          | Description                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------------- |
+| `realm workflow init <name>`     | Scaffold a new workflow project directory                                       |
+| `realm workflow validate <path>` | Validate a workflow YAML without registering it                                 |
+| `realm workflow register <path>` | Register a workflow in the local store                                          |
+| `realm workflow watch <path>`    | Watch a workflow YAML and re-register on every change                           |
+| `realm workflow run <path>`      | Run a workflow interactively (development mode)                                 |
+| `realm agent`                    | Run a workflow autonomously with an LLM — no MCP client or IDE required         |
+| `realm workflow test <path>`     | Run fixture-based tests against a workflow                                      |
+| `realm run list`                 | List all runs; filter by `--workflow <id>` or `--status <phase>`                |
+| `realm run resume <run-id>`      | Resume a paused run                                                             |
+| `realm run respond <run-id>`     | Submit a response to a human gate                                               |
+| `realm run inspect <run-id>`     | Print the full evidence chain for a run                                         |
+| `realm run replay <run-id>`      | Re-evaluate preconditions with modified step outputs                            |
+| `realm run diff <run-a> <run-b>` | Compare evidence chains of two runs side by side                                |
+| `realm run cleanup`              | Mark idle non-terminal runs as abandoned                                        |
+| `realm workflow migrate`         | Back-fill provenance fields on local workflow definitions from earlier versions |
+| `realm mcp`                      | Start the MCP server over stdio (for local AI agents)                           |
+| `realm serve`                    | Start the MCP server over HTTP with Bearer token auth (for hosted platforms)    |
 
 Run `realm <command> --help` for full options on any command.
 
@@ -184,12 +174,12 @@ Run `realm <command> --help` for full options on any command.
 
 ## Development
 
-**Prerequisites:** Node.js 20+, npm 10+
+**Prerequisites:** Node.js 22+, npm 10+
 
 ```bash
 npm install          # install all workspace dependencies
 npm run build        # compile all packages
-npm run test         # run all tests (542 total)
+npm run test         # run all tests
 npm run lint         # lint all packages
 ```
 
