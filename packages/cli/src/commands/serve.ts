@@ -5,8 +5,9 @@ import { timingSafeEqual } from 'node:crypto';
 import { Command } from 'commander';
 import { JsonWorkflowStore } from '@sensigo/realm';
 import { createRealmMcpServer } from '@sensigo/realm-mcp';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+
+const MAX_BODY_BYTES = 1 * 1024 * 1024; // 1 MiB
 
 /**
  * Checks an Authorization header's Bearer token using timing-safe comparison.
@@ -55,42 +56,68 @@ export async function startHttpMcpServer(options: StartServerOptions): Promise<S
       }
     }
 
-    // Collect the request body before handing off to the transport.
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(chunk as Buffer);
-    }
-    const rawBody = Buffer.concat(chunks).toString('utf-8');
+    try {
+      // Collect the request body before handing off to the transport.
+      let totalBytes = 0;
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        totalBytes += (chunk as Buffer).length;
+        if (totalBytes > MAX_BODY_BYTES) {
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Request body too large' }));
+          req.destroy();
+          return;
+        }
+        chunks.push(chunk as Buffer);
+      }
+      const rawBody = Buffer.concat(chunks).toString('utf-8');
 
-    let parsedBody: unknown;
-    if (rawBody.length > 0) {
-      try {
-        parsedBody = JSON.parse(rawBody);
-      } catch {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
-        return;
+      let parsedBody: unknown;
+      if (rawBody.length > 0) {
+        try {
+          parsedBody = JSON.parse(rawBody);
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
+          return;
+        }
+      }
+
+      const store = workflowStore ?? new JsonWorkflowStore();
+      const mcpServer = createRealmMcpServer({ workflowStore: store });
+      // Omitting sessionIdGenerator enables stateless mode (SDK default when absent).
+      const transport = new StreamableHTTPServerTransport({});
+      // @ts-expect-error — SDK type mismatch under exactOptionalPropertyTypes:
+      // StreamableHTTPServerTransport.onclose is (() => void) | undefined but
+      // Transport.onclose expects () => void. Runtime behaviour is correct.
+      await mcpServer.connect(transport);
+      await transport.handleRequest(req, res, parsedBody);
+    } catch (err) {
+      if (!res.headersSent && !res.destroyed) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
+      } else {
+        res.destroy(err instanceof Error ? err : new Error(String(err)));
       }
     }
-
-    const store = workflowStore ?? new JsonWorkflowStore();
-    const mcpServer = createRealmMcpServer({ workflowStore: store });
-    // Omitting sessionIdGenerator enables stateless mode (SDK default when absent).
-    // Cast through unknown because the SDK's StreamableHTTPServerTransport was not
-    // compiled with exactOptionalPropertyTypes and its onclose getter returns
-    // `(() => void) | undefined`, which TypeScript rejects against Transport's
-    // `onclose?: () => void` under our stricter tsconfig.
-    const transport = new StreamableHTTPServerTransport({}) as unknown as Transport;
-    await mcpServer.connect(transport);
-    await (transport as unknown as StreamableHTTPServerTransport).handleRequest(
-      req,
-      res,
-      parsedBody,
-    );
   });
 
-  return new Promise((resolve) => {
-    httpServer.listen(port, host, () => resolve(httpServer));
+  return new Promise((resolve, reject) => {
+    let isListening = false;
+
+    httpServer.on('error', (err) => {
+      if (!isListening) {
+        reject(err);
+      } else {
+        console.error('Realm MCP server error:', err);
+        httpServer.close(() => process.exit(1));
+      }
+    });
+
+    httpServer.listen(port, host, () => {
+      isListening = true;
+      resolve(httpServer);
+    });
   });
 }
 
