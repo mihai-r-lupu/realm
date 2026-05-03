@@ -17,6 +17,7 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
+      - run: node .github/scripts/check-versions.mjs
       - run: npm run format:check
       - run: npm run lint
       - run: npm run test
