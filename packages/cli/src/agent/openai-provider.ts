@@ -133,10 +133,6 @@ export class OpenAIProvider extends ToolCapableLlmProvider {
       ...(this.baseUrl !== undefined ? { baseURL: this.baseUrl } : {}),
     });
 
-    const createCompletions = client.chat.completions.create as (
-      opts: Record<string, unknown>,
-    ) => Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-
     const responseFormat =
       options.inputSchema !== undefined
         ? {
@@ -185,7 +181,10 @@ export class OpenAIProvider extends ToolCapableLlmProvider {
         content:
           'You have reached the maximum number of tool calls. Produce your final JSON answer now using only what you have already gathered. No further tool calls will be executed.',
       });
-      const final = await createCompletions(buildFinalCallOpts());
+      const final = await // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (client.chat.completions.create as (opts: Record<string, unknown>) => Promise<any>)(
+        buildFinalCallOpts(),
+      );
       const text: string = (final.choices[0].message.content as string | null) ?? '';
       const parsed = tryParseJson(text);
       if (parsed && validateSchema(parsed, options.inputSchema)) {
@@ -200,7 +199,10 @@ export class OpenAIProvider extends ToolCapableLlmProvider {
     };
 
     while (true) {
-      const response = await createCompletions(buildMainCallOpts());
+      const response = await // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (client.chat.completions.create as (opts: Record<string, unknown>) => Promise<any>)(
+        buildMainCallOpts(),
+      );
       const message = response.choices[0].message as {
         content: string | null;
         tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>;
