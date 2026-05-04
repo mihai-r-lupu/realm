@@ -817,8 +817,8 @@ describe('runAgent — MCP tools integration', () => {
     expect(mockClient.disconnectCount).toBe(1);
   });
 
-  it('undeclared tool name → console.warn emitted; run proceeds with remaining tools', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('returns failed when a declared tool is not found in the MCP server', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const mockClient = makeMockMcpClient({
       // getTools returns nothing — simulating a server that does not know the tool
       async getTools(): Promise<McpTool[]> {
@@ -827,9 +827,7 @@ describe('runAgent — MCP tools integration', () => {
     });
     const provider = new (class extends ToolCapableLlmProvider {
       callStep = vi.fn();
-      callStepWithTools = vi
-        .fn()
-        .mockResolvedValue({ output: { summary: 'done anyway' }, toolCalls: [] });
+      callStepWithTools = vi.fn();
     })();
     const store = new InMemoryStore();
     const deps: AgentDeps = {
@@ -842,10 +840,11 @@ describe('runAgent — MCP tools integration', () => {
 
     const result = await runAgent(deps, { definition: mcpWorkflow, params: {} });
 
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('get_pull_request'));
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not found'));
-    expect(result).toBe('completed');
-    warnSpy.mockRestore();
+    expect(result).toBe('failed');
+    expect(mockClient.disconnectCount).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('get_pull_request'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('research'));
+    errorSpy.mockRestore();
   });
 
   it('--run-id attaches to a persisted run and drives it to completion', async () => {

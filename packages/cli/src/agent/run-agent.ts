@@ -8,6 +8,7 @@ import {
   findEligibleSteps,
   executeChain,
   buildNextActions,
+  WorkflowError,
   type RunStore,
   type WorkflowDefinition,
   type StepDefinition,
@@ -674,37 +675,44 @@ export async function runAgent(deps: AgentDeps, options: AgentRunOptions): Promi
             byServer.get(serverId)!.push(toolName);
           }
 
-          const toolDefs: ToolDefinition[] = [];
-          for (const [serverId, allowList] of byServer) {
-            const mcpTools = await mcpClient.getTools(serverId, allowList);
+          let toolsResult;
+          try {
+            const toolDefs: ToolDefinition[] = [];
+            for (const [serverId, allowList] of byServer) {
+              const mcpTools = await mcpClient.getTools(serverId, allowList);
 
-            const returnedNames = new Set(mcpTools.map((t) => t.name));
-            for (const name of allowList) {
-              if (!returnedNames.has(name)) {
-                console.warn(
-                  `⚠ Tool '${serverId}:${name}' declared in step '${stepName}' was not found in any connected MCP server and will not be available.`,
-                );
+              const returnedNames = new Set(mcpTools.map((t) => t.name));
+              for (const name of allowList) {
+                if (!returnedNames.has(name)) {
+                  throw new WorkflowError(
+                    `Step '${stepName}' declares tool '${serverId}:${name}' which is not exposed by MCP server '${serverId}'. ` +
+                      `Check the tool name against the server's published tool list.`,
+                    {
+                      code: 'MCP_TOOL_NOT_FOUND',
+                      category: 'ENGINE',
+                      agentAction: 'stop',
+                      retryable: false,
+                    },
+                  );
+                }
+              }
+
+              for (const mcpTool of mcpTools) {
+                toolDefs.push({
+                  id: `${serverId}:${mcpTool.name}`,
+                  serverId,
+                  name: mcpTool.name,
+                  description: mcpTool.description,
+                  inputSchema: mcpTool.inputSchema,
+                });
               }
             }
 
-            for (const mcpTool of mcpTools) {
-              toolDefs.push({
-                id: `${serverId}:${mcpTool.name}`,
-                serverId,
-                name: mcpTool.name,
-                description: mcpTool.description,
-                inputSchema: mcpTool.inputSchema,
-              });
-            }
-          }
+            const executor: ToolExecutor = async (namespacedName, args) => {
+              const [serverId, toolName] = namespacedName.split(':') as [string, string];
+              return mcpClient!.call(serverId, toolName, args);
+            };
 
-          const executor: ToolExecutor = async (namespacedName, args) => {
-            const [serverId, toolName] = namespacedName.split(':') as [string, string];
-            return mcpClient!.call(serverId, toolName, args);
-          };
-
-          let toolsResult;
-          try {
             if (!isToolCapable(deps.provider)) {
               throw new Error(
                 'invariant: provider lost tool capability between startup and step execution',
