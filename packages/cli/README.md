@@ -64,19 +64,41 @@ OPENAI_API_KEY=<your-key> realm agent \
   --model deepseek-chat
 ```
 
-## Custom Providers (0.2.0)
+## Custom Providers
 
-`realm agent` currently supports `openai` and `anthropic` as built-in providers.
-OpenAI-compatible endpoints (DeepSeek, Qwen, Groq, Together, local vLLM) are supported
-today via `--base-url`.
+`realm agent` supports custom LLM providers via `--provider-module`. Pass the path to an ESM
+module that exports an instance of `LlmProvider` or `ToolCapableLlmProvider` as its default
+export.
 
-Support for fully custom providers via `--provider-module <path>` is planned for 0.2.0.
-This will allow passing a module that exports a default `LlmProvider` or
-`ToolCapableLlmProvider` implementation (both exported from `@sensigo/realm-cli/agent`).
-The interfaces are stable as of 0.1.0.
+**Minimal example:**
+
+```typescript
+// my-ollama-provider.ts
+import { LlmProvider } from '@sensigo/realm-cli/agent';
+
+class OllamaProvider extends LlmProvider {
+  async callStep(prompt: string): Promise<Record<string, unknown>> {
+    // call your local Ollama endpoint here
+    const response = await fetch('http://localhost:11434/api/generate', { ... });
+    return await response.json() as Record<string, unknown>;
+  }
+}
+
+export default new OllamaProvider();
+```
+
+```bash
+realm agent --workflow ./my-workflow --provider-module ./my-ollama-provider.js
+```
+
+The module must export an **instance** (not a class) as its default export. The instance must
+extend `LlmProvider` (for basic steps) or `ToolCapableLlmProvider` (for tool-enabled steps),
+both exported from `@sensigo/realm-cli/agent`.
 
 Custom provider modules are user-supplied code executed in the same process as `realm agent`.
 Only use modules you trust.
+
+`--provider-module` cannot be combined with `--provider`, `--model`, or `--base-url`.
 
 ## Programmatic extension
 

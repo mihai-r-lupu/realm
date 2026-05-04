@@ -10,7 +10,7 @@ import {
 import type { WorkflowDefinition, WorkflowRegistrar, PendingGate } from '@sensigo/realm';
 import { runAgent, postGateNotificationToSlack } from '../agent/run-agent.js';
 import type { AgentDeps, AgentRunOptions } from '../agent/run-agent.js';
-import type { LlmProvider } from '../agent/llm-provider.js';
+import { LlmProvider } from '../agent/llm-provider.js';
 import { resolveProvider } from '../agent/llm-provider.js';
 import { checkAdapterPrerequisites, formatPreflightError } from '../agent/preflight.js';
 
@@ -18,11 +18,12 @@ import { checkAdapterPrerequisites, formatPreflightError } from '../agent/prefli
 // MockLlmProvider — queue-based: returns responses in order of callStep() calls.
 // ---------------------------------------------------------------------------
 
-class MockLlmProvider implements LlmProvider {
+class MockLlmProvider extends LlmProvider {
   readonly callCount: { value: number } = { value: 0 };
   private readonly responses: Array<Record<string, unknown> | Error>;
 
   constructor(responses: Array<Record<string, unknown> | Error>) {
+    super();
     this.responses = responses;
   }
 
