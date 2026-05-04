@@ -12,11 +12,10 @@ export interface McpTool {
 }
 
 // Tool definition passed to the provider — MCP shape plus routing metadata.
-// id and serverId are routing metadata ONLY — never sent to the LLM API.
 export interface ToolDefinition {
-  id: string; // namespaced routing key: "server_id:tool_name"
+  id: string; // namespaced routing key: "server_id:tool_name" — use for executor() calls ONLY, never for LLM wire format
   serverId: string; // "github" — used to route call to correct McpClient server
-  name: string; // bare tool name as declared by the MCP server
+  name: string; // bare tool name as declared by the MCP server — use this for LLM API wire format
   description: string;
   inputSchema: Record<string, unknown>;
 }

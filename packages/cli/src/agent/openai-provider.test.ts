@@ -103,9 +103,7 @@ describe('OpenAIProvider.callStepWithTools', () => {
     const executor = vi.fn().mockResolvedValue({ content: 'file data' });
     mockCreate
       .mockResolvedValueOnce(
-        makeToolCallResponse([
-          { id: 'call_abc', name: 'github:get_file', args: { path: 'README.md' } },
-        ]),
+        makeToolCallResponse([{ id: 'call_abc', name: 'get_file', args: { path: 'README.md' } }]),
       )
       .mockResolvedValueOnce(makeTextResponse('{"summary":"ok"}'));
 
@@ -130,7 +128,7 @@ describe('OpenAIProvider.callStepWithTools', () => {
   it('max_tool_calls reached → final extraction prompt sent → returns output', async () => {
     const executor = vi.fn().mockResolvedValue('data');
     mockCreate
-      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'srv:t' }]))
+      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"answer":"done"}'));
 
     const provider = new OpenAIProvider('gpt-4o');
@@ -155,7 +153,7 @@ describe('OpenAIProvider.callStepWithTools', () => {
     const schema = { required: ['answer', 'confidence'] };
     const executor = vi.fn().mockResolvedValue('data');
     mockCreate
-      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'srv:t' }]))
+      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"answer":"yes"}')); // 'confidence' missing
 
     const provider = new OpenAIProvider('gpt-4o');
@@ -177,7 +175,7 @@ describe('OpenAIProvider.callStepWithTools', () => {
     // Use a very short real timeout (1ms) rather than fake timers to avoid complexity.
     const hangingExecutor = vi.fn().mockReturnValue(new Promise<unknown>(() => {}));
     mockCreate
-      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'tc_timeout', name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'tc_timeout', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"done":true}'));
 
     const provider = new OpenAIProvider('gpt-4o');
@@ -201,7 +199,7 @@ describe('OpenAIProvider.callStepWithTools', () => {
   it('errored tool call: executor throws → error appended as tool result → loop continues', async () => {
     const failExecutor = vi.fn().mockRejectedValue(new Error('upstream failure'));
     mockCreate
-      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"result":"ok"}'));
 
     const provider = new OpenAIProvider('gpt-4o');
@@ -219,7 +217,7 @@ describe('OpenAIProvider.callStepWithTools', () => {
     const verbatimId = 'call_xyz_very_specific_12345';
     const executor = vi.fn().mockResolvedValue('result');
     mockCreate
-      .mockResolvedValueOnce(makeToolCallResponse([{ id: verbatimId, name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolCallResponse([{ id: verbatimId, name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"ok":true}'));
 
     const provider = new OpenAIProvider('gpt-4o');
@@ -237,7 +235,7 @@ describe('OpenAIProvider.callStepWithTools', () => {
     const objResult = { data: [1, 2, 3] };
     const executor = vi.fn().mockResolvedValue(objResult);
     mockCreate
-      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"ok":true}'));
 
     const provider = new OpenAIProvider('gpt-4o');
@@ -255,7 +253,7 @@ describe('OpenAIProvider.callStepWithTools', () => {
     const tokenResult = 'Fetched data. Bearer secrettoken123 is the auth.';
     const executor = vi.fn().mockResolvedValue(tokenResult);
     mockCreate
-      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"ok":true}'));
 
     const provider = new OpenAIProvider('gpt-4o');
@@ -274,7 +272,7 @@ describe('OpenAIProvider.callStepWithTools', () => {
     // An error with an empty message produces sanitizeError('') === '' → fallback fires.
     const failExecutor = vi.fn().mockRejectedValue(new Error(''));
     mockCreate
-      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolCallResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"ok":true}'));
 
     const provider = new OpenAIProvider('gpt-4o');
@@ -293,9 +291,9 @@ describe('OpenAIProvider.callStepWithTools', () => {
     mockCreate
       .mockResolvedValueOnce(
         makeToolCallResponse([
-          { id: 'b1', name: 'srv:t1' },
-          { id: 'b2', name: 'srv:t2' },
-          { id: 'b3', name: 'srv:t3' },
+          { id: 'b1', name: 't1' },
+          { id: 'b2', name: 't2' },
+          { id: 'b3', name: 't3' },
         ]),
       )
       .mockResolvedValueOnce(makeTextResponse('{"done":true}'));
@@ -322,9 +320,9 @@ describe('OpenAIProvider.callStepWithTools', () => {
     mockCreate
       .mockResolvedValueOnce(
         makeToolCallResponse([
-          { id: 'x1', name: 'srv:t1' },
-          { id: 'x2', name: 'srv:t2' }, // budget exhausted here
-          { id: 'x3', name: 'srv:t3' }, // budget exhausted here
+          { id: 'x1', name: 't1' },
+          { id: 'x2', name: 't2' }, // budget exhausted here
+          { id: 'x3', name: 't3' }, // budget exhausted here
         ]),
       )
       .mockResolvedValueOnce(makeTextResponse('{"final":true}'));
