@@ -14,7 +14,7 @@ import type { BidirectionalGateParams, AgentDeps } from './run-agent.js';
 import type { PendingGate, RunStore, WorkflowDefinition, ToolCallRecord } from '@sensigo/realm';
 import { CURRENT_WORKFLOW_SCHEMA_VERSION, createDefaultRegistry } from '@sensigo/realm';
 import { InMemoryStore } from '@sensigo/realm-testing';
-import type { LlmProvider } from './llm-provider.js';
+import type { LlmProvider, ToolCapableLlmProvider } from './llm-provider.js';
 import type { McpClient, McpTool, McpServerConfig } from './mcp-types.js';
 import { startSlackGateServer } from './slack-gate-server.js';
 import type { SlackGateEvent } from './slack-gate-server.js';
@@ -711,7 +711,7 @@ describe('runAgent — MCP tools integration', () => {
         started_at: new Date().toISOString(),
       },
     ];
-    const provider: LlmProvider = {
+    const provider: ToolCapableLlmProvider = {
       callStep: vi.fn(),
       callStepWithTools: vi.fn().mockResolvedValue({ output: { summary: 'done' }, toolCalls }),
     };
@@ -749,7 +749,7 @@ describe('runAgent — MCP tools integration', () => {
         started_at: new Date().toISOString(),
       },
     ];
-    const provider: LlmProvider = {
+    const provider: ToolCapableLlmProvider = {
       callStep: vi.fn(),
       callStepWithTools: vi.fn().mockResolvedValue({ output: { summary: 'analysed' }, toolCalls }),
     };
@@ -775,7 +775,7 @@ describe('runAgent — MCP tools integration', () => {
 
   it('disconnect() called on normal completion', async () => {
     const mockClient = makeMockMcpClient();
-    const provider: LlmProvider = {
+    const provider: ToolCapableLlmProvider = {
       callStep: vi.fn(),
       callStepWithTools: vi.fn().mockResolvedValue({ output: { summary: 'done' }, toolCalls: [] }),
     };
@@ -796,7 +796,7 @@ describe('runAgent — MCP tools integration', () => {
 
   it('disconnect() called on step failure (callStepWithTools throws)', async () => {
     const mockClient = makeMockMcpClient();
-    const provider: LlmProvider = {
+    const provider: ToolCapableLlmProvider = {
       callStep: vi.fn(),
       callStepWithTools: vi.fn().mockRejectedValue(new Error('LLM crashed')),
     };
@@ -823,7 +823,7 @@ describe('runAgent — MCP tools integration', () => {
         return [];
       },
     });
-    const provider: LlmProvider = {
+    const provider: ToolCapableLlmProvider = {
       callStep: vi.fn(),
       callStepWithTools: vi
         .fn()

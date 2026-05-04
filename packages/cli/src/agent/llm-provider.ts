@@ -9,17 +9,31 @@ export interface LlmProvider {
    * The returned value is passed directly to executeChain as step params.
    */
   callStep(prompt: string, inputSchema?: Record<string, unknown>): Promise<Record<string, unknown>>;
-  /** Agentic loop path — tool-capable steps. */
-  callStepWithTools?(
+}
+
+/**
+ * Extended interface for providers that support the agentic tool-calling loop.
+ * Not all providers implement this — check with isToolCapable() before use.
+ */
+export interface ToolCapableLlmProvider extends LlmProvider {
+  callStepWithTools(
     prompt: string,
     tools: ToolDefinition[],
     executor: ToolExecutor,
     options: {
       inputSchema?: Record<string, unknown>;
-      maxToolCalls?: number; // default: 20
-      toolTimeoutMs?: number; // default: 30000 — applies per executor() call; NOT to final extraction
+      maxToolCalls?: number;
+      toolTimeoutMs?: number;
     },
   ): Promise<StepWithToolsResult>;
+}
+
+/**
+ * Type predicate for narrowing LlmProvider to ToolCapableLlmProvider.
+ * Used at startup to validate the provider supports tool-enabled workflows.
+ */
+export function isToolCapable(provider: LlmProvider): provider is ToolCapableLlmProvider {
+  return typeof (provider as ToolCapableLlmProvider).callStepWithTools === 'function';
 }
 
 export type ProviderName = 'openai' | 'anthropic';

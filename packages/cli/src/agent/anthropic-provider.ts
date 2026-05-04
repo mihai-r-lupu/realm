@@ -1,7 +1,7 @@
 // anthropic-provider.ts — Anthropic LLM provider implementation for realm agent.
 // Requires @anthropic-ai/sdk >= 0.20.0 as an optional peer dependency (npm install @anthropic-ai/sdk).
 import { WorkflowError } from '@sensigo/realm';
-import type { LlmProvider } from './llm-provider.js';
+import type { LlmProvider, ToolCapableLlmProvider } from './llm-provider.js';
 import type {
   ToolCallRecord,
   ToolDefinition,
@@ -31,7 +31,7 @@ function buildSystemPrompt(inputSchema?: Record<string, unknown>): string {
  * Uses the Messages API and extracts JSON from the first text content block.
  * Retries once if the model returns non-JSON content.
  */
-export class AnthropicProvider implements LlmProvider {
+export class AnthropicProvider implements ToolCapableLlmProvider {
   constructor(private readonly model: string) {}
 
   async callStep(

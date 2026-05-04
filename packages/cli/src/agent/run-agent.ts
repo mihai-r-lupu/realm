@@ -18,6 +18,7 @@ import {
 } from '@sensigo/realm';
 import type { WorkflowRegistrar } from '@sensigo/realm';
 import type { LlmProvider } from './llm-provider.js';
+import { isToolCapable } from './llm-provider.js';
 import type { McpClient, ToolDefinition, ToolExecutor } from './mcp-types.js';
 import { McpClient as McpClientImpl } from './mcp-client.js';
 import { startSlackGateServer } from './slack-gate-server.js';
@@ -542,6 +543,12 @@ export async function runAgent(deps: AgentDeps, options: AgentRunOptions): Promi
       definition.mcp_servers,
       undefined, // AbortSignal not threaded into runAgent — disconnect() is in finally
     );
+    if (!isToolCapable(deps.provider)) {
+      throw new Error(
+        'This workflow uses MCP tool-enabled steps, but the configured LLM provider does not support tool calling. ' +
+          'Use --provider openai or --provider anthropic.',
+      );
+    }
   }
 
   try {
@@ -698,7 +705,12 @@ export async function runAgent(deps: AgentDeps, options: AgentRunOptions): Promi
 
           let toolsResult;
           try {
-            toolsResult = await deps.provider.callStepWithTools!(prompt, toolDefs, executor, {
+            if (!isToolCapable(deps.provider)) {
+              throw new Error(
+                'invariant: provider lost tool capability between startup and step execution',
+              );
+            }
+            toolsResult = await deps.provider.callStepWithTools(prompt, toolDefs, executor, {
               ...(stepDef.input_schema !== undefined
                 ? { inputSchema: stepDef.input_schema as Record<string, unknown> }
                 : {}),
