@@ -157,6 +157,7 @@ export async function startWebhookServer(options: StartWebhookServerOptions): Pr
     const params: Record<string, unknown> = {
       pr_number: (pr as { number?: unknown }).number,
       pr_url: (pr as { html_url?: unknown }).html_url,
+      repo: (repo as { full_name?: unknown }).full_name,
       repo_owner: (repoOwner as { login?: unknown }).login,
       repo_name: (repo as { name?: unknown }).name,
       pr_title: (pr as { title?: unknown }).title,
