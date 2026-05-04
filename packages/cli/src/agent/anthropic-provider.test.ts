@@ -42,7 +42,7 @@ function makeTextResponse(text: string) {
 
 // ---------- helpers -------------------------------------------------------
 
-const NOOP_EXECUTOR = async () => ({});
+const _NOOP_EXECUTOR = async () => ({});
 
 function oneTool(id = 'srv:op'): ToolDefinition {
   const colonIdx = id.indexOf(':');

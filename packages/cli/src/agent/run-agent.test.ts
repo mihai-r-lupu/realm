@@ -15,7 +15,7 @@ import type { PendingGate, RunStore, WorkflowDefinition, ToolCallRecord } from '
 import { CURRENT_WORKFLOW_SCHEMA_VERSION, createDefaultRegistry } from '@sensigo/realm';
 import { InMemoryStore } from '@sensigo/realm-testing';
 import type { LlmProvider, ToolCapableLlmProvider } from './llm-provider.js';
-import type { McpClient, McpTool, McpServerConfig } from './mcp-types.js';
+import type { McpClient, McpTool } from './mcp-types.js';
 import { startSlackGateServer } from './slack-gate-server.js';
 import type { SlackGateEvent } from './slack-gate-server.js';
 import { connectSocketMode } from './slack-socket-client.js';
