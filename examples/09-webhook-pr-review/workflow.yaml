@@ -61,8 +61,7 @@ steps:
     execution: agent
     tools:
       - 'github:get_pull_request'
-      - 'github:list_pull_requests_files'
-      - 'github:get_pull_request_diff'
+      - 'github:get_pull_request_files'
     max_tool_calls: 10
     tool_timeout: 30
     input_schema:
