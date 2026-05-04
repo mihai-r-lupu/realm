@@ -14,7 +14,7 @@ import type { BidirectionalGateParams, AgentDeps } from './run-agent.js';
 import type { PendingGate, RunStore, WorkflowDefinition, ToolCallRecord } from '@sensigo/realm';
 import { CURRENT_WORKFLOW_SCHEMA_VERSION, createDefaultRegistry } from '@sensigo/realm';
 import { InMemoryStore } from '@sensigo/realm-testing';
-import type { LlmProvider, ToolCapableLlmProvider } from './llm-provider.js';
+import { LlmProvider, ToolCapableLlmProvider } from './llm-provider.js';
 import type { McpClient, McpTool } from './mcp-types.js';
 import { startSlackGateServer } from './slack-gate-server.js';
 import type { SlackGateEvent } from './slack-gate-server.js';
@@ -441,7 +441,9 @@ function makeGateParams(overrides: Partial<BidirectionalGateParams> = {}): Bidir
     runId: 'run1',
     definition: makeMinimalDefinition(),
     store: makeMinimalStore(),
-    provider: { callStep: vi.fn() } as unknown as LlmProvider,
+    provider: new (class extends LlmProvider {
+      callStep = vi.fn();
+    })(),
     slackBotToken: 'xoxb-test',
     slackChannelId: 'C123',
     gateThreadTs: '1234567890.000',
@@ -711,10 +713,10 @@ describe('runAgent — MCP tools integration', () => {
         started_at: new Date().toISOString(),
       },
     ];
-    const provider: ToolCapableLlmProvider = {
-      callStep: vi.fn(),
-      callStepWithTools: vi.fn().mockResolvedValue({ output: { summary: 'done' }, toolCalls }),
-    };
+    const provider = new (class extends ToolCapableLlmProvider {
+      callStep = vi.fn();
+      callStepWithTools = vi.fn().mockResolvedValue({ output: { summary: 'done' }, toolCalls });
+    })();
     const store = new InMemoryStore();
     const deps: AgentDeps = {
       store,
@@ -749,10 +751,10 @@ describe('runAgent — MCP tools integration', () => {
         started_at: new Date().toISOString(),
       },
     ];
-    const provider: ToolCapableLlmProvider = {
-      callStep: vi.fn(),
-      callStepWithTools: vi.fn().mockResolvedValue({ output: { summary: 'analysed' }, toolCalls }),
-    };
+    const provider = new (class extends ToolCapableLlmProvider {
+      callStep = vi.fn();
+      callStepWithTools = vi.fn().mockResolvedValue({ output: { summary: 'analysed' }, toolCalls });
+    })();
     const store = new InMemoryStore();
     const deps: AgentDeps = {
       store,
@@ -775,10 +777,10 @@ describe('runAgent — MCP tools integration', () => {
 
   it('disconnect() called on normal completion', async () => {
     const mockClient = makeMockMcpClient();
-    const provider: ToolCapableLlmProvider = {
-      callStep: vi.fn(),
-      callStepWithTools: vi.fn().mockResolvedValue({ output: { summary: 'done' }, toolCalls: [] }),
-    };
+    const provider = new (class extends ToolCapableLlmProvider {
+      callStep = vi.fn();
+      callStepWithTools = vi.fn().mockResolvedValue({ output: { summary: 'done' }, toolCalls: [] });
+    })();
     const store = new InMemoryStore();
     const deps: AgentDeps = {
       store,
@@ -796,10 +798,10 @@ describe('runAgent — MCP tools integration', () => {
 
   it('disconnect() called on step failure (callStepWithTools throws)', async () => {
     const mockClient = makeMockMcpClient();
-    const provider: ToolCapableLlmProvider = {
-      callStep: vi.fn(),
-      callStepWithTools: vi.fn().mockRejectedValue(new Error('LLM crashed')),
-    };
+    const provider = new (class extends ToolCapableLlmProvider {
+      callStep = vi.fn();
+      callStepWithTools = vi.fn().mockRejectedValue(new Error('LLM crashed'));
+    })();
     const store = new InMemoryStore();
     const deps: AgentDeps = {
       store,
@@ -823,12 +825,12 @@ describe('runAgent — MCP tools integration', () => {
         return [];
       },
     });
-    const provider: ToolCapableLlmProvider = {
-      callStep: vi.fn(),
-      callStepWithTools: vi
+    const provider = new (class extends ToolCapableLlmProvider {
+      callStep = vi.fn();
+      callStepWithTools = vi
         .fn()
-        .mockResolvedValue({ output: { summary: 'done anyway' }, toolCalls: [] }),
-    };
+        .mockResolvedValue({ output: { summary: 'done anyway' }, toolCalls: [] });
+    })();
     const store = new InMemoryStore();
     const deps: AgentDeps = {
       store,
@@ -874,9 +876,9 @@ describe('runAgent — MCP tools integration', () => {
       },
     };
 
-    const provider: LlmProvider = {
-      callStep: vi.fn().mockResolvedValue({ summary: 'all good' }),
-    };
+    const provider = new (class extends LlmProvider {
+      callStep = vi.fn().mockResolvedValue({ summary: 'all good' });
+    })();
     const deps: AgentDeps = {
       store,
       workflowStore: makeWorkflowStore(simpleWorkflow),
@@ -923,7 +925,9 @@ describe('runAgent — MCP tools integration', () => {
         },
       },
     };
-    const provider: LlmProvider = { callStep: vi.fn().mockResolvedValue({ summary: 'done' }) };
+    const provider = new (class extends LlmProvider {
+      callStep = vi.fn().mockResolvedValue({ summary: 'done' });
+    })();
     const deps: AgentDeps = {
       store,
       workflowStore: makeWorkflowStore(simpleWorkflow),

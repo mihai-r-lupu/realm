@@ -1,22 +1,24 @@
 // llm-provider.ts — LLM provider interface and factory function for realm agent.
 import type { ToolDefinition, ToolExecutor, StepWithToolsResult } from './mcp-types.js';
 
-/** A single LLM call: given a prompt and optional JSON schema, return a parsed JSON object. */
-export interface LlmProvider {
-  /**
-   * Calls the LLM with the step prompt and returns a JSON object.
-   * If input_schema is provided, instructs the LLM to conform to it.
-   * The returned value is passed directly to executeChain as step params.
-   */
-  callStep(prompt: string, inputSchema?: Record<string, unknown>): Promise<Record<string, unknown>>;
+/**
+ * Abstract base class for LLM providers used by realm agent.
+ * Extend this class to implement a custom provider.
+ */
+export abstract class LlmProvider {
+  /** Call the LLM with a step prompt and return a JSON object. */
+  abstract callStep(
+    prompt: string,
+    inputSchema?: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
 }
 
 /**
- * Extended interface for providers that support the agentic tool-calling loop.
- * Not all providers implement this — check with isToolCapable() before use.
+ * Extended abstract class for providers that support the agentic tool-calling loop.
+ * Extend this class if your provider can drive tool-enabled workflow steps.
  */
-export interface ToolCapableLlmProvider extends LlmProvider {
-  callStepWithTools(
+export abstract class ToolCapableLlmProvider extends LlmProvider {
+  abstract callStepWithTools(
     prompt: string,
     tools: ToolDefinition[],
     executor: ToolExecutor,
@@ -29,11 +31,10 @@ export interface ToolCapableLlmProvider extends LlmProvider {
 }
 
 /**
- * Type predicate for narrowing LlmProvider to ToolCapableLlmProvider.
- * Used at startup to validate the provider supports tool-enabled workflows.
+ * Returns true if the provider supports the agentic tool-calling loop.
  */
 export function isToolCapable(provider: LlmProvider): provider is ToolCapableLlmProvider {
-  return typeof (provider as ToolCapableLlmProvider).callStepWithTools === 'function';
+  return provider instanceof ToolCapableLlmProvider;
 }
 
 export type ProviderName = 'openai' | 'anthropic';

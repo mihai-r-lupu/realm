@@ -1,7 +1,8 @@
 // realm agent — autonomous CLI command that drives a workflow using an LLM provider.
 // Core loop logic lives in packages/cli/src/agent/run-agent.ts for testability.
 import { Command } from 'commander';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   loadWorkflowFromFile,
   JsonFileStore,
@@ -10,8 +11,8 @@ import {
   GitHubAdapter,
   SlackAdapter,
 } from '@sensigo/realm';
+import { LlmProvider, resolveProvider } from '../agent/llm-provider.js';
 import type { ProviderName } from '../agent/llm-provider.js';
-import { resolveProvider } from '../agent/llm-provider.js';
 import { runAgent } from '../agent/run-agent.js';
 import {
   checkAdapterPrerequisites,
@@ -31,6 +32,10 @@ export const agentCommand = new Command('agent')
     'Base URL for OpenAI-compatible endpoints (e.g. DeepSeek, Qwen, Groq)',
   )
   .option(
+    '--provider-module <path>',
+    'Path to a custom LlmProvider module (default export must be an instance extending LlmProvider)',
+  )
+  .option(
     '--register',
     'Persist the workflow definition to ~/.realm/workflows/ (same as realm workflow register)',
   )
@@ -42,6 +47,7 @@ export const agentCommand = new Command('agent')
       provider?: string;
       model?: string;
       baseUrl?: string;
+      providerModule?: string;
       register?: boolean;
     }) => {
       if (!opts.workflow && !opts.runId) {
@@ -61,11 +67,44 @@ export const agentCommand = new Command('agent')
       try {
         const workflowStore = new JsonWorkflowStore();
         const store = new JsonFileStore();
-        const provider = await resolveProvider(
-          opts.provider as ProviderName | undefined,
-          opts.model,
-          opts.baseUrl,
-        );
+        let provider: LlmProvider;
+        if (opts.providerModule !== undefined) {
+          if (
+            opts.provider !== undefined ||
+            opts.model !== undefined ||
+            opts.baseUrl !== undefined
+          ) {
+            console.error(
+              'Error: --provider-module cannot be combined with --provider, --model, or --base-url',
+            );
+            process.exit(1);
+          }
+          const modulePath = resolve(opts.providerModule);
+          const moduleUrl = pathToFileURL(modulePath).href;
+          let mod: { default?: unknown };
+          try {
+            mod = (await import(moduleUrl)) as { default?: unknown };
+          } catch (err) {
+            console.error(
+              `Error: failed to import provider module '${opts.providerModule}': ${err instanceof Error ? err.message : String(err)}`,
+            );
+            process.exit(1);
+          }
+          if (!(mod.default instanceof LlmProvider)) {
+            console.error(
+              `Error: provider module default export must be an instance extending LlmProvider.\n` +
+                `Import LlmProvider from '@sensigo/realm-cli/agent' and export 'export default new MyProvider()'.`,
+            );
+            process.exit(1);
+          }
+          provider = mod.default;
+        } else {
+          provider = await resolveProvider(
+            opts.provider as ProviderName | undefined,
+            opts.model,
+            opts.baseUrl,
+          );
+        }
         const registry = createDefaultRegistry();
         if (process.env['GITHUB_TOKEN'] !== undefined)
           registry.register(
