@@ -32,7 +32,13 @@ function buildSystemPrompt(inputSchema?: Record<string, unknown>): string {
  * Retries once if the model returns non-JSON content.
  */
 export class OpenAIProvider implements ToolCapableLlmProvider {
-  constructor(private readonly model: string) {}
+  private readonly model: string;
+  private readonly baseUrl: string | undefined;
+
+  constructor(model: string, baseUrl?: string) {
+    this.model = model;
+    this.baseUrl = baseUrl;
+  }
 
   async callStep(
     prompt: string,
@@ -54,6 +60,7 @@ export class OpenAIProvider implements ToolCapableLlmProvider {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client = new (mod.default as new (opts: Record<string, unknown>) => any)({
       apiKey: process.env['OPENAI_API_KEY'],
+      ...(this.baseUrl !== undefined ? { baseURL: this.baseUrl } : {}),
     });
 
     const systemPrompt = buildSystemPrompt(inputSchema);
@@ -122,6 +129,7 @@ export class OpenAIProvider implements ToolCapableLlmProvider {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client = new (mod.default as new (opts: Record<string, unknown>) => any)({
       apiKey: process.env['OPENAI_API_KEY'],
+      ...(this.baseUrl !== undefined ? { baseURL: this.baseUrl } : {}),
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

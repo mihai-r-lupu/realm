@@ -231,6 +231,33 @@ describe('resolveProvider', () => {
       'realm agent requires an LLM API key',
     );
   });
+
+  it('throws when --base-url is set and provider resolves to anthropic (explicit flag)', async () => {
+    process.env['ANTHROPIC_API_KEY'] = 'test-key';
+    delete process.env['OPENAI_API_KEY'];
+
+    await expect(
+      resolveProvider('anthropic', undefined, 'https://api.example.com'),
+    ).rejects.toThrow('--base-url is only supported with --provider openai');
+  });
+
+  it('throws when --base-url is set and anthropic is auto-detected (no openai key)', async () => {
+    process.env['ANTHROPIC_API_KEY'] = 'test-key';
+    delete process.env['OPENAI_API_KEY'];
+
+    await expect(resolveProvider(undefined, undefined, 'https://api.example.com')).rejects.toThrow(
+      '--base-url is only supported with --provider openai',
+    );
+  });
+
+  it('does not throw when --base-url is set with --provider openai', async () => {
+    process.env['OPENAI_API_KEY'] = 'test-key';
+    delete process.env['ANTHROPIC_API_KEY'];
+
+    // The guard must not fire — resolveProvider returns successfully for openai + base-url.
+    const provider = await resolveProvider('openai', undefined, 'https://api.deepseek.com');
+    expect(provider).toBeDefined();
+  });
 });
 
 describe('postGateNotificationToSlack', () => {

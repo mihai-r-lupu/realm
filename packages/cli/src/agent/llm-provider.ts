@@ -45,6 +45,7 @@ export type ProviderName = 'openai' | 'anthropic';
 export async function resolveProvider(
   providerFlag: ProviderName | undefined,
   modelFlag: string | undefined,
+  baseUrlFlag?: string,
 ): Promise<LlmProvider> {
   const hasOpenAI = process.env['OPENAI_API_KEY'] !== undefined;
   const hasAnthropic = process.env['ANTHROPIC_API_KEY'] !== undefined;
@@ -57,9 +58,16 @@ export async function resolveProvider(
 
   const provider = providerFlag ?? (hasOpenAI ? 'openai' : 'anthropic');
 
+  if (baseUrlFlag !== undefined && provider === 'anthropic') {
+    throw new Error(
+      '--base-url is only supported with --provider openai (or OpenAI-compatible endpoints). ' +
+        'For Anthropic, configure the endpoint via the ANTHROPIC_BASE_URL environment variable.',
+    );
+  }
+
   if (provider === 'openai') {
     const { OpenAIProvider } = await import('./openai-provider.js');
-    return new OpenAIProvider(modelFlag ?? 'gpt-4o');
+    return new OpenAIProvider(modelFlag ?? 'gpt-4o', baseUrlFlag);
   } else {
     const { AnthropicProvider } = await import('./anthropic-provider.js');
     return new AnthropicProvider(modelFlag ?? 'claude-sonnet-4-5');

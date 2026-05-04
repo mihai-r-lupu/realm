@@ -27,6 +27,10 @@ export const agentCommand = new Command('agent')
   .option('--provider <provider>', 'LLM provider: openai or anthropic (auto-detected from env)')
   .option('--model <model>', 'Model name override (default: gpt-4o / claude-sonnet-4-5)')
   .option(
+    '--base-url <url>',
+    'Base URL for OpenAI-compatible endpoints (e.g. DeepSeek, Qwen, Groq)',
+  )
+  .option(
     '--register',
     'Persist the workflow definition to ~/.realm/workflows/ (same as realm workflow register)',
   )
@@ -37,6 +41,7 @@ export const agentCommand = new Command('agent')
       params: string;
       provider?: string;
       model?: string;
+      baseUrl?: string;
       register?: boolean;
     }) => {
       if (!opts.workflow && !opts.runId) {
@@ -59,6 +64,7 @@ export const agentCommand = new Command('agent')
         const provider = await resolveProvider(
           opts.provider as ProviderName | undefined,
           opts.model,
+          opts.baseUrl,
         );
         const registry = createDefaultRegistry();
         if (process.env['GITHUB_TOKEN'] !== undefined)
