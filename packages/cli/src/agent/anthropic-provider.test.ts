@@ -100,7 +100,7 @@ describe('AnthropicProvider.callStepWithTools', () => {
     mockCreate
       .mockResolvedValueOnce(
         makeToolUseResponse([
-          { id: 'toolu_01abc', name: 'github:get_file', input: { path: 'README.md' } },
+          { id: 'toolu_01abc', name: 'get_file', input: { path: 'README.md' } },
         ]),
       )
       .mockResolvedValueOnce(makeTextResponse('{"summary":"ok"}'));
@@ -126,7 +126,7 @@ describe('AnthropicProvider.callStepWithTools', () => {
   it('max_tool_calls reached → final extraction has tool_choice:none, no tools, no response_format', async () => {
     const executor = vi.fn().mockResolvedValue('data');
     mockCreate
-      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'srv:t' }]))
+      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"answer":"done"}'));
 
     const provider = new AnthropicProvider('claude-sonnet-4-5');
@@ -148,7 +148,7 @@ describe('AnthropicProvider.callStepWithTools', () => {
     const schema = { required: ['answer', 'confidence'] };
     const executor = vi.fn().mockResolvedValue('data');
     mockCreate
-      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'srv:t' }]))
+      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"answer":"yes"}')); // 'confidence' missing
 
     const provider = new AnthropicProvider('claude-sonnet-4-5');
@@ -169,7 +169,7 @@ describe('AnthropicProvider.callStepWithTools', () => {
   it('tool timeout fires → error accumulated as tool_result with tool_use_id echoed → slot consumed', async () => {
     const hangingExecutor = vi.fn().mockReturnValue(new Promise<unknown>(() => {}));
     mockCreate
-      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'toolu_timeout', name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'toolu_timeout', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"done":true}'));
 
     const provider = new AnthropicProvider('claude-sonnet-4-5');
@@ -199,7 +199,7 @@ describe('AnthropicProvider.callStepWithTools', () => {
   it('errored tool call: executor throws → error accumulated → loop continues', async () => {
     const failExecutor = vi.fn().mockRejectedValue(new Error('upstream failure'));
     mockCreate
-      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"result":"ok"}'));
 
     const provider = new AnthropicProvider('claude-sonnet-4-5');
@@ -217,7 +217,7 @@ describe('AnthropicProvider.callStepWithTools', () => {
     const verbatimId = 'toolu_01XYZveryspecific12345';
     const executor = vi.fn().mockResolvedValue('result');
     mockCreate
-      .mockResolvedValueOnce(makeToolUseResponse([{ id: verbatimId, name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolUseResponse([{ id: verbatimId, name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"ok":true}'));
 
     const provider = new AnthropicProvider('claude-sonnet-4-5');
@@ -237,7 +237,7 @@ describe('AnthropicProvider.callStepWithTools', () => {
     const objResult = { data: [1, 2, 3] };
     const executor = vi.fn().mockResolvedValue(objResult);
     mockCreate
-      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"ok":true}'));
 
     const provider = new AnthropicProvider('claude-sonnet-4-5');
@@ -257,7 +257,7 @@ describe('AnthropicProvider.callStepWithTools', () => {
     const tokenResult = 'Fetched data. Bearer secrettoken123 is the auth.';
     const executor = vi.fn().mockResolvedValue(tokenResult);
     mockCreate
-      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"ok":true}'));
 
     const provider = new AnthropicProvider('claude-sonnet-4-5');
@@ -277,7 +277,7 @@ describe('AnthropicProvider.callStepWithTools', () => {
   it('when sanitized error string is empty, tool result content is "Error: (redacted)"', async () => {
     const failExecutor = vi.fn().mockRejectedValue(new Error(''));
     mockCreate
-      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'srv:op' }]))
+      .mockResolvedValueOnce(makeToolUseResponse([{ id: 'c1', name: 'op' }]))
       .mockResolvedValueOnce(makeTextResponse('{"ok":true}'));
 
     const provider = new AnthropicProvider('claude-sonnet-4-5');
@@ -298,9 +298,9 @@ describe('AnthropicProvider.callStepWithTools', () => {
     mockCreate
       .mockResolvedValueOnce(
         makeToolUseResponse([
-          { id: 'b1', name: 'srv:t1' },
-          { id: 'b2', name: 'srv:t2' },
-          { id: 'b3', name: 'srv:t3' },
+          { id: 'b1', name: 't1' },
+          { id: 'b2', name: 't2' },
+          { id: 'b3', name: 't3' },
         ]),
       )
       .mockResolvedValueOnce(makeTextResponse('{"done":true}'));
@@ -337,9 +337,9 @@ describe('AnthropicProvider.callStepWithTools', () => {
     mockCreate
       .mockResolvedValueOnce(
         makeToolUseResponse([
-          { id: 'x1', name: 'srv:t1' }, // executes, fills the 1-slot budget
-          { id: 'x2', name: 'srv:t2' }, // budget exhausted
-          { id: 'x3', name: 'srv:t3' }, // budget exhausted
+          { id: 'x1', name: 't1' }, // executes, fills the 1-slot budget
+          { id: 'x2', name: 't2' }, // budget exhausted
+          { id: 'x3', name: 't3' }, // budget exhausted
         ]),
       )
       .mockResolvedValueOnce(makeTextResponse('{"final":true}'));

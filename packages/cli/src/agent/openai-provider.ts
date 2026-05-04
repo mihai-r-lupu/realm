@@ -141,15 +141,30 @@ export class OpenAIProvider extends ToolCapableLlmProvider {
           }
         : undefined;
 
-    // ToolDefinition → OpenAI function tool wire format (namespaced id is used for round-tripping).
-    const openaiTools = tools.map((tool) => ({
-      type: 'function' as const,
-      function: {
-        name: tool.id,
-        description: tool.description,
-        parameters: tool.inputSchema,
-      },
-    }));
+    // toolIdMap: bareName → namespaced id, used to recover routing key from LLM responses.
+    // Collision guard: two MCP servers may not expose the same bare tool name in the same step.
+    const toolIdMap = new Map<string, string>();
+    const openaiTools: Array<{
+      type: 'function';
+      function: { name: string; description: string; parameters: Record<string, unknown> };
+    }> = [];
+    for (const tool of tools) {
+      if (toolIdMap.has(tool.name)) {
+        throw new Error(
+          `Tool name collision: '${tool.name}' is exposed by multiple MCP servers. ` +
+            `Declare tools from only one server per name, or remove the duplicate.`,
+        );
+      }
+      toolIdMap.set(tool.name, tool.id);
+      openaiTools.push({
+        type: 'function',
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.inputSchema,
+        },
+      });
+    }
 
     const maxCalls = options.maxToolCalls ?? 20;
     let tool_call_count = 0;
@@ -227,7 +242,8 @@ export class OpenAIProvider extends ToolCapableLlmProvider {
             continue;
           }
 
-          const { serverId, toolName } = parseNamespacedId(tool.function.name);
+          const originalId = toolIdMap.get(tool.function.name)!;
+          const { serverId, toolName } = parseNamespacedId(originalId);
           const args = JSON.parse(tool.function.arguments || '{}') as Record<string, unknown>;
           const start = Date.now();
 
@@ -236,7 +252,7 @@ export class OpenAIProvider extends ToolCapableLlmProvider {
 
           try {
             const rawResult = await Promise.race([
-              executor(tool.function.name, args),
+              executor(originalId, args),
               rejectAfter(options.toolTimeoutMs ?? 30000),
             ]);
             const serialized = serializeToolResult(rawResult);

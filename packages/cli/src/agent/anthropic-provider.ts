@@ -123,16 +123,28 @@ export class AnthropicProvider extends ToolCapableLlmProvider {
       apiKey: process.env['ANTHROPIC_API_KEY'],
     });
 
-    const createMessages = client.messages.create as (
-      opts: Record<string, unknown>,
-    ) => Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-
-    // ToolDefinition → Anthropic tool wire format (namespaced id used for round-tripping).
-    const anthropicTools = tools.map((tool) => ({
-      name: tool.id,
-      description: tool.description,
-      input_schema: tool.inputSchema, // note: input_schema, not parameters
-    }));
+    // toolIdMap: bareName → namespaced id, used to recover routing key from LLM responses.
+    // Collision guard: two MCP servers may not expose the same bare tool name in the same step.
+    const toolIdMap = new Map<string, string>();
+    const anthropicTools: Array<{
+      name: string;
+      description: string;
+      input_schema: Record<string, unknown>;
+    }> = [];
+    for (const tool of tools) {
+      if (toolIdMap.has(tool.name)) {
+        throw new Error(
+          `Tool name collision: '${tool.name}' is exposed by multiple MCP servers. ` +
+            `Declare tools from only one server per name, or remove the duplicate.`,
+        );
+      }
+      toolIdMap.set(tool.name, tool.id);
+      anthropicTools.push({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.inputSchema, // note: input_schema, not parameters
+      });
+    }
 
     const maxCalls = options.maxToolCalls ?? 20;
     let tool_call_count = 0;
@@ -156,7 +168,8 @@ export class AnthropicProvider extends ToolCapableLlmProvider {
     // Calls the API with tool_choice: none and no tools array to force a plain text answer.
     // Does NOT push to history — callers must ensure history ends with a valid user turn.
     const performFinalExtraction = async (): Promise<StepWithToolsResult> => {
-      const final = await createMessages({
+      const final = await // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (client.messages.create as (opts: Record<string, unknown>) => Promise<any>)({
         model: this.model,
         max_tokens: 4096,
         system,
@@ -182,7 +195,10 @@ export class AnthropicProvider extends ToolCapableLlmProvider {
     };
 
     while (true) {
-      const response = await createMessages(buildMainCallOpts());
+      const response = await // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (client.messages.create as (opts: Record<string, unknown>) => Promise<any>)(
+        buildMainCallOpts(),
+      );
       const toolUseBlocks = (
         response.content as Array<{ type: string; id?: string; name?: string; input?: unknown }>
       ).filter((b) => b.type === 'tool_use');
@@ -211,7 +227,8 @@ export class AnthropicProvider extends ToolCapableLlmProvider {
             continue;
           }
 
-          const { serverId, toolName } = parseNamespacedId(block.name!);
+          const originalId = toolIdMap.get(block.name!)!;
+          const { serverId, toolName } = parseNamespacedId(originalId);
           const args = (block.input ?? {}) as Record<string, unknown>;
           const start = Date.now();
 
@@ -220,7 +237,7 @@ export class AnthropicProvider extends ToolCapableLlmProvider {
 
           try {
             const rawResult = await Promise.race([
-              executor(block.name!, args),
+              executor(originalId, args),
               rejectAfter(options.toolTimeoutMs ?? 30000),
             ]);
             const serialized = serializeToolResult(rawResult);
