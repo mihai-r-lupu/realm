@@ -139,13 +139,16 @@ realm agent \
   --params '{"key":"value"}'
 ```
 
-| Option              | Default    | Description                                                                                                                                            |
-| ------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--workflow <path>` | (required) | Path to `workflow.yaml` or its containing directory                                                                                                    |
-| `--params <json>`   | `{}`       | Run params as a JSON string                                                                                                                            |
-| `--provider <name>` | `openai`   | LLM provider. Values: `openai`, `anthropic`                                                                                                            |
-| `--register`        | off        | Persist the workflow to `~/.realm/workflows/` so `realm run inspect` resolves it by ID                                                                 |
-| `--run-id <id>`     | —          | Attach to an existing run instead of creating a new one. Mutually exclusive with `--workflow`. The run must exist and must not be in a terminal state. |
+| Option                     | Default          | Description                                                                                                                                            |
+| -------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--workflow <path>`        | (required)       | Path to `workflow.yaml` or its containing directory                                                                                                    |
+| `--params <json>`          | `{}`             | Run params as a JSON string                                                                                                                            |
+| `--provider <name>`        | auto             | LLM provider. Values: `openai`, `anthropic`. Auto-detected from whichever API key is set.                                                              |
+| `--model <name>`           | provider default | Model name override. Default: `gpt-4o` for OpenAI, `claude-sonnet-4-5` for Anthropic.                                                                  |
+| `--base-url <url>`         | —                | Base URL for OpenAI-compatible endpoints (DeepSeek, Qwen, Groq, etc.). Only valid with `--provider openai` or when `OPENAI_API_KEY` is set.            |
+| `--provider-module <path>` | —                | Path to a custom provider module. Cannot be combined with `--provider`, `--model`, or `--base-url`. See [Custom providers](#custom-providers) below.   |
+| `--register`               | off              | Persist the workflow to `~/.realm/workflows/` so `realm run inspect` resolves it by ID                                                                 |
+| `--run-id <id>`            | —                | Attach to an existing run instead of creating a new one. Mutually exclusive with `--workflow`. The run must exist and must not be in a terminal state. |
 
 **LLM key:** set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in your shell or `.env` file. The
 CLI loads `.env` automatically on startup.
@@ -164,6 +167,47 @@ selected automatically from the env vars that are present:
 
 For step-by-step Slack app setup and the full env var reference, see
 [Slack Gate Modes](./realm-agent-slack.md).
+
+**OpenAI-compatible endpoints:** use `--base-url` to point `realm agent` at any OpenAI-compatible
+API, including cost-efficient alternatives:
+
+```bash
+# DeepSeek
+OPENAI_API_KEY=sk-... realm agent --workflow ./my-workflow \
+  --model deepseek-chat \
+  --base-url https://api.deepseek.com/v1
+
+# Groq
+OPENAI_API_KEY=gsk_... realm agent --workflow ./my-workflow \
+  --model llama-3.3-70b-versatile \
+  --base-url https://api.groq.com/openai/v1
+```
+
+**Custom providers:** use `--provider-module` to supply a fully custom LLM implementation.
+The module must export an instance (not a class) extending `LlmProvider` from
+`@sensigo/realm-cli/agent`:
+
+```typescript
+// my-provider.ts
+import { LlmProvider } from '@sensigo/realm-cli/agent';
+
+class MyProvider extends LlmProvider {
+  async callStep(prompt: string, inputSchema?: Record<string, unknown>) {
+    // call your LLM here
+    return { result: '...' };
+  }
+}
+
+export default new MyProvider();
+```
+
+```bash
+realm agent --workflow ./my-workflow --provider-module ./my-provider.js
+```
+
+`--provider-module` cannot be combined with `--provider`, `--model`, or `--base-url`.
+If the default export is not an instance of `LlmProvider`, `realm agent` exits with a
+descriptive error before the run starts.
 
 ---
 
