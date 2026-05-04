@@ -3,3 +3,5 @@ pre-commit:
     format:
       run: npm run format
       stage_fixed: true
+    lint:
+      run: npm run lint
