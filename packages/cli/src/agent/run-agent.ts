@@ -346,7 +346,7 @@ export async function handleBidirectionalGate(params: BidirectionalGateParams): 
     runId,
     definition,
     store,
-    provider,
+    provider: _provider,
     slackBotToken,
     slackChannelId,
     gateThreadTs,

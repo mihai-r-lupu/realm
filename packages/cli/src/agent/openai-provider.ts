@@ -1,7 +1,7 @@
 // openai-provider.ts — OpenAI LLM provider implementation for realm agent.
 // Requires openai >= 4.0.0 as an optional peer dependency (npm install openai).
 import { WorkflowError } from '@sensigo/realm';
-import type { LlmProvider, ToolCapableLlmProvider } from './llm-provider.js';
+import type { ToolCapableLlmProvider } from './llm-provider.js';
 import type {
   ToolCallRecord,
   ToolDefinition,
@@ -132,10 +132,9 @@ export class OpenAIProvider implements ToolCapableLlmProvider {
       ...(this.baseUrl !== undefined ? { baseURL: this.baseUrl } : {}),
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const createCompletions = client.chat.completions.create as (
       opts: Record<string, unknown>,
-    ) => Promise<any>;
+    ) => Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     const responseFormat =
       options.inputSchema !== undefined

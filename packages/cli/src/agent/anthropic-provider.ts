@@ -1,7 +1,7 @@
 // anthropic-provider.ts — Anthropic LLM provider implementation for realm agent.
 // Requires @anthropic-ai/sdk >= 0.20.0 as an optional peer dependency (npm install @anthropic-ai/sdk).
 import { WorkflowError } from '@sensigo/realm';
-import type { LlmProvider, ToolCapableLlmProvider } from './llm-provider.js';
+import type { ToolCapableLlmProvider } from './llm-provider.js';
 import type {
   ToolCallRecord,
   ToolDefinition,
@@ -121,10 +121,9 @@ export class AnthropicProvider implements ToolCapableLlmProvider {
       apiKey: process.env['ANTHROPIC_API_KEY'],
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const createMessages = client.messages.create as (
       opts: Record<string, unknown>,
-    ) => Promise<any>;
+    ) => Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     // ToolDefinition → Anthropic tool wire format (namespaced id used for round-tripping).
     const anthropicTools = tools.map((tool) => ({
@@ -155,7 +154,6 @@ export class AnthropicProvider implements ToolCapableLlmProvider {
     // Calls the API with tool_choice: none and no tools array to force a plain text answer.
     // Does NOT push to history — callers must ensure history ends with a valid user turn.
     const performFinalExtraction = async (): Promise<StepWithToolsResult> => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const final = await createMessages({
         model: this.model,
         max_tokens: 4096,
