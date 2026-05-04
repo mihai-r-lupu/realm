@@ -1,8 +1,9 @@
 # Example 09 — Webhook PR Review
 # Triggered by GitHub pull_request:opened or pull_request:synchronize events.
 # Use `realm webhook` to receive and dispatch these events.
-
-name: webhook-pr-review
+id: webhook-pr-review
+name: Webhook PR Review
+version: 1
 description: >
   Reviews a GitHub pull request using MCP tools, pauses for human approval,
   then posts the approved review as a GitHub comment.
@@ -11,6 +12,7 @@ params_schema:
   type: object
   required:
     - pr_number
+    - repo
     - repo_owner
     - repo_name
     - pr_title
@@ -21,6 +23,7 @@ params_schema:
     - github_delivery_id
   properties:
     pr_number: { type: integer }
+    repo: { type: string, description: 'Full repository name in owner/repo format' }
     repo_owner: { type: string }
     repo_name: { type: string }
     pr_title: { type: string }
@@ -30,6 +33,15 @@ params_schema:
     author: { type: string }
     pr_action: { type: string }
     github_delivery_id: { type: string }
+
+services:
+  github:
+    adapter: github
+    trust: engine_delivered
+    auth:
+      token_from: secrets.GITHUB_TOKEN
+    config:
+      base_url: 'https://api.github.com'
 
 mcp_servers:
   - id: github
@@ -42,8 +54,7 @@ mcp_servers:
       GITHUB_TOKEN: '${GITHUB_TOKEN}'
 
 steps:
-  - id: fetch_pr
-    name: Fetch PR diff and file list
+  fetch_pr:
     description: >
       Retrieve the full diff, list of changed files, and any inline review comments
       already present on this PR. Capture the content needed to assess the change.
@@ -61,8 +72,7 @@ steps:
         diff_summary: { type: string }
         changed_files: { type: array, items: { type: string } }
 
-  - id: analyze_changes
-    name: Analyze and draft review
+  analyze_changes:
     description: >
       Using the diff and file list from fetch_pr, analyze the change for correctness,
       style, test coverage, and security concerns. Draft a concise review comment
@@ -81,21 +91,35 @@ steps:
         blocking_count: { type: integer }
         suggestion_count: { type: integer }
 
-  - id: approve_review
-    name: Human approval gate
+  approve_review:
     description: >
       Present the drafted review to a human reviewer. They may approve it for posting
       or reject it to discard this run without commenting on the PR.
-    execution: human
+    execution: auto
     depends_on: [analyze_changes]
+    trust: human_confirmed
+    gate:
+      choices: [approve, reject]
+      message: |
+        PR #{{ run.params.pr_number }} — {{ run.params.repo }}
+        Title: {{ run.params.pr_title }}
+        Author: {{ run.params.author }}
 
-  - id: post_review
-    name: Post review comment
-    description: >
-      Post the approved review body as a PR review comment on GitHub using the
-      GitHub REST API adapter.
-    execution: handler
+        Drafted review:
+        {{ context.resources.analyze_changes.review_body }}
+      resolution_messages:
+        approve: '✅ Review approved — posting to GitHub PR.'
+        reject: '❌ Review rejected — run will not continue.'
+
+  post_review:
+    description: Post the approved review body as a PR review comment on GitHub.
+    execution: auto
     depends_on: [approve_review]
-    handler:
-      uses_service: github
-      action: create_pull_request_review
+    when: "approve_review.choice == 'approve'"
+    uses_service: github
+    service_method: create
+    operation: post_comment
+    input_map:
+      repo: run.params.repo
+      pr_number: run.params.pr_number
+      body: context.resources.analyze_changes.review_body
