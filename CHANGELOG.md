@@ -225,10 +225,23 @@ All notable changes to this project are documented here.
   expression `stepDef.transitions?.[transitionKey]` no longer had `.produces_state` visible to
   TypeScript. Added a `SimpleTransition` cast that is safe because gate-choice keys (`on_approve`,
   `on_reject`, etc.) can never be `on_success`.
+- `Processor`, `ProcessorInput`, `ProcessorOutput` exported from `@sensigo/realm` — these
+  interfaces existed in `packages/core/src/extensions/processor.ts` but were not re-exported
+  from the package root, making them inaccessible to consumers that build on the processor
+  extension point. Fixed as part of correcting a build failure in `@sensigo/realm-testing`
+  where `testProcessor` required these types.
+- `realm webhook`: Slack env vars (`SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `SLACK_CHANNEL_ID`,
+  `SLACK_SIGNING_SECRET`, `SLACK_EVENTS_PORT`, `SLACK_WEBHOOK_URL`,
+  `SLACK_GATE_REMINDER_INTERVAL_MS`, `SLACK_GATE_ESCALATION_THRESHOLD_MS`) now propagated to
+  `runAgent` in the `--run-id` branch. Previously, the branch used by `realm webhook` to
+  attach to an existing run called `runAgent` with only `{ existingRunId, definition, params: {} }`,
+  leaving `hasTransport` false and preventing the bidirectional Slack gate from ever connecting.
+  One-way `notify_*` adapter notifications were unaffected because `SlackAdapter` registration
+  in the adapter registry is independent of the transport options.
 
 ### Tests
 
-326 tests across all packages (215 core, 42 CLI, 29 MCP, 40 testing).
+962 tests across all packages (639 core, 243 CLI, 33 MCP, 47 testing).
 
 ---
 
