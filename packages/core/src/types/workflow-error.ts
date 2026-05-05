@@ -68,7 +68,8 @@ export type ErrorCode =
   | 'RESOURCE_NOT_ACCESSIBLE'
   // MCP
   | 'MCP_CONNECTION_FAILED'
-  | 'MCP_TOOL_NOT_FOUND';
+  | 'MCP_TOOL_NOT_FOUND'
+  | 'MCP_TOOL_NAME_COLLISION';
 
 export interface WorkflowErrorOptions {
   code: ErrorCode;

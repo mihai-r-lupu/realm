@@ -678,6 +678,7 @@ export async function runAgent(deps: AgentDeps, options: AgentRunOptions): Promi
           let toolsResult;
           try {
             const toolDefs: ToolDefinition[] = [];
+            const barenameOwner = new Map<string, string>(); // bareName → serverId of first registration
             for (const [serverId, allowList] of byServer) {
               const mcpTools = await mcpClient.getTools(serverId, allowList);
 
@@ -698,6 +699,20 @@ export async function runAgent(deps: AgentDeps, options: AgentRunOptions): Promi
               }
 
               for (const mcpTool of mcpTools) {
+                const firstOwner = barenameOwner.get(mcpTool.name);
+                if (firstOwner !== undefined) {
+                  throw new WorkflowError(
+                    `Tool name collision in step '${stepName}': '${mcpTool.name}' is exposed by both '${firstOwner}' and '${serverId}'. ` +
+                      `Tool names must be unique across all connected servers within a step.`,
+                    {
+                      code: 'MCP_TOOL_NAME_COLLISION',
+                      category: 'ENGINE',
+                      agentAction: 'stop',
+                      retryable: false,
+                    },
+                  );
+                }
+                barenameOwner.set(mcpTool.name, serverId);
                 toolDefs.push({
                   id: `${serverId}:${mcpTool.name}`,
                   serverId,
