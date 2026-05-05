@@ -134,12 +134,7 @@ export class OpenAIProvider extends ToolCapableLlmProvider {
     });
 
     const responseFormat =
-      options.inputSchema !== undefined
-        ? {
-            type: 'json_schema' as const,
-            json_schema: { name: 'output', strict: true, schema: options.inputSchema },
-          }
-        : undefined;
+      options.inputSchema !== undefined ? ({ type: 'json_object' } as const) : undefined;
 
     // toolIdMap: bareName → namespaced id, used to recover routing key from LLM responses.
     // Collision guard: two MCP servers may not expose the same bare tool name in the same step.
