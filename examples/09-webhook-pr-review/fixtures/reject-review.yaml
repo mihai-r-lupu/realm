@@ -1,0 +1,44 @@
+name: pr review — rejected
+params:
+  pr_number: 7
+  repo: acme/api-service
+  repo_owner: acme
+  repo_name: api-service
+  pr_title: 'WIP: Refactor database queries'
+  head_sha: 'f6e5d4c3b2a1'
+  pr_url: 'https://github.com/acme/api-service/pull/7'
+  author: dev-user
+  pr_action: opened
+  github_delivery_id: 'def-456-delivery'
+mocks:
+  slack:
+    post_message:
+      status: 200
+      data:
+        ok: true
+agent_responses:
+  fetch_pr:
+    diff_summary: 'Work-in-progress refactor of database query layer. Moves queries from inline SQL to a repository pattern but several methods are unimplemented and tests are missing.'
+    changed_files:
+      - src/db/user-repository.ts
+      - src/db/order-repository.ts
+  analyze_changes:
+    review_body: 'This PR is marked WIP and several repository methods are stubbed with TODO comments. The refactor direction is sound but the implementation is incomplete — recommend holding for a follow-up PR once all methods are implemented and tested.'
+    notification_text: 'PR #7 — WIP: Refactor database queries — ready for review. Risk: high. Recommendation: request changes.'
+    confirmation_text: 'PR #7 review complete. Changes requested.'
+gate_responses:
+  approve_review: reject
+expected:
+  final_state: completed
+  skipped_steps:
+    - post_review
+    - notify_posted
+  evidence:
+    - step_id: fetch_pr
+      status: success
+    - step_id: analyze_changes
+      status: success
+    - step_id: notify_reviewer
+      status: success
+    - step_id: approve_review
+      status: success

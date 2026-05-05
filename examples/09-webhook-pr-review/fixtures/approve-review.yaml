@@ -1,0 +1,51 @@
+name: pr review — approved
+params:
+  pr_number: 42
+  repo: acme/api-service
+  repo_owner: acme
+  repo_name: api-service
+  pr_title: 'Add rate limiting to auth endpoints'
+  head_sha: 'a1b2c3d4e5f6'
+  pr_url: 'https://github.com/acme/api-service/pull/42'
+  author: dev-user
+  pr_action: opened
+  github_delivery_id: 'abc-123-delivery'
+mocks:
+  slack:
+    post_message:
+      status: 200
+      data:
+        ok: true
+  github:
+    post_comment:
+      status: 201
+      data:
+        id: 9876543
+        html_url: 'https://github.com/acme/api-service/pull/42#issuecomment-9876543'
+agent_responses:
+  fetch_pr:
+    diff_summary: 'Adds a token bucket rate limiter to the authentication endpoints. Modifies the middleware stack to apply per-IP limits and introduces configuration constants for burst and refill rates.'
+    changed_files:
+      - src/middleware/rate-limiter.ts
+      - src/config/rate-limit.ts
+  analyze_changes:
+    review_body: 'The rate limiting implementation looks solid. The token bucket approach is appropriate here and the configuration constants are well-named. No security concerns identified — the IP extraction honours X-Forwarded-For only behind a trusted proxy flag.'
+    notification_text: 'PR #42 — Add rate limiting to auth endpoints — ready for review. Risk: low. Recommendation: approve.'
+    confirmation_text: 'PR #42 approved and comment posted. Review complete.'
+gate_responses:
+  approve_review: approve
+expected:
+  final_state: completed
+  evidence:
+    - step_id: fetch_pr
+      status: success
+    - step_id: analyze_changes
+      status: success
+    - step_id: notify_reviewer
+      status: success
+    - step_id: approve_review
+      status: success
+    - step_id: post_review
+      status: success
+    - step_id: notify_posted
+      status: success
