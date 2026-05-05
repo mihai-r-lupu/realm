@@ -847,6 +847,65 @@ describe('runAgent — MCP tools integration', () => {
     errorSpy.mockRestore();
   });
 
+  it('returns failed when two servers expose the same bare tool name (MCP_TOOL_NAME_COLLISION)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // server1 and server2 both expose a tool with bare name 'get_file'
+    const mockClient = makeMockMcpClient({
+      async getTools(serverId: string, allowList: string[]): Promise<McpTool[]> {
+        return allowList.map((name) => ({
+          name,
+          description: `Tool ${name} from ${serverId}`,
+          inputSchema: { type: 'object' },
+        }));
+      },
+    });
+    const collisionWorkflow: WorkflowDefinition = {
+      id: 'collision-wf',
+      name: 'Collision Workflow',
+      version: 1,
+      schema_version: CURRENT_WORKFLOW_SCHEMA_VERSION,
+      mcp_servers: [
+        { id: 'server1', command: 'npx', args: ['-y', 'mcp-server1'] },
+        { id: 'server2', command: 'npx', args: ['-y', 'mcp-server2'] },
+      ],
+      steps: {
+        analyse: {
+          description: 'Step that uses conflicting tool names',
+          execution: 'agent',
+          tools: ['server1:get_file', 'server2:get_file'],
+          max_tool_calls: 5,
+          tool_timeout: 10,
+          input_schema: {
+            type: 'object',
+            properties: { summary: { type: 'string' } },
+            required: ['summary'],
+          },
+        },
+      },
+    };
+    const provider = new (class extends ToolCapableLlmProvider {
+      callStep = vi.fn();
+      callStepWithTools = vi.fn();
+    })();
+    const store = new InMemoryStore();
+    const deps: AgentDeps = {
+      store,
+      workflowStore: makeWorkflowStore(collisionWorkflow),
+      provider,
+      registry: createDefaultRegistry(),
+      mcpClientFactory: () => mockClient,
+    };
+
+    const result = await runAgent(deps, { definition: collisionWorkflow, params: {} });
+
+    expect(result).toBe('failed');
+    expect(provider.callStepWithTools).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('get_file'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('server1'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('server2'));
+    errorSpy.mockRestore();
+  });
+
   it('--run-id attaches to a persisted run and drives it to completion', async () => {
     // Create the run first using the normal path.
     const store = new InMemoryStore();

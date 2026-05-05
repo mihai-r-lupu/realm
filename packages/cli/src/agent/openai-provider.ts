@@ -151,8 +151,7 @@ export class OpenAIProvider extends ToolCapableLlmProvider {
     for (const tool of tools) {
       if (toolIdMap.has(tool.name)) {
         throw new Error(
-          `Tool name collision: '${tool.name}' is exposed by multiple MCP servers. ` +
-            `Declare tools from only one server per name, or remove the duplicate.`,
+          `invariant: duplicate bare tool name '${tool.name}' in toolIdMap — this should have been caught at toolDefs assembly in run-agent.ts`,
         );
       }
       toolIdMap.set(tool.name, tool.id);
