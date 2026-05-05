@@ -1,0 +1,84 @@
+// openai-reasoning-provider.ts — OpenAI reasoning model provider (o1/o3) for realm agent.
+// Extends LlmProvider (not ToolCapableLlmProvider) — reasoning models do not support the tools parameter.
+import { LlmProvider } from './llm-provider.js';
+import { buildSystemPrompt } from './agent-utils.js';
+
+/**
+ * OpenAI reasoning model provider for realm agent.
+ * Handles the o1/o3 model families, which differ from standard chat completions:
+ * - No `response_format` parameter (JSON enforced via system prompt + retry).
+ * - System prompt content is folded into the first user message — the safe
+ *   universal approach for the full o1/o3 lineage. (o1 originally rejected the
+ *   system role; later versions accept it as a developer role, but prepending
+ *   to the user message works uniformly across all revisions.)
+ * - Tool calling is not supported — this class extends LlmProvider, not
+ *   ToolCapableLlmProvider, so `isToolCapable` returns false for these instances.
+ */
+export class OpenAIReasoningProvider extends LlmProvider {
+  private readonly model: string;
+
+  constructor(model: string) {
+    super();
+    this.model = model;
+  }
+
+  async callStep(
+    prompt: string,
+    inputSchema?: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    // Dynamically import openai to keep it an optional peer dependency.
+    // Assigning the module specifier to a typed variable via 'string' makes TS
+    // treat it as Promise<any>, bypassing static module resolution at build time.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let mod: any;
+    try {
+      const moduleId: string = 'openai';
+      mod = await import(moduleId);
+    } catch {
+      console.error('realm agent requires the openai package. Run: npm install openai');
+      process.exit(1);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new (mod.default as new (opts: Record<string, unknown>) => any)({
+      apiKey: process.env['OPENAI_API_KEY'],
+    });
+
+    // Fold system prompt into the user message — safe for all o1/o3 API revisions.
+    const systemPrompt = buildSystemPrompt(inputSchema);
+    const userContent = `${systemPrompt}\n\n${prompt}`;
+
+    type Message = { role: 'user' | 'assistant'; content: string };
+    const messages: Message[] = [{ role: 'user', content: userContent }];
+
+    const makeRequest = async (msgs: Message[]): Promise<string> => {
+      const response = await // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (client.chat.completions.create as (opts: Record<string, unknown>) => Promise<any>)({
+        model: this.model,
+        messages: msgs,
+      });
+      return (response.choices[0]?.message?.content as string | undefined) ?? '';
+    };
+
+    const content = await makeRequest(messages);
+    try {
+      return JSON.parse(content) as Record<string, unknown>;
+    } catch {
+      // Retry once with an explicit reminder to return JSON.
+      const retryMessages: Message[] = [
+        ...messages,
+        { role: 'assistant', content },
+        {
+          role: 'user',
+          content: 'Your previous response was not valid JSON. Respond with a JSON object only.',
+        },
+      ];
+      const retry = await makeRequest(retryMessages);
+      try {
+        return JSON.parse(retry) as Record<string, unknown>;
+      } catch {
+        throw new Error(`OpenAI returned non-JSON content after retry: ${retry.slice(0, 200)}`);
+      }
+    }
+  }
+}

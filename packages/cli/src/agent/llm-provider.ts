@@ -86,6 +86,14 @@ export async function resolveProvider(
   }
 
   if (provider === 'openai') {
+    // Match o1, o1-mini, o1-preview, o3, o3-mini, o4-mini, etc. The user has
+    // explicitly declared the model name, so matching on name is the correct
+    // signal here — not an internal allowlist.
+    const REASONING_MODELS = /^o[1-4](-|$)/i;
+    if (modelFlag !== undefined && REASONING_MODELS.test(modelFlag)) {
+      const { OpenAIReasoningProvider } = await import('./openai-reasoning-provider.js');
+      return new OpenAIReasoningProvider(modelFlag);
+    }
     const { OpenAIProvider } = await import('./openai-provider.js');
     return new OpenAIProvider(modelFlag ?? 'gpt-4o', baseUrlFlag);
   } else {

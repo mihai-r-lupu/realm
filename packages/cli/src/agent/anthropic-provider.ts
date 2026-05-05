@@ -15,16 +15,8 @@ import {
   tryParseJson,
   validateSchema,
   rejectAfter,
+  buildSystemPrompt,
 } from './agent-utils.js';
-
-const SYSTEM_PROMPT_BASE =
-  'You are an AI agent executing a step in a structured workflow.\n' +
-  'Your task is described below. Respond with a JSON object only — no markdown, no explanation.';
-
-function buildSystemPrompt(inputSchema?: Record<string, unknown>): string {
-  if (inputSchema === undefined) return SYSTEM_PROMPT_BASE;
-  return `${SYSTEM_PROMPT_BASE}\nThe JSON must conform to this schema: ${JSON.stringify(inputSchema)}`;
-}
 
 /**
  * Anthropic LLM provider for realm agent.
