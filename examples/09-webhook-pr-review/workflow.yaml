@@ -1,12 +1,17 @@
 # Example 09 — Webhook PR Review
 # Triggered by GitHub pull_request:opened or pull_request:synchronize events.
 # Use `realm webhook` to receive and dispatch these events.
+#
+# Flow: GitHub webhook → fetch PR diff via MCP → analyze and draft review →
+#       notify reviewer on Slack → human approves or rejects via CLI →
+#       post approved review to GitHub → confirm on Slack.
 id: webhook-pr-review
 name: Webhook PR Review
 version: 1
 description: >
-  Reviews a GitHub pull request using MCP tools, pauses for human approval,
-  then posts the approved review as a GitHub comment.
+  Reviews a GitHub pull request using MCP tools, notifies a Slack channel with
+  the draft review, pauses for human approval, then posts the approved review
+  as a GitHub comment and confirms on Slack.
 
 params_schema:
   type: object
@@ -43,6 +48,10 @@ services:
     config:
       base_url: 'https://api.github.com'
 
+  slack:
+    adapter: slack
+    trust: engine_delivered
+
 mcp_servers:
   - id: github
     transport: stdio
@@ -59,6 +68,13 @@ steps:
       Retrieve the full diff, list of changed files, and any inline review comments
       already present on this PR. Capture the content needed to assess the change.
     execution: agent
+    prompt: |
+      Retrieve the full diff, list of changed files, and any inline review comments
+      already present on PR #{{ run.params.pr_number }} in {{ run.params.repo }}.
+      Owner: {{ run.params.repo_owner }}, repo: {{ run.params.repo_name }}.
+      Use get_pull_request to fetch PR metadata and get_pull_request_files for the
+      list of changed files. Summarise what changed in diff_summary and list the
+      changed file paths in changed_files.
     tools:
       - 'github:get_pull_request'
       - 'github:get_pull_request_files'
@@ -78,24 +94,55 @@ steps:
       (max 500 words) that summarizes findings and any blocking issues.
     execution: agent
     depends_on: [fetch_pr]
+    prompt: |
+      You are reviewing PR #{{ run.params.pr_number }} in {{ run.params.repo }}.
+      Title: {{ run.params.pr_title }}
+      Author: {{ run.params.author }}
+      PR URL: {{ run.params.pr_url }}
+
+      Diff summary from fetch_pr:
+      {{ context.resources.fetch_pr.diff_summary }}
+
+      Changed files:
+      {{ context.resources.fetch_pr.changed_files }}
+
+      Analyze the change for correctness, style, test coverage, and security concerns.
+      Use get_pull_request if you need additional detail about the PR.
+      Draft a concise review comment (max 500 words) — store it in review_body.
+      Count blocking issues and suggestions. Also compose notification_text: a short
+      Slack-friendly message (plain text, no markdown, under 120 words) summarising
+      the PR, key findings, and your recommendation. Include the PR title and author.
     tools:
       - 'github:get_pull_request'
     max_tool_calls: 5
     tool_timeout: 30
     input_schema:
       type: object
-      required: [review_body]
+      required: [review_body, notification_text]
       properties:
         review_body: { type: string }
+        notification_text: { type: string }
         blocking_count: { type: integer }
         suggestion_count: { type: integer }
+
+  notify_reviewer:
+    description: >
+      Send the drafted review to the Slack channel so the reviewer can read the
+      analysis and decide whether to approve or reject it via the CLI.
+    execution: auto
+    depends_on: [analyze_changes]
+    uses_service: slack
+    service_method: create
+    operation: post_message
+    input_map:
+      text: context.resources.analyze_changes.notification_text
 
   approve_review:
     description: >
       Present the drafted review to a human reviewer. They may approve it for posting
       or reject it to discard this run without commenting on the PR.
     execution: auto
-    depends_on: [analyze_changes]
+    depends_on: [notify_reviewer]
     trust: human_confirmed
     gate:
       choices: [approve, reject]
@@ -122,3 +169,13 @@ steps:
       repo: run.params.repo
       pr_number: run.params.pr_number
       body: context.resources.analyze_changes.review_body
+
+  notify_posted:
+    description: Confirm on Slack that the review was posted to GitHub.
+    execution: auto
+    depends_on: [post_review]
+    uses_service: slack
+    service_method: create
+    operation: post_message
+    input_map:
+      text: context.resources.analyze_changes.notification_text
