@@ -354,9 +354,9 @@ describe('OpenAIProvider.callStepWithTools', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 12. inputSchema present → response_format uses json_schema
+  // 12. inputSchema present → response_format is json_object (schema enforced via system prompt + validation loop)
   // -----------------------------------------------------------------------
-  it('inputSchema present → response_format is json_schema structured output', async () => {
+  it('inputSchema present → response_format is json_object', async () => {
     const schema = {
       type: 'object',
       properties: { answer: { type: 'string' } },
@@ -367,10 +367,7 @@ describe('OpenAIProvider.callStepWithTools', () => {
     const provider = new OpenAIProvider('gpt-4o');
     await provider.callStepWithTools('prompt', [], NOOP_EXECUTOR, { inputSchema: schema });
 
-    expect(mockCreate.mock.calls[0][0].response_format).toEqual({
-      type: 'json_schema',
-      json_schema: { name: 'output', strict: true, schema },
-    });
+    expect(mockCreate.mock.calls[0][0].response_format).toEqual({ type: 'json_object' });
   });
 
   // -----------------------------------------------------------------------
