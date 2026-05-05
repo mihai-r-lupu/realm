@@ -112,16 +112,19 @@ steps:
       Count blocking issues and suggestions. Also compose notification_text: a short
       Slack-friendly message (plain text, no markdown, under 120 words) summarising
       the PR, key findings, and your recommendation. Include the PR title and author.
+      Also compose confirmation_text: a short Slack message (plain text, ≤ 60 words)
+      to send after the review is approved and posted. Include the PR number and repo.
     tools:
       - 'github:get_pull_request'
     max_tool_calls: 5
     tool_timeout: 30
     input_schema:
       type: object
-      required: [review_body, notification_text]
+      required: [review_body, notification_text, confirmation_text]
       properties:
         review_body: { type: string }
         notification_text: { type: string }
+        confirmation_text: { type: string }
         blocking_count: { type: integer }
         suggestion_count: { type: integer }
 
@@ -178,4 +181,4 @@ steps:
     service_method: create
     operation: post_message
     input_map:
-      text: context.resources.analyze_changes.notification_text
+      text: context.resources.analyze_changes.confirmation_text

@@ -43,6 +43,7 @@ export type {
   StepContext,
   StepHandlerResult,
 } from './extensions/step-handler.js';
+export type { Processor, ProcessorInput, ProcessorOutput } from './extensions/processor.js';
 export { ExtensionRegistry } from './extensions/registry.js';
 export { createDefaultRegistry } from './extensions/default-registry.js';
 
