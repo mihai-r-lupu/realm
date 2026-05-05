@@ -397,3 +397,48 @@ describe('OpenAIProvider.callStepWithTools', () => {
     expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('tools');
   });
 });
+
+// =========================================================================
+// capabilities() tests
+// =========================================================================
+describe('OpenAIProvider.capabilities', () => {
+  beforeEach(() => mockCreate.mockReset());
+
+  // -----------------------------------------------------------------------
+  // 15. jsonMode: true for native OpenAI (no baseUrl)
+  // -----------------------------------------------------------------------
+  it('capabilities() returns jsonMode: true for native OpenAI (no baseUrl)', () => {
+    const provider = new OpenAIProvider('gpt-4o');
+    expect(provider.capabilities()).toEqual({ jsonMode: true });
+  });
+
+  // -----------------------------------------------------------------------
+  // 16. jsonMode: false when baseUrl is set
+  // -----------------------------------------------------------------------
+  it('capabilities() returns jsonMode: false when baseUrl is set', () => {
+    const provider = new OpenAIProvider('gpt-4o', 'https://compat.example.com');
+    expect(provider.capabilities()).toEqual({ jsonMode: false });
+  });
+
+  // -----------------------------------------------------------------------
+  // 17. callStep with baseUrl — response_format is NOT in request
+  // -----------------------------------------------------------------------
+  it('callStep with baseUrl — response_format is NOT in request', async () => {
+    mockCreate.mockResolvedValueOnce(makeTextResponse('{"x":1}'));
+    const provider = new OpenAIProvider('some-model', 'https://compat.example.com');
+    await provider.callStep('prompt');
+    expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('response_format');
+  });
+
+  // -----------------------------------------------------------------------
+  // 18. callStepWithTools with baseUrl and inputSchema — response_format is NOT in request
+  // -----------------------------------------------------------------------
+  it('callStepWithTools with baseUrl and inputSchema — response_format is NOT in request', async () => {
+    mockCreate.mockResolvedValueOnce(makeTextResponse('{"x":1}'));
+    const provider = new OpenAIProvider('some-model', 'https://compat.example.com');
+    await provider.callStepWithTools('prompt', [], NOOP_EXECUTOR, {
+      inputSchema: { required: ['x'] },
+    });
+    expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('response_format');
+  });
+});

@@ -397,3 +397,16 @@ describe('AnthropicProvider.callStepWithTools', () => {
     expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('response_format');
   });
 });
+
+// =========================================================================
+// capabilities() tests
+// =========================================================================
+describe('AnthropicProvider.capabilities', () => {
+  // -----------------------------------------------------------------------
+  // 13. AnthropicProvider inherits jsonMode: false (regression guard)
+  // -----------------------------------------------------------------------
+  it('capabilities() returns jsonMode: false (inherits LlmProvider default)', () => {
+    const provider = new AnthropicProvider('claude-sonnet-4-5');
+    expect(provider.capabilities()).toEqual({ jsonMode: false });
+  });
+});

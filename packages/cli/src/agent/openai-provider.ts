@@ -1,7 +1,7 @@
 // openai-provider.ts — OpenAI LLM provider implementation for realm agent.
 // Requires openai >= 4.0.0 as an optional peer dependency (npm install openai).
 import { WorkflowError } from '@sensigo/realm';
-import { ToolCapableLlmProvider } from './llm-provider.js';
+import { ToolCapableLlmProvider, type ProviderCapabilities } from './llm-provider.js';
 import type {
   ToolCallRecord,
   ToolDefinition,
@@ -41,6 +41,15 @@ export class OpenAIProvider extends ToolCapableLlmProvider {
     this.baseUrl = baseUrl;
   }
 
+  /**
+   * Native OpenAI endpoints have a well-defined, tested capability surface that includes
+   * json_object mode. Custom compat endpoints behind --base-url do not guarantee this feature.
+   * Default to prompt-only enforcement for any unknown endpoint.
+   */
+  capabilities(): ProviderCapabilities {
+    return { jsonMode: this.baseUrl === undefined };
+  }
+
   async callStep(
     prompt: string,
     inputSchema?: Record<string, unknown>,
@@ -72,12 +81,15 @@ export class OpenAIProvider extends ToolCapableLlmProvider {
     ];
 
     const makeRequest = async (msgs: Message[]): Promise<string> => {
-      const response = await // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (client.chat.completions.create as (opts: Record<string, unknown>) => Promise<any>)({
+      const opts: Record<string, unknown> = {
         model: this.model,
-        response_format: { type: 'json_object' },
         messages: msgs,
-      });
+      };
+      if (this.capabilities().jsonMode) {
+        opts['response_format'] = { type: 'json_object' };
+      }
+      const response = await // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (client.chat.completions.create as (opts: Record<string, unknown>) => Promise<any>)(opts);
       return (response.choices[0]?.message?.content as string | undefined) ?? '';
     };
 
@@ -134,7 +146,9 @@ export class OpenAIProvider extends ToolCapableLlmProvider {
     });
 
     const responseFormat =
-      options.inputSchema !== undefined ? ({ type: 'json_object' } as const) : undefined;
+      this.capabilities().jsonMode && options.inputSchema !== undefined
+        ? ({ type: 'json_object' } as const)
+        : undefined;
 
     // toolIdMap: bareName → namespaced id, used to recover routing key from LLM responses.
     // Collision guard: two MCP servers may not expose the same bare tool name in the same step.

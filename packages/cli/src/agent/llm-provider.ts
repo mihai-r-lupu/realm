@@ -2,6 +2,20 @@
 import type { ToolDefinition, ToolExecutor, StepWithToolsResult } from './mcp-types.js';
 
 /**
+ * Describes the optional feature set that an LLM provider supports.
+ * Custom providers can override {@link LlmProvider.capabilities} to declare
+ * features beyond the universal baseline.
+ */
+export interface ProviderCapabilities {
+  /**
+   * Whether this provider sends `response_format: { type: 'json_object' }` in API requests.
+   * When false, JSON compliance is enforced through system prompt instruction and retry only.
+   * This is the universal baseline — all providers work without json_object mode.
+   */
+  jsonMode: boolean;
+}
+
+/**
  * Abstract base class for LLM providers used by realm agent.
  * Extend this class to implement a custom provider.
  */
@@ -11,6 +25,11 @@ export abstract class LlmProvider {
     prompt: string,
     inputSchema?: Record<string, unknown>,
   ): Promise<Record<string, unknown>>;
+
+  /** Returns the capability set for this provider instance. */
+  capabilities(): ProviderCapabilities {
+    return { jsonMode: false };
+  }
 }
 
 /**
