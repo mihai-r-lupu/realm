@@ -429,21 +429,6 @@ const result = await testStepHandler(handler, inputs, {
 });
 ```
 
-### `testProcessor(processor, content, config?)`
-
-Calls `processor.process(content, config)` and returns the `ProcessorOutput`. `config`
-defaults to `{}`.
-
-```typescript
-import { testProcessor } from '@sensigo/realm-testing';
-import { normalizeText } from '@sensigo/realm';
-
-const output = await testProcessor(normalizeText, { text: '\u201chello\u201d', metadata: {} });
-expect(output.text).toBe('"hello"');
-```
-
-`content` is a `ProcessorInput`: `{ text: string; metadata: Record<string, unknown> }`.
-
 ### `testAdapter(adapter, operation, params?)`
 
 Calls `adapter.fetch(operation, params, {})` and returns the `ServiceResponse`. `params`
