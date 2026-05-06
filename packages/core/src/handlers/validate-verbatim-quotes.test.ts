@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ValidateVerbatimQuotesHandler } from '../validate-verbatim-quotes.js';
-import type { StepContext } from '../../extensions/step-handler.js';
+import { ValidateVerbatimQuotesHandler } from './validate-verbatim-quotes.js';
+import type { StepContext } from '../extensions/step-handler.js';
 
 const handler = new ValidateVerbatimQuotesHandler();
 

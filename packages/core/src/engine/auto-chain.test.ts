@@ -1,4 +1,5 @@
 // Tests for executeChain — automatic chaining through consecutive auto steps.
+// Source: execution-loop.ts
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

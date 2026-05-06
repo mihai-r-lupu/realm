@@ -10,8 +10,8 @@ import {
 import type { WorkflowDefinition, WorkflowRegistrar, PendingGate } from '@sensigo/realm';
 import { runAgent } from '../agent/run-agent.js';
 import type { AgentDeps, AgentRunOptions } from '../agent/run-agent.js';
-import { LlmProvider } from '../agent/llm-provider.js';
-import { resolveProvider } from '../agent/llm-provider.js';
+import { LlmProvider } from '../agent/providers/llm-provider.js';
+import { resolveProvider } from '../agent/providers/llm-provider.js';
 import { checkAdapterPrerequisites, formatPreflightError } from '../agent/preflight.js';
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ValidateFieldMatchHandler } from '../validate-field-match.js';
-import type { StepContext } from '../../extensions/step-handler.js';
+import { ValidateFieldMatchHandler } from './validate-field-match.js';
+import type { StepContext } from '../extensions/step-handler.js';
 
 const handler = new ValidateFieldMatchHandler();
 

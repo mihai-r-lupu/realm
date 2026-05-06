@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveResource } from '../primitives/resolve-resource.js';
+import { resolveResource } from './resolve-resource.js';
 
 describe('resolveResource', () => {
   it('returns the value when resources, step, and field all exist', () => {

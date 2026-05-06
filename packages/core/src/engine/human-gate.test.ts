@@ -1,4 +1,5 @@
 // Tests for human gate mechanics — trust: human_confirmed pauses execution at a gate,
+// Source: execution-loop.ts
 // and submitHumanResponse advances the run after a valid human choice.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtemp } from 'node:fs/promises';

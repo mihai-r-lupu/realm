@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compareStrings } from '../primitives/compare-strings.js';
+import { compareStrings } from './compare-strings.js';
 
 describe('compareStrings', () => {
   describe('exact mode', () => {

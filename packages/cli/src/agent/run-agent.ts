@@ -17,10 +17,10 @@ import {
   type ToolCallRecord,
 } from '@sensigo/realm';
 import type { WorkflowRegistrar } from '@sensigo/realm';
-import type { LlmProvider } from './llm-provider.js';
-import { isToolCapable } from './llm-provider.js';
-import type { McpClient, ToolDefinition, ToolExecutor } from './mcp-types.js';
-import { McpClient as McpClientImpl } from './mcp-client.js';
+import type { LlmProvider } from './providers/llm-provider.js';
+import { isToolCapable } from './providers/llm-provider.js';
+import type { McpClient, ToolDefinition, ToolExecutor } from './mcp/mcp-extensions.js';
+import { McpClient as McpClientImpl } from './mcp/mcp-client.js';
 
 export type AgentRunResult = 'completed' | 'failed';
 

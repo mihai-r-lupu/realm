@@ -11,7 +11,7 @@ import {
 } from './slack-gate-notifier.js';
 import type { BidirectionalGateParams } from './slack-gate-notifier.js';
 import type { PendingGate, RunStore, WorkflowDefinition } from '@sensigo/realm';
-import { LlmProvider } from './llm-provider.js';
+import { LlmProvider } from '../providers/llm-provider.js';
 import { startSlackGateServer } from './slack-gate-server.js';
 import type { SlackGateEvent } from './slack-gate-server.js';
 import { connectSocketMode } from './slack-socket-client.js';

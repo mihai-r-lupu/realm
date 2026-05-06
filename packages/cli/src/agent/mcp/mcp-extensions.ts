@@ -1,6 +1,6 @@
-// Types used exclusively inside packages/cli — MCP client, providers, and run-agent.ts.
-// ToolCallRecord and McpServerConfig are imported from core (not redefined here) because
-// they are also referenced by core types.
+// MCP extensions — CLI-internal MCP types: McpTool, ToolDefinition, ToolExecutor,
+// StepWithToolsResult, McpClient. Also re-exports ToolCallRecord and McpServerConfig
+// from @sensigo/realm for use within the CLI package.
 import type { ToolCallRecord, McpServerConfig } from '@sensigo/realm';
 export type { ToolCallRecord, McpServerConfig };
 

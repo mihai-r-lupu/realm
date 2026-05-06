@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { partitionBySubstring } from '../primitives/partition-by-substring.js';
+import { partitionBySubstring } from './partition-by-substring.js';
 
 const SOURCE = 'The quick brown fox jumps over the lazy dog';
 

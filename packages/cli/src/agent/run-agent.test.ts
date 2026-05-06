@@ -5,8 +5,8 @@ import type { AgentDeps } from './run-agent.js';
 import type { WorkflowDefinition, ToolCallRecord } from '@sensigo/realm';
 import { CURRENT_WORKFLOW_SCHEMA_VERSION, createDefaultRegistry } from '@sensigo/realm';
 import { InMemoryStore } from '@sensigo/realm-testing';
-import { LlmProvider, ToolCapableLlmProvider } from './llm-provider.js';
-import type { McpClient, McpTool } from './mcp-types.js';
+import { LlmProvider, ToolCapableLlmProvider } from './providers/llm-provider.js';
+import type { McpClient, McpTool } from './mcp/mcp-extensions.js';
 
 // ---------------------------------------------------------------------------
 // MCP tools integration tests

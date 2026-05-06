@@ -1,5 +1,5 @@
 // llm-provider.ts — LLM provider interface and factory function for realm agent.
-import type { ToolDefinition, ToolExecutor, StepWithToolsResult } from './mcp-types.js';
+import type { ToolDefinition, ToolExecutor, StepWithToolsResult } from '../mcp/mcp-extensions.js';
 
 /**
  * Describes the optional feature set that an LLM provider supports.

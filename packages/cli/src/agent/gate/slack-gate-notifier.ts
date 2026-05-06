@@ -8,7 +8,7 @@ import {
   type WorkflowDefinition,
   type PendingGate,
 } from '@sensigo/realm';
-import type { LlmProvider } from './llm-provider.js';
+import type { LlmProvider } from '../providers/llm-provider.js';
 import { startSlackGateServer } from './slack-gate-server.js';
 import { connectSocketMode } from './slack-socket-client.js';
 

@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OpenAIProvider } from './openai-provider.js';
 import { WorkflowError } from '@sensigo/realm';
-import type { ToolDefinition } from './mcp-types.js';
+import type { ToolDefinition } from '../mcp/mcp-extensions.js';
 
 // ---------- shared mock for the openai package ----------------------------
 // mockCreate is captured here so each test can configure it via mockResolvedValueOnce.

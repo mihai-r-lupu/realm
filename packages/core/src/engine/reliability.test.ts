@@ -1,4 +1,5 @@
 // Tests for step-level timeout, retry, pending state, and failure-terminal guarantees.
+// Source: execution-loop.ts
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

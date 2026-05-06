@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { walkField } from '../primitives/walk-field.js';
+import { walkField } from './walk-field.js';
 
 describe('walkField', () => {
   it('returns empty array for primitives', () => {

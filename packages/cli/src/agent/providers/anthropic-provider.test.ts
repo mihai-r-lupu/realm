@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnthropicProvider } from './anthropic-provider.js';
 import { WorkflowError } from '@sensigo/realm';
-import type { ToolDefinition } from './mcp-types.js';
+import type { ToolDefinition } from '../mcp/mcp-extensions.js';
 
 // ---------- shared mock for the @anthropic-ai/sdk package -----------------
 const mockCreate = vi.fn();

@@ -11,11 +11,11 @@ import {
   GitHubAdapter,
   SlackAdapter,
 } from '@sensigo/realm';
-import { LlmProvider, resolveProvider } from '../agent/llm-provider.js';
-import type { ProviderName } from '../agent/llm-provider.js';
+import { LlmProvider, resolveProvider } from '../agent/providers/llm-provider.js';
+import type { ProviderName } from '../agent/providers/llm-provider.js';
 import { runAgent } from '../agent/run-agent.js';
-import { createSlackGateHandler } from '../agent/slack-gate-notifier.js';
-import type { SlackGateHandlerConfig } from '../agent/slack-gate-notifier.js';
+import { createSlackGateHandler } from '../agent/gate/slack-gate-notifier.js';
+import type { SlackGateHandlerConfig } from '../agent/gate/slack-gate-notifier.js';
 import {
   checkAdapterPrerequisites,
   formatPreflightError,

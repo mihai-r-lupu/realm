@@ -1,4 +1,5 @@
 // Tests for DAG-based branching: trigger_rule variants, when-condition routing,
+// Source: execution-loop.ts
 // fan-out eligibility, and gate-response flow.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';

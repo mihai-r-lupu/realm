@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { countResults } from '../primitives/count-results.js';
+import { countResults } from './count-results.js';
 
 describe('countResults', () => {
   it('candidates_found equals accepted + rejected', () => {

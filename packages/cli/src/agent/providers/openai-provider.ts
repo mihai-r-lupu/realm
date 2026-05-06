@@ -7,7 +7,7 @@ import type {
   ToolDefinition,
   ToolExecutor,
   StepWithToolsResult,
-} from './mcp-types.js';
+} from '../mcp/mcp-extensions.js';
 import {
   sanitizeError,
   serializeToolResult,
