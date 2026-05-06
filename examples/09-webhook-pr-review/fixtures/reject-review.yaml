@@ -10,12 +10,6 @@ params:
   author: dev-user
   pr_action: opened
   github_delivery_id: 'def-456-delivery'
-mocks:
-  slack:
-    post_message:
-      status: 200
-      data:
-        ok: true
 agent_responses:
   fetch_pr:
     diff_summary: 'Work-in-progress refactor of database query layer. Moves queries from inline SQL to a repository pattern but several methods are unimplemented and tests are missing.'
@@ -24,7 +18,6 @@ agent_responses:
       - src/db/order-repository.ts
   analyze_changes:
     review_body: 'This PR is marked WIP and several repository methods are stubbed with TODO comments. The refactor direction is sound but the implementation is incomplete — recommend holding for a follow-up PR once all methods are implemented and tested.'
-    notification_text: 'PR #7 — WIP: Refactor database queries — ready for review. Risk: high. Recommendation: request changes.'
     confirmation_text: 'PR #7 review complete. Changes requested.'
 gate_responses:
   approve_review: reject
@@ -37,8 +30,6 @@ expected:
     - step_id: fetch_pr
       status: success
     - step_id: analyze_changes
-      status: success
-    - step_id: notify_reviewer
       status: success
     - step_id: approve_review
       status: success

@@ -143,6 +143,18 @@ When the run reaches the gate, the CLI prints the review output and waits:
    Waiting for response...
 ```
 
+In a separate terminal, run the printed command to approve or request changes:
+
+```bash
+# To approve (posts the review comment as an approval):
+realm run respond <run-id> --gate <gate-id> --choice approve
+
+# To request changes (posts the review comment as a changes request):
+realm run respond <run-id> --gate <gate-id> --choice request_changes
+```
+
+`realm agent` detects the resolved gate and continues automatically.
+
 ---
 
 ## Inspect the evidence chain

@@ -1,4 +1,4 @@
-// Tests for runAgent(), postGateNotificationToSlack(), resolveProvider(), and checkAdapterPrerequisites().
+// Tests for runAgent(), resolveProvider(), checkAdapterPrerequisites(), and the agentCommand CLI guards.
 // Uses InMemoryStore and MockLlmProvider to run the agent loop without real I/O.
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { InMemoryStore } from '@sensigo/realm-testing';
@@ -8,7 +8,7 @@ import {
   submitHumanResponse,
 } from '@sensigo/realm';
 import type { WorkflowDefinition, WorkflowRegistrar, PendingGate } from '@sensigo/realm';
-import { runAgent, postGateNotificationToSlack } from '../agent/run-agent.js';
+import { runAgent } from '../agent/run-agent.js';
 import type { AgentDeps, AgentRunOptions } from '../agent/run-agent.js';
 import { LlmProvider } from '../agent/llm-provider.js';
 import { resolveProvider } from '../agent/llm-provider.js';
@@ -166,7 +166,7 @@ describe('runAgent', () => {
 
   it('pauses at a gate and continues after the onGate hook resolves it', async () => {
     const provider = new MockLlmProvider([{ output: 'step done' }]);
-    const onGate = vi.fn().mockImplementation(async (runId: string, gate: PendingGate) => {
+    const gateHandler = vi.fn().mockImplementation(async (runId: string, gate: PendingGate) => {
       const run = await deps.store.get(runId);
       await submitHumanResponse(deps.store, gateWorkflow, {
         runId,
@@ -175,12 +175,12 @@ describe('runAgent', () => {
       });
       void run; // keep TS happy
     });
-    const deps = makeDeps({ provider, onGate });
+    const deps = makeDeps({ provider, gateHandler });
 
     const result = await runAgent(deps, makeOptions({ definition: gateWorkflow }));
 
     expect(result).toBe('completed');
-    expect(onGate).toHaveBeenCalledOnce();
+    expect(gateHandler).toHaveBeenCalledOnce();
   });
 
   it('returns failed when executeChain returns status: error', async () => {
@@ -257,53 +257,6 @@ describe('resolveProvider', () => {
     // The guard must not fire — resolveProvider returns successfully for openai + base-url.
     const provider = await resolveProvider('openai', undefined, 'https://api.deepseek.com');
     expect(provider).toBeDefined();
-  });
-});
-
-describe('postGateNotificationToSlack', () => {
-  it('posts the correct request body to the webhook URL', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true });
-    vi.stubGlobal('fetch', mockFetch);
-
-    const gate: PendingGate = {
-      gate_id: 'gate-001',
-      step_name: 'human_review',
-      preview: { title: 'My PR' },
-      choices: ['approve'],
-      opened_at: new Date().toISOString(),
-    };
-    await postGateNotificationToSlack(
-      'https://hooks.slack.com/test',
-      gate,
-      'realm run respond abc --gate gate-001 --choice approve',
-    );
-
-    expect(mockFetch).toHaveBeenCalledOnce();
-    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://hooks.slack.com/test');
-    const body = JSON.parse(init.body as string) as { text: string; blocks: unknown[] };
-    expect(body.text).toContain('gate');
-    expect(JSON.stringify(body.blocks)).toContain('human_review');
-    expect(JSON.stringify(body.blocks)).toContain('realm run respond abc');
-
-    vi.unstubAllGlobals();
-  });
-
-  it('swallows network errors without throwing', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
-
-    const gate: PendingGate = {
-      gate_id: 'g1',
-      step_name: 's1',
-      preview: {},
-      choices: ['approve'],
-      opened_at: new Date().toISOString(),
-    };
-    await expect(
-      postGateNotificationToSlack('https://hooks.slack.com/test', gate, 'cmd'),
-    ).resolves.toBeUndefined();
-
-    vi.unstubAllGlobals();
   });
 });
 

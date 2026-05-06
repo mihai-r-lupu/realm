@@ -14,6 +14,8 @@ import {
 import { LlmProvider, resolveProvider } from '../agent/llm-provider.js';
 import type { ProviderName } from '../agent/llm-provider.js';
 import { runAgent } from '../agent/run-agent.js';
+import { createSlackGateHandler } from '../agent/slack-gate-notifier.js';
+import type { SlackGateHandlerConfig } from '../agent/slack-gate-notifier.js';
 import {
   checkAdapterPrerequisites,
   formatPreflightError,
@@ -125,42 +127,50 @@ export const agentCommand = new Command('agent')
           // --run-id path: attach to existing run, load definition from store.
           const runRecord = await store.get(opts.runId);
           const definition = await workflowStore.get(runRecord.workflow_id);
+
+          const hasSlack =
+            process.env['SLACK_BOT_TOKEN'] !== undefined ||
+            process.env['SLACK_WEBHOOK_URL'] !== undefined;
+          const slackConfig: SlackGateHandlerConfig = {
+            store,
+            definition,
+            provider,
+            ...(process.env['SLACK_WEBHOOK_URL'] !== undefined && {
+              webhookUrl: process.env['SLACK_WEBHOOK_URL'],
+            }),
+            ...(process.env['SLACK_BOT_TOKEN'] !== undefined && {
+              botToken: process.env['SLACK_BOT_TOKEN'],
+            }),
+            ...(process.env['SLACK_CHANNEL_ID'] !== undefined && {
+              channelId: process.env['SLACK_CHANNEL_ID'],
+            }),
+            ...(process.env['SLACK_SIGNING_SECRET'] !== undefined && {
+              signingSecret: process.env['SLACK_SIGNING_SECRET'],
+            }),
+            ...(process.env['SLACK_EVENTS_PORT'] !== undefined && {
+              eventsPort: parseInt(process.env['SLACK_EVENTS_PORT'], 10),
+            }),
+            ...(process.env['SLACK_APP_TOKEN'] !== undefined && {
+              appToken: process.env['SLACK_APP_TOKEN'],
+            }),
+            ...(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'] !== undefined && {
+              reminderIntervalMs: parseInt(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'], 10),
+            }),
+            ...(process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'] !== undefined && {
+              escalationThresholdMs: parseInt(
+                process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'],
+                10,
+              ),
+            }),
+          };
+          const gateHandler = hasSlack ? createSlackGateHandler(slackConfig) : undefined;
+
           result = await runAgent(
-            { store, workflowStore, provider, registry },
+            { store, workflowStore, provider, registry, ...(gateHandler ? { gateHandler } : {}) },
             {
               existingRunId: opts.runId,
               definition,
               params: {},
-              ...(process.env['SLACK_WEBHOOK_URL'] !== undefined && {
-                slackWebhookUrl: process.env['SLACK_WEBHOOK_URL'],
-              }),
-              ...(process.env['SLACK_BOT_TOKEN'] !== undefined && {
-                slackBotToken: process.env['SLACK_BOT_TOKEN'],
-              }),
-              ...(process.env['SLACK_CHANNEL_ID'] !== undefined && {
-                slackChannelId: process.env['SLACK_CHANNEL_ID'],
-              }),
-              ...(process.env['SLACK_SIGNING_SECRET'] !== undefined && {
-                slackSigningSecret: process.env['SLACK_SIGNING_SECRET'],
-              }),
-              ...(process.env['SLACK_EVENTS_PORT'] !== undefined && {
-                slackEventsPort: parseInt(process.env['SLACK_EVENTS_PORT'], 10),
-              }),
-              ...(process.env['SLACK_APP_TOKEN'] !== undefined && {
-                slackAppToken: process.env['SLACK_APP_TOKEN'],
-              }),
-              ...(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'] !== undefined && {
-                slackGateReminderIntervalMs: parseInt(
-                  process.env['SLACK_GATE_REMINDER_INTERVAL_MS'],
-                  10,
-                ),
-              }),
-              ...(process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'] !== undefined && {
-                slackGateEscalationThresholdMs: parseInt(
-                  process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'],
-                  10,
-                ),
-              }),
             },
           );
         } else {
@@ -187,42 +197,55 @@ export const agentCommand = new Command('agent')
             console.warn(`  ⚠  ${warning.message}`);
           }
 
+          const hasSlack2 =
+            process.env['SLACK_BOT_TOKEN'] !== undefined ||
+            process.env['SLACK_WEBHOOK_URL'] !== undefined;
+          const slackConfig2: SlackGateHandlerConfig = {
+            store,
+            definition,
+            provider,
+            ...(process.env['SLACK_WEBHOOK_URL'] !== undefined && {
+              webhookUrl: process.env['SLACK_WEBHOOK_URL'],
+            }),
+            ...(process.env['SLACK_BOT_TOKEN'] !== undefined && {
+              botToken: process.env['SLACK_BOT_TOKEN'],
+            }),
+            ...(process.env['SLACK_CHANNEL_ID'] !== undefined && {
+              channelId: process.env['SLACK_CHANNEL_ID'],
+            }),
+            ...(process.env['SLACK_SIGNING_SECRET'] !== undefined && {
+              signingSecret: process.env['SLACK_SIGNING_SECRET'],
+            }),
+            ...(process.env['SLACK_EVENTS_PORT'] !== undefined && {
+              eventsPort: parseInt(process.env['SLACK_EVENTS_PORT'], 10),
+            }),
+            ...(process.env['SLACK_APP_TOKEN'] !== undefined && {
+              appToken: process.env['SLACK_APP_TOKEN'],
+            }),
+            ...(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'] !== undefined && {
+              reminderIntervalMs: parseInt(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'], 10),
+            }),
+            ...(process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'] !== undefined && {
+              escalationThresholdMs: parseInt(
+                process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'],
+                10,
+              ),
+            }),
+          };
+          const gateHandler2 = hasSlack2 ? createSlackGateHandler(slackConfig2) : undefined;
+
           result = await runAgent(
-            { store, workflowStore, provider, registry },
+            {
+              store,
+              workflowStore,
+              provider,
+              registry,
+              ...(gateHandler2 ? { gateHandler: gateHandler2 } : {}),
+            },
             {
               definition,
               params,
               register: opts.register === true,
-              ...(process.env['SLACK_WEBHOOK_URL'] !== undefined && {
-                slackWebhookUrl: process.env['SLACK_WEBHOOK_URL'],
-              }),
-              ...(process.env['SLACK_BOT_TOKEN'] !== undefined && {
-                slackBotToken: process.env['SLACK_BOT_TOKEN'],
-              }),
-              ...(process.env['SLACK_CHANNEL_ID'] !== undefined && {
-                slackChannelId: process.env['SLACK_CHANNEL_ID'],
-              }),
-              ...(process.env['SLACK_SIGNING_SECRET'] !== undefined && {
-                slackSigningSecret: process.env['SLACK_SIGNING_SECRET'],
-              }),
-              ...(process.env['SLACK_EVENTS_PORT'] !== undefined && {
-                slackEventsPort: parseInt(process.env['SLACK_EVENTS_PORT'], 10),
-              }),
-              ...(process.env['SLACK_APP_TOKEN'] !== undefined && {
-                slackAppToken: process.env['SLACK_APP_TOKEN'],
-              }),
-              ...(process.env['SLACK_GATE_REMINDER_INTERVAL_MS'] !== undefined && {
-                slackGateReminderIntervalMs: parseInt(
-                  process.env['SLACK_GATE_REMINDER_INTERVAL_MS'],
-                  10,
-                ),
-              }),
-              ...(process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'] !== undefined && {
-                slackGateEscalationThresholdMs: parseInt(
-                  process.env['SLACK_GATE_ESCALATION_THRESHOLD_MS'],
-                  10,
-                ),
-              }),
             },
           );
         }

@@ -20,8 +20,9 @@ import {
 
 /**
  * OpenAI LLM provider for realm agent.
- * Uses the Chat Completions API with json_object response format.
- * Retries once if the model returns non-JSON content.
+ * Uses the Chat Completions API. Sends `response_format: json_object` on native
+ * OpenAI endpoints; falls back to prompt-only JSON enforcement on compat endpoints
+ * behind `--base-url`. Retries once if the model returns non-JSON content.
  */
 export class OpenAIProvider extends ToolCapableLlmProvider {
   private readonly model: string;

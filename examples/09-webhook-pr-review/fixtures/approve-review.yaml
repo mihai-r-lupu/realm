@@ -30,7 +30,6 @@ agent_responses:
       - src/config/rate-limit.ts
   analyze_changes:
     review_body: 'The rate limiting implementation looks solid. The token bucket approach is appropriate here and the configuration constants are well-named. No security concerns identified — the IP extraction honours X-Forwarded-For only behind a trusted proxy flag.'
-    notification_text: 'PR #42 — Add rate limiting to auth endpoints — ready for review. Risk: low. Recommendation: approve.'
     confirmation_text: 'PR #42 approved and comment posted. Review complete.'
 gate_responses:
   approve_review: approve
@@ -40,8 +39,6 @@ expected:
     - step_id: fetch_pr
       status: success
     - step_id: analyze_changes
-      status: success
-    - step_id: notify_reviewer
       status: success
     - step_id: approve_review
       status: success
