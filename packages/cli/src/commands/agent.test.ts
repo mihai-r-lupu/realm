@@ -164,7 +164,7 @@ describe('runAgent', () => {
     expect(provider.callCount.value).toBe(2);
   });
 
-  it('pauses at a gate and continues after the onGate hook resolves it', async () => {
+  it('pauses at a gate and continues after the gateHandler resolves it', async () => {
     const provider = new MockLlmProvider([{ output: 'step done' }]);
     const gateHandler = vi.fn().mockImplementation(async (runId: string, gate: PendingGate) => {
       const run = await deps.store.get(runId);
