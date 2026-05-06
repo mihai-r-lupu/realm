@@ -18,6 +18,7 @@ import { mcpCommand } from './commands/mcp.js';
 import { serveCommand } from './commands/serve.js';
 import { migrateCommand } from './commands/migrate.js';
 import { agentCommand } from './commands/agent.js';
+import { webhookCommand } from './commands/webhook.js';
 
 /** Commands that operate on workflow definitions (realm workflow <cmd>). */
 export const workflowCommands = [
@@ -42,4 +43,4 @@ export const runCommands = [
 ];
 
 /** Top-level commands not nested under a subgroup. */
-export const topLevelCommands = [mcpCommand, serveCommand, agentCommand];
+export const topLevelCommands = [mcpCommand, serveCommand, agentCommand, webhookCommand];

@@ -34,6 +34,7 @@ export {
 export type { PreconditionResult } from './engine/precondition.js';
 export type { StepDiagnostics } from './types/run-record.js';
 export const VERSION = '0.1.0';
+export type { ToolCallRecord, McpServerConfig } from './types/mcp-types.js';
 
 // Extensions
 export type { ServiceAdapter, ServiceResponse } from './extensions/service-adapter.js';
@@ -52,7 +53,6 @@ export { captureEvidence } from './evidence/snapshot.js';
 export type { CaptureEvidenceParams } from './evidence/snapshot.js';
 
 // Adapters
-export { MockAdapter } from './adapters/mock-adapter.js';
 export { GenericHttpAdapter } from './adapters/http-adapter.js';
 export type { HttpAdapterConfig } from './adapters/http-adapter.js';
 export { FileSystemAdapter } from './adapters/file-adapter.js';

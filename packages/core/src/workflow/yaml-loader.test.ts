@@ -513,3 +513,228 @@ steps:
     expect(def.workflow_context?.['schema']).toBeUndefined();
   });
 });
+
+describe('MCP tools validation', () => {
+  const MCP_BASE_YAML = `
+id: mcp-test
+name: MCP Test
+version: 1
+mcp_servers:
+  - id: github
+    command: npx
+    args: [-y, '@modelcontextprotocol/server-github']
+steps:
+  step-one:
+    description: First step
+    execution: auto
+    depends_on: []
+  step-two:
+    description: Agent step with tools
+    execution: agent
+    depends_on: [step-one]
+    input_schema:
+      type: object
+      properties:
+        result:
+          type: string
+      required: [result]
+    tools:
+      - github:get_pull_request
+`;
+
+  it('tools on execution: auto step throws WorkflowError about only valid on agent', () => {
+    const content = MCP_BASE_YAML.replace(
+      'execution: auto',
+      'execution: auto\n    tools:\n      - github:list_issues',
+    ).replace(
+      'input_schema:\n      type: object\n      properties:\n        result:\n          type: string\n      required: [result]\n    tools:\n      - github:get_pull_request',
+      '',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain('only valid on execution: agent steps');
+    }
+  });
+
+  it('tools on a step with handler throws WorkflowError about only valid on agent steps', () => {
+    const content = `
+id: handler-tools-test
+name: Handler Tools Test
+version: 1
+mcp_servers:
+  - id: github
+    command: npx
+    args: [-y, '@modelcontextprotocol/server-github']
+steps:
+  step-one:
+    description: Handler step with tools
+    execution: agent
+    handler: my_handler
+    input_schema:
+      type: object
+      properties:
+        result:
+          type: string
+      required: [result]
+    tools:
+      - github:get_pull_request
+`;
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain('only valid on execution: agent steps');
+    }
+  });
+
+  it('tools without input_schema throws WorkflowError about requires input_schema', () => {
+    const content = MCP_BASE_YAML.replace(
+      '    input_schema:\n      type: object\n      properties:\n        result:\n          type: string\n      required: [result]\n    tools:\n      - github:get_pull_request',
+      '    tools:\n      - github:get_pull_request',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("requires 'input_schema'");
+    }
+  });
+
+  it('tools entry not in server_id:tool_name format throws WorkflowError', () => {
+    const content = MCP_BASE_YAML.replace('- github:get_pull_request', '- invalid-format');
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("must be in 'server_id:tool_name' format");
+    }
+  });
+
+  it('tools entry referencing unknown mcp_servers id throws WorkflowError', () => {
+    const content = MCP_BASE_YAML.replace(
+      '- github:get_pull_request',
+      '- unknown-server:some_tool',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain('references unknown MCP server');
+    }
+  });
+
+  it('mcp_servers with duplicate id throws WorkflowError', () => {
+    const content = `
+id: dup-server-test
+name: Dup Server Test
+version: 1
+mcp_servers:
+  - id: github
+    command: npx
+    args: [-y, '@modelcontextprotocol/server-github']
+  - id: github
+    command: npx
+    args: [-y, '@modelcontextprotocol/server-github']
+steps:
+  step-one:
+    description: A step
+    execution: auto
+`;
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain('duplicate server id');
+    }
+  });
+
+  it('max_tool_calls: 0 throws WorkflowError about positive integer', () => {
+    const content = MCP_BASE_YAML.replace(
+      '    tools:\n      - github:get_pull_request',
+      '    max_tool_calls: 0\n    tools:\n      - github:get_pull_request',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain(
+        "'max_tool_calls' must be a positive integer",
+      );
+    }
+  });
+
+  it('max_tool_calls: -1 throws WorkflowError about positive integer', () => {
+    const content = MCP_BASE_YAML.replace(
+      '    tools:\n      - github:get_pull_request',
+      '    max_tool_calls: -1\n    tools:\n      - github:get_pull_request',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain(
+        "'max_tool_calls' must be a positive integer",
+      );
+    }
+  });
+
+  it('max_tool_calls: 1.5 throws WorkflowError about positive integer', () => {
+    const content = MCP_BASE_YAML.replace(
+      '    tools:\n      - github:get_pull_request',
+      '    max_tool_calls: 1.5\n    tools:\n      - github:get_pull_request',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain(
+        "'max_tool_calls' must be a positive integer",
+      );
+    }
+  });
+
+  it('tool_timeout: 0 throws WorkflowError about positive integer', () => {
+    const content = MCP_BASE_YAML.replace(
+      '    tools:\n      - github:get_pull_request',
+      '    tool_timeout: 0\n    tools:\n      - github:get_pull_request',
+    );
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      expect((err as WorkflowError).message).toContain("'tool_timeout' must be a positive integer");
+    }
+  });
+
+  it('valid tools on execution: agent with input_schema and known server loads without error', () => {
+    expect(() => loadWorkflowFromString(MCP_BASE_YAML)).not.toThrow();
+    const def = loadWorkflowFromString(MCP_BASE_YAML);
+    expect(def.steps['step-two']?.tools).toEqual(['github:get_pull_request']);
+    expect(def.mcp_servers).toHaveLength(1);
+    expect(def.mcp_servers![0]!.id).toBe('github');
+  });
+
+  it('multiple validation errors in one workflow are all collected and thrown together', () => {
+    const content = `
+id: multi-error-test
+name: Multi Error Test
+version: 1
+steps:
+  step-one:
+    description: Bad step
+    execution: auto
+    max_tool_calls: 0
+    tool_timeout: -5
+`;
+    expect(() => loadWorkflowFromString(content)).toThrow(WorkflowError);
+    try {
+      loadWorkflowFromString(content);
+    } catch (err) {
+      const message = (err as WorkflowError).message;
+      expect(message).toContain("'max_tool_calls' must be a positive integer");
+      expect(message).toContain("'tool_timeout' must be a positive integer");
+    }
+  });
+});

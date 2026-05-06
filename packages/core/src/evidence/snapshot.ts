@@ -1,6 +1,7 @@
 // Standalone evidence capture utility — builds an EvidenceSnapshot from step execution data.
 import { createHash } from 'node:crypto';
 import type { EvidenceSnapshot, StepDiagnostics } from '../types/run-record.js';
+import type { ToolCallRecord } from '../types/mcp-types.js';
 
 export interface CaptureEvidenceParams {
   stepId: string;
@@ -13,6 +14,8 @@ export interface CaptureEvidenceParams {
   agentProfile?: string;
   agentProfileHash?: string;
   resolvedParams?: Record<string, unknown>;
+  /** MCP tool calls made during this step. Absent = callStep path; present = callStepWithTools path. */
+  toolCalls?: ToolCallRecord[];
 }
 
 /** Builds an EvidenceSnapshot from step execution parameters, including a SHA-256 content hash. */
@@ -34,5 +37,6 @@ export function captureEvidence(params: CaptureEvidenceParams): EvidenceSnapshot
       ? { agent_profile_hash: params.agentProfileHash }
       : {}),
     ...(params.resolvedParams !== undefined ? { resolved_params: params.resolvedParams } : {}),
+    ...(params.toolCalls !== undefined ? { tool_calls: params.toolCalls } : {}),
   };
 }
